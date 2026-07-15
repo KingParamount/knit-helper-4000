@@ -19,3 +19,8 @@ export type {
 
 export { sizes, findSize, availableChests } from './data/sizes';
 export { optionList, optionIds, easeStyles, easeBase } from './data/options';
+export { rules, engineLimits } from './data/constraints';
+export type { RawRule, EngineLimit } from './data/constraints';
+
+export { validate } from './validate';
+export type { Selection, Violation, ValidationResult } from './validate';
