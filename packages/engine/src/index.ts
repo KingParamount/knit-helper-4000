@@ -24,3 +24,6 @@ export type { RawRule, EngineLimit } from './data/constraints';
 
 export { validate } from './validate';
 export type { Selection, Violation, ValidationResult } from './validate';
+
+export { garmentWidths, easeAmount, EASE_SHARE } from './dimensions';
+export type { GarmentWidths } from './dimensions';
