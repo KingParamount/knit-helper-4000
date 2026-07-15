@@ -39,42 +39,93 @@ Women 36" (`ease_factor` 1.37) and Women 46" (`ease_factor` 1.67):
 |---|---|---|---|---|
 | Skintight | **−0.75** | −1.03 → "−1" | −1.25 → "−1.3" | ✓ |
 | Tight | **0.75** | 1.03 → "1" | 1.25 → "1.3" | ✓ |
-| Moderate | **≈1.70** | 2.33 → "2.3" | 2.84 → "2.9" | ~ off by 0.1 |
+| Moderate | **1.71** | 2.34 → "2.3" | 2.86 → "2.9" | ✓ (both Ex.2 figures) |
 | Comfortable | **3.00** | 4.11 → "4" | 5.01 → "5" | ✓ |
 | Oversized | **4.50** | 6.17 → "6" | 7.52 → "7.5" | ✓ |
 
 8 of 10 exact. Skintight is exactly negated Tight.
 
-## OPEN QUESTION — resolve before trusting
+## RESOLVED — model is multiplicative, `base[moderate] = 1.71`
 
-Two predictions are off by 0.1":
+Searched the full manual (`manual.txt`, 3186 lines) and `hints.txt`. **The two worked
+examples above are the only ones that exist** — there is no third. So the Moderate model
+rests on exactly four anchors (`ease_factor` → manual-quoted ease):
 
-- Moderate @ Woman 46" predicts 2.84 ("2.8"), manual says "2.9"
-- Moderate @ Man 52" predicts 3.40 ("3.4"), manual says "3.5"
+| ease_factor | manual |
+|---|---|
+| 1.05 (Child 22") | 1.8" |
+| 1.37 (Woman 36") | 2.3" |
+| 1.67 (Woman 46") | 2.9" |
+| 2.00 (Man 52")   | 3.5" |
 
-Both errors are in the same direction and both are Moderate. Candidate explanations:
+All four candidate explanations were tested against all four anchors, at the 1-decimal
+rounding the manual prints. Results (not guesses — computed):
 
-1. `base[moderate]` is 1.71–1.75 rather than 1.70, and the manual's other figures round to hide it.
-   (1.75 fixes Man 52" exactly but breaks Woman 36".)
-2. The app rounds the computed ease to the nearest 0.25" before applying it.
-3. There's an additive term as well as a multiplicative one.
-4. The manual's prose is simply rounded inconsistently by a human.
+1. **Single multiplicative base — DEAD.** No single `base` reproduces all four, nor even
+   Example 1 alone: Man 52" requires `base ≥ 1.725`, Woman 36" requires `base < 1.7153`
+   (empty intersection). `base = 1.71` is the best single value: 3/4 exact, and the *only*
+   value satisfying **both** figures of the systematic women's range in Example 2
+   (1.37→2.3 *and* 1.67→2.9) plus Child 22". Its sole miss is Man 52" (3.42 vs 3.5) — a
+   one-off illustration in Example 1. `base = 1.70` misses two (Woman 46" and Man 52").
+2. **Round internal ease to nearest 0.25" — DEAD.** 2.9" is unreachable from any 0.25"
+   multiple at 1 dp (the grid steps …2.8, 3.0… , skipping 2.9), so Woman 46" can never
+   be produced under this rule.
+3. **Additive term `a + b·ef` — fits, but rejected on parsimony.** An additive form *does*
+   reproduce all four within rounding (e.g. `a = −0.16, b = 1.82`; 22 such pairs exist on
+   a 0.01 grid). It is **not** eliminated by the data. It is rejected because it fits two
+   free parameters to four rounded points with **no cross-style support**: the other four
+   styles (Skintight −0.75, Tight +0.75, Comfortable 3.0, Oversized 4.5) are cleanly
+   multiplicative with `a = 0` (Skintight = −Tight exactly). An additive term unique to
+   Moderate, to explain a 0.1" residual, is unmotivated.
+4. **Loose human rounding in the prose — this is the residual.** Example 2's own prose
+   drops decimals: it quotes Comfortable as "4-5" where the model gives 4.11-5.01, and
+   Oversized as "6-7.5" where the model gives 6.17-7.52. The 0.1" Moderate discrepancies
+   are the same loose rounding, well inside knitting tolerance.
 
-**Action:** search `manual.txt` for further worked examples and fit against all of them.
-Do not hard-code 1.70 without checking. If it can't be resolved, prefer (4) and use 1.70 —
-the error is 0.1" on a garment, i.e. well inside knitting tolerance.
+**Decision:** `ease_inches = base[style] · ease_factor[size]`, multiplicative,
+`base[moderate] = 1.71`. Candidates 1 (exact) and 2 are disproved; candidate 3 is a
+rejected overfit; the ≤0.1" residual is candidate 4 (manual prose rounding).
 
 ## Where ease is applied
 
-Per the manual: **chest, back width, armhole, upper arm.** Not to lengths.
-`ease_arml` is applied to the armhole separately and additively — the relationship
-between `ease_arml` and the armhole component of `ease_factor * base` is **not yet
-established**. Check the manual's ARMHOLE topic.
+Per the manual (`manual.txt:325`): **chest, back width, armhole, upper arm.** Not to lengths.
 
-## Metric
+**`ease_arml` is NOT an armhole allowance.** The form definition
+(`dfms/TCUSTOMSIZEFORM.dfm:528`, field `EaseArml`, control `DBArmEase`) labels it
+*"Ease adjustment for length of sleeve"* and marks the control `Visible = False`. It is a
+hidden **sleeve-length** ease parameter (`arml` = arm length), unrelated to the armhole.
+Do not add it to armhole maths.
 
-The size table stores every size twice, once with `units: "in"` and once with `units: "cm"`.
-`ease_factor` is identical in both rows (it is dimensionless). The `base` values above are
-in **inches**. For metric, either convert the result or derive metric bases from the cm rows.
-Do not assume `base_cm = base_in * 2.54` without checking against the manual's metric examples —
-the original may have used rounded metric constants rather than converting.
+**The four widths do not necessarily share one ease amount.** `base·ease_factor` is worked
+only for the *chest* in the manual. Whether back width, armhole and upper arm receive the
+*same* amount or their own is **not** settled by the manual's numbers (the wording — "the
+amount of ease applied varies with Ease Style and chest size" — is ambiguous, and there are
+no worked non-chest examples). Knitting geometry argues against one shared amount (a flat
+back panel spans only ~half the body circumference). This is handled as a per-dimension
+**ease application policy** — see `dimensions_model.md` — with chest solid and the others
+carrying flagged, sourced defaults to be confirmed at the Woman-36" dimensions checkpoint.
+
+The armhole *baseline* is `2 × arm_depth` (`manual.txt:257`, "use half of the measurement
+around the armhole" → the round-the-armhole measurement is twice the depth). The Basics
+`armhole` column is a *body* girth from a different program and is **not** an answer key —
+ignore it here. The armhole *ease* magnitude is one of the per-dimension unknowns above.
+
+## Metric — the cm rows are a separate dataset, not conversions (verified)
+
+The size table stores every size twice, `units: "in"` and `units: "cm"`. **The cm rows are
+independently rounded to friendly numbers, not converted from inches** — e.g. Baby 18" is
+stored as **46 cm, not 45.72**; the whole cm ladder is its own clean 5-cm-step set. So the
+two unit systems are two datasets, not one dataset plus a converter. `ease_factor` is
+identical in both (it is dimensionless).
+
+Consequences for the engine:
+- **Internal unit: millimetres.** Convert to mm from the **chosen row's native values**
+  (cm row → ×10, inch row → ×25.4), never by cross-converting one unit system into the other.
+- The `base` values above are in **inches**. **Do not compute `base_cm = 1.71 × 2.54`.**
+- **There are no metric worked ease examples in the manual** (searched — Examples 1 and 2 at
+  `manual.txt:326-327` are both in inches). So the metric ease bases **cannot be derived** and
+  are an **OPEN QUESTION**. Until resolved, compute ease from the inch model and convert the
+  *result* for display; treat a metric-native ease path as unbuilt.
+
+Display, separately: user picks cm or inches in the UI; inches render as **fractions (16ths),
+never decimals** (a knitter reads "3⅜in", not "3.4in").

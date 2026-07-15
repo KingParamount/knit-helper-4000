@@ -144,7 +144,7 @@
   "ease": [
     { "id": "skintight",   "label": "Skintight", "base": -0.75, "note": "Manual intro calls this 'Very tight'; the STYLE DATA topic calls it 'Skintight'. Same option." },
     { "id": "tight",       "label": "Tight",       "base":  0.75 },
-    { "id": "moderate",    "label": "Moderate",    "base":  1.70, "note": "base uncertain to +/-0.02; see ease_model.md" },
+    { "id": "moderate",    "label": "Moderate",    "base":  1.71, "note": "resolved to 1.71; fits both Example-2 figures + Child 22 (only Man 52 off by 0.1, a rounding residual). See ease_model.md." },
     { "id": "comfortable", "label": "Comfortable", "base":  3.00 },
     { "id": "oversized",   "label": "Oversized",   "base":  4.50 }
   ],

@@ -36,11 +36,11 @@
       "text": "Raglan shoulder cannot have boat neckline.",
       "forbid": [{ "shoulder": ["raglan"] }, { "neckline_front": ["boat"] }] },
 
-    { "id": "SADDLE_NECKLINE_LIMITS", "confidence": "medium",
+    { "id": "SADDLE_NECKLINE_LIMITS", "confidence": "high",
       "text": "Saddle shoulder cannot have boat or flat front or shallow neckline or backless.",
       "forbid": [{ "shoulder": ["saddle"] }, { "neckline_front": ["boat", "flat", "shallow"] }],
       "also_forbid": [{ "shoulder": ["saddle"] }, { "neckline_back": ["backless"] }],
-      "note": "Parsing ambiguity: 'boat or flat front or shallow neckline or backless' — unclear whether 'boat' binds to front only. Check manual." },
+      "note": "Resolved against manual.txt:707-708 (error string 'SADDLE SHOULDER CANNOT HAVE BOAT OR FLAT FRONT OR SHALLOW NECKLINE OR BACKLESS'): boat/flat/shallow are front-neckline values, backless is back. Encoding correct; 'boat' binds front (and BOAT_MATCHES forces front=back anyway)." },
 
     { "id": "DROP_NOT_BACKLESS", "confidence": "high",
       "text": "Drop shoulder cannot be Backless.",
@@ -50,13 +50,15 @@
       "text": "Backless style must be sleeveless also.",
       "require": { "when": { "neckline_back": ["backless"] }, "then": { "sleeve_length": ["sleeveless"] } } },
 
-    { "id": "SETIN_BACKLESS_COLLAR_LIMITS", "confidence": "medium",
+    { "id": "SETIN_BACKLESS_COLLAR_LIMITS", "confidence": "high",
       "text": "Cannot have hood, turtleneck, cowl or shawl collar with Set-in Backless Style.",
-      "forbid": [{ "shoulder": ["set_in"] }, { "neckline_back": ["backless"] }, { "collar": ["hood", "turtleneck", "cowl", "shawl"] }] },
+      "forbid": [{ "shoulder": ["set_in"] }, { "neckline_back": ["backless"] }, { "collar": ["hood", "turtleneck", "cowl", "shawl"] }],
+      "note": "Resolved against manual.txt:693. 'Set-in Backless Style' = set_in shoulder + backless back. 3-clause AND is correct." },
 
-    { "id": "SHIRT_COLLAR_SETIN_BACKLESS", "confidence": "medium",
+    { "id": "SHIRT_COLLAR_SETIN_BACKLESS", "confidence": "high",
       "text": "Cannot have Shirt Collar with Backless style on a Set-in Shoulder.",
-      "forbid": [{ "shoulder": ["set_in"] }, { "neckline_back": ["backless"] }, { "collar": ["shirt_split"] }] },
+      "forbid": [{ "shoulder": ["set_in"] }, { "neckline_back": ["backless"] }, { "collar": ["shirt_split"] }],
+      "note": "Resolved against manual.txt:698. Same structure as SETIN_BACKLESS_COLLAR_LIMITS, split out as a separate error string for the shirt collar." },
 
     { "id": "DOLMAN_NEEDS_DROP", "confidence": "high",
       "text": "Dolman Sleeve must have drop shoulder.",
@@ -86,10 +88,10 @@
       "text": "Cannot have Circular Construction Method with machine knit.",
       "forbid": [{ "construction": ["circular_bottom_up", "circular_top_down"] }, { "method_body": ["machine"] }] },
 
-    { "id": "CIRCULAR_RAGLAN_NO_BACK_NECK", "confidence": "medium",
+    { "id": "CIRCULAR_RAGLAN_NO_BACK_NECK", "confidence": "high",
       "text": "Cannot have back neck shaping with Circular Raglan or Yoke.",
-      "forbid": [{ "construction": ["circular_bottom_up", "circular_top_down"] }, { "shoulder": ["raglan", "round_yoke"] }, { "neckline_back": ["round", "high_round", "v", "scoop", "ballet", "square", "boat"] }],
-      "note": "'back neck shaping' presumably means anything other than flat/shallow/backless. Verify." },
+      "forbid": [{ "construction": ["circular_bottom_up", "circular_top_down"] }, { "shoulder": ["raglan", "round_yoke"] }, { "neckline_back": ["round", "high_round", "v", "scoop", "ballet", "square", "boat", "shallow", "backless"] }],
+      "note": "Resolved: manual.txt:334 'no back neck shaping (flat back neck only) if raglan or yoke shoulder'. Flat is the ONLY allowed back neck, so shallow and backless are also forbidden (added). The prior list omitted shallow, which wrongly permitted it (shallow uses back-neck depth per manual.txt:531, i.e. it is shaping)." },
 
     { "id": "CARDIGAN_NECKLINE_LIMITS", "confidence": "high",
       "text": "Cannot have a boat or keyhole neckline on a cardigan.",
@@ -142,10 +144,11 @@
       "text": "Shawl collar must have V or square front neckline shaping.",
       "require": { "when": { "collar": ["shawl"] }, "then": { "neckline_front": ["v", "square"] } } },
 
-    { "id": "SHIRT_COLLAR_NECK_LIMITS", "confidence": "medium",
+    { "id": "SHIRT_COLLAR_NECK_LIMITS", "confidence": "high",
       "text": "Cannot have Shirt Collar with Square Neck or V Back Neck shaping.",
-      "forbid": [{ "collar": ["shirt_split"] }, { "neckline_back": ["square", "v"] }],
-      "note": "Ambiguous: could mean square front OR v back. Check manual." },
+      "forbid": [{ "collar": ["shirt_split"] }, { "neckline_front": ["square"] }],
+      "also_forbid": [{ "collar": ["shirt_split"] }, { "neckline_back": ["v"] }],
+      "note": "Resolved against manual.txt:697 'CANNOT HAVE SHIRT COLLAR WITH SQUARE NECK OR V BACK NECK SHAPING'. The asymmetry is the tell: 'V' is qualified 'BACK', 'SQUARE NECK' is unqualified = front (the default neckline). Corroborated by the mirror rule SHAWL_FRONT_NECK / manual.txt:711, where square is a front value. Prior encoding put square on the back and never checked front-square." },
 
     { "id": "RIB_METHOD_MATCHES_HAND", "confidence": "high",
       "text": "If the body is knit by hand, then the ribbing must be by hand also.",
@@ -154,7 +157,21 @@
     { "id": "RIB_METHOD_MATCHES_CROCHET", "confidence": "high",
       "text": "If the body or ribbing is crocheted, then the other must be crocheted also.",
       "require": { "when": { "method_body": ["crochet"] }, "then": { "method_rib": ["crochet"] } },
-      "symmetric": true }
+      "symmetric": true },
+
+    { "id": "BACKLESS_REQUIRES_RAGLAN_OR_SETIN", "confidence": "high", "severity": "warning",
+      "source": "manual",
+      "quote": "Backless styles must be sleeveless as well, with either a raglan or set-in shoulder.",
+      "source_ref": "reference/sweaters/manual.txt:423",
+      "require": { "when": { "neckline_back": ["backless"] }, "then": { "shoulder": ["raglan", "set_in"] } },
+      "note": "Prose-derived, no uppercase error string found — the program may have enforced this via UI availability rather than a validation message. severity=warning until confirmed. Complements DROP_NOT_BACKLESS and SADDLE_NECKLINE_LIMITS, which forbid two specific shoulder+backless cases; this generalises the rule (also excludes modified_drop, drop_grafted, round_yoke)." },
+
+    { "id": "TOPDOWN_FLAT_FRONT_NECK", "confidence": "high", "severity": "warning",
+      "source": "manual",
+      "quote": "CIRCULAR TOP-DOWN ... Restrictions: ... flat front neckline and flat back neckline only ...",
+      "source_ref": "reference/sweaters/manual.txt:336-337",
+      "require": { "when": { "construction": ["circular_top_down"] }, "then": { "neckline_front": ["flat"] } },
+      "note": "Prose-derived, no uppercase error string found. The flat-BACK half of this restriction is covered by CIRCULAR_RAGLAN_NO_BACK_NECK (top-down requires raglan/round_yoke per TOPDOWN_SHOULDER_LIMITS); this rule adds the flat-FRONT requirement, which was previously unencoded. severity=warning until confirmed enforced." }
   ],
 
   "engine_limits": [
