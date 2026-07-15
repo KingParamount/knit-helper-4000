@@ -1,65 +1,66 @@
 /**
  * size + ease_style -> finished garment widths (the eased dimensions).
  *
- * This is the first slice of GarmentDimensions: the four widths the manual says
- * ease is applied to (chest, back width, armhole, upper arm). Lengths, neck
- * geometry and rib widths come later. See `data/dimensions_model.md`.
+ * First slice of GarmentDimensions. Derived from current (2026) knitting standards
+ * rather than reproducing the original — see `data/dimensions_model.md`. Values are
+ * sourced: Craft Yarn Council fit ladder for the chest ease; standard set-in-sleeve
+ * allowances (Sister Mountain / Ann Budd) for the rest.
  *
  * Works in the size row's own unit (inches for the inch rows). mm-canonicalisation
- * is a render/gauge-boundary concern, deferred until gauge is wired in.
+ * is a render/gauge-boundary concern, deferred until gauge is wired in — note the
+ * fixed allowances below are inch values and will need metric-native equivalents then.
  *
- * WARNING: only `chest` is trustworthy. `backWidth`, `armhole` and `sleeveTop`
- * carry flagged ease assumptions (open item E1) to be confirmed at the Woman-36"
- * checkpoint — ideally against one readout of the original's dimensions screen.
+ * Scope: SET-IN sleeve, straight body. Other shoulder styles (drop, raglan, …) use
+ * different allowances and are not modelled yet.
  */
 
 import type { SizeRecord, EaseStyleId } from './data/types';
 import { easeBase } from './data/options';
 
 /**
- * Fraction of the chest ease (`base·ease_factor`) applied to each width.
- * Only `chest` is settled; the rest are assumptions — see `dimensions_model.md`.
+ * Fixed ease allowances for a set-in sleeve, in inches. These do not scale with
+ * the chest ease style — a set-in armhole/sleeve is fitted regardless of body
+ * looseness. (A truly oversized garment loosens the sleeve slightly; treated as a
+ * later refinement.) Sources in `dimensions_model.md`.
  */
-export const EASE_SHARE = {
-  chest: 1, // solid — manual worked examples
-  backWidth: 0.5, // ASSUMPTION: a flat back panel spans ~half the circumference
-  armhole: 1, // ASSUMPTION: magnitude unknown
-  sleeveTop: 1, // ASSUMPTION: upper arm is a circumference like the chest
+export const SETIN_ALLOWANCE_IN = {
+  backWidth: 0.0, // set-in shoulder seam sits on the shoulder tip — zero ease
+  armholeDepth: 1.5, // body arm depth + 1.5"
+  upperArm: 1.0, // body upper arm + 1"
 } as const;
 
 export interface GarmentWidths {
   unit: 'in';
   /** The chest ease, `base·ease_factor`, in inches (negative for skintight). */
-  ease: number;
-  /** Body width the chest dimension is built on: larger of chest/hip (straight body). */
-  bodyWidthBasis: number;
-  /** True when the hip, not the chest, governs the width. */
-  hipGoverns: boolean;
+  chestEase: number;
+  /** Finished body width = bust + chest ease (bust-only; hip clearance is deferred). */
   chest: number;
+  /** Finished back width (between armhole seams). */
   backWidth: number;
+  /** Finished armhole depth (vertical). */
+  armholeDepth: number;
+  /** Finished armhole measurement (around) = 2 × depth. */
   armhole: number;
+  /** Finished sleeve top (upper arm circumference). */
   sleeveTop: number;
 }
 
-/** The multiplicative ease amount for this size + style (see `ease_model.md`). */
-export function easeAmount(size: SizeRecord, style: EaseStyleId): number {
+/** The multiplicative chest ease for this size + style (see `ease_model.md`). */
+export function chestEase(size: SizeRecord, style: EaseStyleId): number {
   return easeBase(style) * size.ease_factor;
 }
 
-/** The four eased widths for a straight-body garment. */
+/** The finished widths for a set-in-sleeve, straight-body garment. */
 export function garmentWidths(size: SizeRecord, style: EaseStyleId): GarmentWidths {
-  const ease = easeAmount(size, style);
-  // manual.txt:488 — straight body is governed by the larger of chest/hip
-  const bodyWidthBasis = Math.max(size.chest, size.hip);
+  const ease = chestEase(size, style);
+  const armholeDepth = size.arm_depth + SETIN_ALLOWANCE_IN.armholeDepth;
   return {
     unit: 'in',
-    ease,
-    bodyWidthBasis,
-    hipGoverns: size.hip > size.chest,
-    chest: bodyWidthBasis + EASE_SHARE.chest * ease,
-    backWidth: size.back_width + EASE_SHARE.backWidth * ease,
-    // armhole baseline = 2·arm_depth (manual.txt:257,506), plus flagged ease
-    armhole: 2 * size.arm_depth + EASE_SHARE.armhole * ease,
-    sleeveTop: size.upper_arm + EASE_SHARE.sleeveTop * ease,
+    chestEase: ease,
+    chest: size.chest + ease, // bust-only; hip clearance handled later by length model
+    backWidth: size.back_width + SETIN_ALLOWANCE_IN.backWidth,
+    armholeDepth,
+    armhole: 2 * armholeDepth, // manual.txt:257,506 — around = twice the depth
+    sleeveTop: size.upper_arm + SETIN_ALLOWANCE_IN.upperArm,
   };
 }

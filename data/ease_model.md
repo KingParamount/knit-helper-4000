@@ -96,19 +96,14 @@ Per the manual (`manual.txt:325`): **chest, back width, armhole, upper arm.** No
 hidden **sleeve-length** ease parameter (`arml` = arm length), unrelated to the armhole.
 Do not add it to armhole maths.
 
-**The four widths do not necessarily share one ease amount.** `base·ease_factor` is worked
-only for the *chest* in the manual. Whether back width, armhole and upper arm receive the
-*same* amount or their own is **not** settled by the manual's numbers (the wording — "the
-amount of ease applied varies with Ease Style and chest size" — is ambiguous, and there are
-no worked non-chest examples). Knitting geometry argues against one shared amount (a flat
-back panel spans only ~half the body circumference). This is handled as a per-dimension
-**ease application policy** — see `dimensions_model.md` — with chest solid and the others
-carrying flagged, sourced defaults to be confirmed at the Woman-36" dimensions checkpoint.
-
-The armhole *baseline* is `2 × arm_depth` (`manual.txt:257`, "use half of the measurement
-around the armhole" → the round-the-armhole measurement is twice the depth). The Basics
-`armhole` column is a *body* girth from a different program and is **not** an answer key —
-ignore it here. The armhole *ease* magnitude is one of the per-dimension unknowns above.
+**Only the chest ease scales with fit style.** `base·ease_factor` is worked only for the
+*chest* in the manual, and for a **set-in sleeve** the other widths turn out to be fixed
+allowances rather than fractions of it (a set-in armhole/sleeve is fitted regardless of body
+looseness). Resolved against 2026 standards, not the manual — see `dimensions_model.md`:
+back width +0", armhole depth +1.5", sleeve top +1" (Sister Mountain); chest = bust + ease,
+bust-only (CYC). The armhole *around*-measure is `2 × armhole_depth` (`manual.txt:257`,
+"use half of the measurement around the armhole"). The Basics `armhole` column is a *body*
+girth from a different program and is **not** an answer key — ignore it.
 
 ## Metric — the cm rows are a separate dataset, not conversions (verified)
 
