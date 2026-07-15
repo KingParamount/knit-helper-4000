@@ -1,0 +1,160 @@
+{
+  "_source": "Verbatim from KWSHELP.HLP topic 'SWEATERS - INTRODUCTION' (Knitware Sweater Design 2.50, 2005). These are the option sets the original supported. They are a STARTING POINT, not a specification to match — see BRIEF.md.",
+  "_note_on_ids": "ids are ours, invented for this project. The original stored single-char codes; we deliberately do not replicate them.",
+
+  "construction": [
+    { "id": "flat_bottom_up",      "label": "Flat (bottom-up)", "default": true },
+    { "id": "circular_bottom_up",  "label": "Circular bottom-up" },
+    { "id": "circular_top_down",   "label": "Circular top-down" }
+  ],
+
+  "body_style": [
+    { "id": "pullover", "label": "Pullover" },
+    { "id": "cardigan", "label": "Cardigan" }
+  ],
+
+  "body_shape": [
+    { "id": "straight",    "label": "Straight" },
+    { "id": "fitted_waist","label": "Fitted waist" },
+    { "id": "a_line",      "label": "A-line" }
+  ],
+
+  "shoulder": [
+    { "id": "drop",          "label": "Drop (T-square)" },
+    { "id": "drop_grafted",  "label": "Drop, grafted", "note": "Not listed in the manual intro but referenced by constraint DROP_GRAFTED_NOT_SLEEVELESS and by a manual aside about sleeves worked top-down with armhole seams eliminated. Verify." },
+    { "id": "modified_drop", "label": "Modified drop" },
+    { "id": "set_in",        "label": "Set-in (fitted)", "sub": "set_in_cap" },
+    { "id": "saddle",        "label": "Saddle" },
+    { "id": "raglan",        "label": "Raglan" },
+    { "id": "round_yoke",    "label": "Round yoke" }
+  ],
+
+  "set_in_cap": [
+    { "id": "classic",  "label": "Classic" },
+    { "id": "gathered", "label": "Gathered" },
+    { "id": "pleated",  "label": "Pleated" }
+  ],
+
+  "body_length": [
+    { "id": "crop",       "label": "Crop", "note": "just below the bust" },
+    { "id": "waist",      "label": "Waist" },
+    { "id": "regular",    "label": "Regular", "note": "between waist and hips" },
+    { "id": "hip",        "label": "Hip" },
+    { "id": "thigh",      "label": "Thigh" },
+    { "id": "above_knee", "label": "Above knee" },
+    { "id": "knee",       "label": "Knee" },
+    { "id": "calf",       "label": "Calf" },
+    { "id": "ankle",      "label": "Ankle" }
+  ],
+
+  "hem": {
+    "_applies_to": ["body", "sleeve"],
+    "values": [
+      { "id": "ribbing",      "label": "Ribbing" },
+      { "id": "moss_band",    "label": "Moss stitch band" },
+      { "id": "garter_band",  "label": "Garter stitch band" },
+      { "id": "frill",        "label": "Frill (ruffle)" },
+      { "id": "folded_band",  "label": "Folded band" },
+      { "id": "crochet_edge", "label": "Crochet edge" },
+      { "id": "none",         "label": "No hem" }
+    ]
+  },
+
+  "neckline_front": [
+    { "id": "round",      "label": "Round (crew)" },
+    { "id": "high_round", "label": "High round" },
+    { "id": "v",          "label": "V" },
+    { "id": "scoop",      "label": "Scoop" },
+    { "id": "ballet",     "label": "Ballet" },
+    { "id": "square",     "label": "Square" },
+    { "id": "boat",       "label": "Boat", "sub": "boat_variant" },
+    { "id": "keyhole",    "label": "Keyhole", "note": "front only" },
+    { "id": "flat",       "label": "Flat" },
+    { "id": "shallow",    "label": "Shallow" }
+  ],
+
+  "neckline_back": [
+    { "id": "round",      "label": "Round (crew)" },
+    { "id": "high_round", "label": "High round" },
+    { "id": "v",          "label": "V" },
+    { "id": "scoop",      "label": "Scoop" },
+    { "id": "ballet",     "label": "Ballet" },
+    { "id": "square",     "label": "Square" },
+    { "id": "boat",       "label": "Boat", "sub": "boat_variant" },
+    { "id": "flat",       "label": "Flat" },
+    { "id": "shallow",    "label": "Shallow" },
+    { "id": "backless",   "label": "Backless", "note": "back only" }
+  ],
+
+  "boat_variant": [
+    { "id": "butted",     "label": "Butted" },
+    { "id": "overlapped", "label": "Overlapped" }
+  ],
+
+  "collar": [
+    { "id": "single_band",  "label": "Single band" },
+    { "id": "double_band",  "label": "Double band" },
+    { "id": "shirt_split",  "label": "Shirt (split)" },
+    { "id": "rolled_edge",  "label": "Rolled edge" },
+    { "id": "funnel",       "label": "Funnel" },
+    { "id": "cowl",         "label": "Cowl" },
+    { "id": "turtleneck",   "label": "Turtleneck" },
+    { "id": "shawl",        "label": "Shawl" },
+    { "id": "hood",         "label": "Hood", "sub": "hood_variant" },
+    { "id": "crochet_edge", "label": "Crochet edge" },
+    { "id": "none",         "label": "None" }
+  ],
+
+  "hood_variant": [
+    { "id": "simple", "label": "Simple" },
+    { "id": "shaped", "label": "Shaped" }
+  ],
+
+  "button_band": {
+    "_applies_to": ["cardigan", "keyhole"],
+    "values": [
+      { "id": "vertical_rib",   "label": "Vertical rib" },
+      { "id": "horizontal_rib", "label": "Horizontal rib" },
+      { "id": "picot",          "label": "Picot (folded band)" },
+      { "id": "moss",           "label": "Moss stitch" },
+      { "id": "garter",         "label": "Garter stitch" },
+      { "id": "none",           "label": "None" }
+    ]
+  },
+
+  "sleeve_length": [
+    { "id": "full",          "label": "Full" },
+    { "id": "three_quarter", "label": "Three-quarter" },
+    { "id": "half",          "label": "Half" },
+    { "id": "short",         "label": "Short" },
+    { "id": "cap",           "label": "Cap" },
+    { "id": "sleeveless",    "label": "Sleeveless (inset)" }
+  ],
+
+  "sleeve_style": [
+    { "id": "narrow_taper",     "label": "Narrow taper" },
+    { "id": "moderate_taper",   "label": "Moderate taper" },
+    { "id": "lantern",          "label": "Lantern / straight" },
+    { "id": "modified_lantern", "label": "Modified lantern" },
+    { "id": "bishop",           "label": "Bishop" },
+    { "id": "bell",             "label": "Bell" },
+    { "id": "dolman",           "label": "Dolman" }
+  ],
+
+  "ease": [
+    { "id": "skintight",   "label": "Skintight", "base": -0.75, "note": "Manual intro calls this 'Very tight'; the STYLE DATA topic calls it 'Skintight'. Same option." },
+    { "id": "tight",       "label": "Tight",       "base":  0.75 },
+    { "id": "moderate",    "label": "Moderate",    "base":  1.70, "note": "base uncertain to +/-0.02; see ease_model.md" },
+    { "id": "comfortable", "label": "Comfortable", "base":  3.00 },
+    { "id": "oversized",   "label": "Oversized",   "base":  4.50 }
+  ],
+
+  "method": {
+    "_applies_to": ["body", "rib"],
+    "values": [
+      { "id": "hand",    "label": "Hand knit" },
+      { "id": "machine", "label": "Machine knit" },
+      { "id": "crochet", "label": "Crochet" }
+    ]
+  }
+}

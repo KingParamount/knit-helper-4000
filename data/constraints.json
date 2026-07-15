@@ -1,0 +1,185 @@
+{
+  "_source": "Extracted from string constants in kws250.exe (Knitware Sweater Design 2.50, 2005). Each rule carries the verbatim original message for traceability.",
+  "_status": "DRAFT — hand-encoded from the extracted strings. The `text` field is verbatim and authoritative. The structured `forbid`/`require` encoding is an INTERPRETATION and must be checked against reference/sweaters/manual.txt before being trusted. Where the encoding is uncertain, `confidence` is set to 'low'.",
+  "_why_these_matter": "These are geometric and physical facts about how knitted garments go together, not stylistic preferences. Reproducing them from theory would be guesswork.",
+
+  "_schema": {
+    "id": "our identifier",
+    "text": "verbatim original message",
+    "forbid": "list of {field: [values]} clauses — the combination is invalid if ALL clauses match",
+    "require": "{ when: {field: [values]}, then: {field: [allowed values]} }",
+    "confidence": "high | medium | low"
+  },
+
+  "rules": [
+    { "id": "ROUND_YOKE_NEEDS_SLEEVES", "confidence": "high",
+      "text": "Cannot have Cap Sleeve or Sleeveless with Round Yoke Shoulder.",
+      "forbid": [{ "shoulder": ["round_yoke"] }, { "sleeve_length": ["cap", "sleeveless"] }] },
+
+    { "id": "SADDLE_NEEDS_SLEEVES", "confidence": "high",
+      "text": "Saddle Shoulder cannot have cap sleeve or sleeveless.",
+      "forbid": [{ "shoulder": ["saddle"] }, { "sleeve_length": ["cap", "sleeveless"] }] },
+
+    { "id": "MOD_DROP_NEEDS_SLEEVES", "confidence": "high",
+      "text": "Modified Drop Shoulder cannot have cap sleeve or sleeveless.",
+      "forbid": [{ "shoulder": ["modified_drop"] }, { "sleeve_length": ["cap", "sleeveless"] }] },
+
+    { "id": "RAGLAN_NO_CAP", "confidence": "high",
+      "text": "Cannot have cap sleeve with raglan shoulder.",
+      "forbid": [{ "shoulder": ["raglan"] }, { "sleeve_length": ["cap"] }] },
+
+    { "id": "DROP_GRAFTED_NOT_SLEEVELESS", "confidence": "high",
+      "text": "Drop Shoulder Grafted cannot be Sleeveless.",
+      "forbid": [{ "shoulder": ["drop_grafted"] }, { "sleeve_length": ["sleeveless"] }] },
+
+    { "id": "RAGLAN_NO_BOAT", "confidence": "high",
+      "text": "Raglan shoulder cannot have boat neckline.",
+      "forbid": [{ "shoulder": ["raglan"] }, { "neckline_front": ["boat"] }] },
+
+    { "id": "SADDLE_NECKLINE_LIMITS", "confidence": "medium",
+      "text": "Saddle shoulder cannot have boat or flat front or shallow neckline or backless.",
+      "forbid": [{ "shoulder": ["saddle"] }, { "neckline_front": ["boat", "flat", "shallow"] }],
+      "also_forbid": [{ "shoulder": ["saddle"] }, { "neckline_back": ["backless"] }],
+      "note": "Parsing ambiguity: 'boat or flat front or shallow neckline or backless' — unclear whether 'boat' binds to front only. Check manual." },
+
+    { "id": "DROP_NOT_BACKLESS", "confidence": "high",
+      "text": "Drop shoulder cannot be Backless.",
+      "forbid": [{ "shoulder": ["drop"] }, { "neckline_back": ["backless"] }] },
+
+    { "id": "BACKLESS_IS_SLEEVELESS", "confidence": "high",
+      "text": "Backless style must be sleeveless also.",
+      "require": { "when": { "neckline_back": ["backless"] }, "then": { "sleeve_length": ["sleeveless"] } } },
+
+    { "id": "SETIN_BACKLESS_COLLAR_LIMITS", "confidence": "medium",
+      "text": "Cannot have hood, turtleneck, cowl or shawl collar with Set-in Backless Style.",
+      "forbid": [{ "shoulder": ["set_in"] }, { "neckline_back": ["backless"] }, { "collar": ["hood", "turtleneck", "cowl", "shawl"] }] },
+
+    { "id": "SHIRT_COLLAR_SETIN_BACKLESS", "confidence": "medium",
+      "text": "Cannot have Shirt Collar with Backless style on a Set-in Shoulder.",
+      "forbid": [{ "shoulder": ["set_in"] }, { "neckline_back": ["backless"] }, { "collar": ["shirt_split"] }] },
+
+    { "id": "DOLMAN_NEEDS_DROP", "confidence": "high",
+      "text": "Dolman Sleeve must have drop shoulder.",
+      "require": { "when": { "sleeve_style": ["dolman"] }, "then": { "shoulder": ["drop"] } } },
+
+    { "id": "DOLMAN_SLEEVE_LENGTHS", "confidence": "high",
+      "text": "Dolman Sleeve must have full, 3/4 or half length sleeve style.",
+      "require": { "when": { "sleeve_style": ["dolman"] }, "then": { "sleeve_length": ["full", "three_quarter", "half"] } } },
+
+    { "id": "DOLMAN_NOT_FITTED", "confidence": "high",
+      "text": "Cannot have Fitted Waist body style with Dolman Sleeve.",
+      "forbid": [{ "body_shape": ["fitted_waist"] }, { "sleeve_style": ["dolman"] }] },
+
+    { "id": "TOPDOWN_SHOULDER_LIMITS", "confidence": "high",
+      "text": "Top-down construction must have Raglan or Round Yoke Shoulder.",
+      "require": { "when": { "construction": ["circular_top_down"] }, "then": { "shoulder": ["raglan", "round_yoke"] } } },
+
+    { "id": "TOPDOWN_NOT_SLEEVELESS", "confidence": "high",
+      "text": "Cannot have sleeveless style with Top-Down Construction.",
+      "forbid": [{ "construction": ["circular_top_down"] }, { "sleeve_length": ["sleeveless"] }] },
+
+    { "id": "ROUND_YOKE_NOT_FLAT", "confidence": "high",
+      "text": "Cannot have Round Yoke shoulder with Flat construction.",
+      "forbid": [{ "construction": ["flat_bottom_up"] }, { "shoulder": ["round_yoke"] }] },
+
+    { "id": "CIRCULAR_NOT_MACHINE", "confidence": "high",
+      "text": "Cannot have Circular Construction Method with machine knit.",
+      "forbid": [{ "construction": ["circular_bottom_up", "circular_top_down"] }, { "method_body": ["machine"] }] },
+
+    { "id": "CIRCULAR_RAGLAN_NO_BACK_NECK", "confidence": "medium",
+      "text": "Cannot have back neck shaping with Circular Raglan or Yoke.",
+      "forbid": [{ "construction": ["circular_bottom_up", "circular_top_down"] }, { "shoulder": ["raglan", "round_yoke"] }, { "neckline_back": ["round", "high_round", "v", "scoop", "ballet", "square", "boat"] }],
+      "note": "'back neck shaping' presumably means anything other than flat/shallow/backless. Verify." },
+
+    { "id": "CARDIGAN_NECKLINE_LIMITS", "confidence": "high",
+      "text": "Cannot have a boat or keyhole neckline on a cardigan.",
+      "forbid": [{ "body_style": ["cardigan"] }, { "neckline_front": ["boat", "keyhole"] }] },
+
+    { "id": "CARDIGAN_COLLAR_LIMITS", "confidence": "high",
+      "text": "Cannot have a cowl or turtlenck collar on a cardigan.",
+      "forbid": [{ "body_style": ["cardigan"] }, { "collar": ["cowl", "turtleneck"] }],
+      "note": "'turtlenck' is a typo in the original." },
+
+    { "id": "KEYHOLE_FRONT_ONLY", "confidence": "high",
+      "text": "Cannot have Keyhole style on Back Neckline.",
+      "forbid": [{ "neckline_back": ["keyhole"] }] },
+
+    { "id": "KEYHOLE_NO_COWL", "confidence": "high",
+      "text": "Cannot have Cowl collar on Keyhole Neckline.",
+      "forbid": [{ "neckline_front": ["keyhole"] }, { "collar": ["cowl"] }] },
+
+    { "id": "BOAT_MATCHES", "confidence": "high",
+      "text": "Boat neck shaping must match on front and back.",
+      "require": { "when": { "neckline_front": ["boat"] }, "then": { "neckline_back": ["boat"] } },
+      "symmetric": true },
+
+    { "id": "BOAT_COLLAR_LIMIT", "confidence": "high",
+      "text": "Boat neck can only have single band collar.",
+      "require": { "when": { "neckline_front": ["boat"] }, "then": { "collar": ["single_band"] } } },
+
+    { "id": "BOAT_OVERLAP_WARNING", "confidence": "high", "severity": "warning",
+      "text": "Warning.  Overlap boat neck may not be suitable for drop shoulder or cap sleeve.",
+      "forbid": [{ "boat_variant": ["overlapped"] }, { "shoulder": ["drop"] }],
+      "note": "WARNING not error — must not block generation." },
+
+    { "id": "HOOD_BACK_NECK", "confidence": "high",
+      "text": "Back neck shaping must be flat, shallow or backless for Hoods.",
+      "require": { "when": { "collar": ["hood"] }, "then": { "neckline_back": ["flat", "shallow", "backless"] } } },
+
+    { "id": "HOOD_FRONT_NECK", "confidence": "high",
+      "text": "Hood must have round, flat or shallow front neckline shaping.",
+      "require": { "when": { "collar": ["hood"] }, "then": { "neckline_front": ["round", "flat", "shallow"] } } },
+
+    { "id": "TURTLE_SHAWL_BACK_NECK", "confidence": "high",
+      "text": "Back neck shaping must be flat, shallow or backless for turtleneck or shawl collar.",
+      "require": { "when": { "collar": ["turtleneck", "shawl"] }, "then": { "neckline_back": ["flat", "shallow", "backless"] } } },
+
+    { "id": "TURTLE_FRONT_NECK", "confidence": "high",
+      "text": "Turtleneck collar must have round, flat or shallow front neckline shaping.",
+      "require": { "when": { "collar": ["turtleneck"] }, "then": { "neckline_front": ["round", "flat", "shallow"] } } },
+
+    { "id": "SHAWL_FRONT_NECK", "confidence": "high",
+      "text": "Shawl collar must have V or square front neckline shaping.",
+      "require": { "when": { "collar": ["shawl"] }, "then": { "neckline_front": ["v", "square"] } } },
+
+    { "id": "SHIRT_COLLAR_NECK_LIMITS", "confidence": "medium",
+      "text": "Cannot have Shirt Collar with Square Neck or V Back Neck shaping.",
+      "forbid": [{ "collar": ["shirt_split"] }, { "neckline_back": ["square", "v"] }],
+      "note": "Ambiguous: could mean square front OR v back. Check manual." },
+
+    { "id": "RIB_METHOD_MATCHES_HAND", "confidence": "high",
+      "text": "If the body is knit by hand, then the ribbing must be by hand also.",
+      "require": { "when": { "method_body": ["hand"] }, "then": { "method_rib": ["hand"] } } },
+
+    { "id": "RIB_METHOD_MATCHES_CROCHET", "confidence": "high",
+      "text": "If the body or ribbing is crocheted, then the other must be crocheted also.",
+      "require": { "when": { "method_body": ["crochet"] }, "then": { "method_rib": ["crochet"] } },
+      "symmetric": true }
+  ],
+
+  "engine_limits": [
+    { "id": "MAX_DECREASE_RATIO", "text": "The program cannot handle a decrease of greater than 3:1.", "value": 3.0,
+      "note": "Original's limit. We are not bound by it, but exceeding it likely produces unknittable shaping. Treat as a warning threshold." },
+    { "id": "MAX_INCREASE_RATIO", "text": "This calculator cannot handle an increase of greater than 2:1.", "value": 2.0,
+      "note": "Applies to the round-yoke calculator specifically." }
+  ],
+
+  "advisories": [
+    { "id": "ROLLED_COLLAR_CROCHET", "severity": "info",
+      "text": "Unless your gauge is very loose, the rolled collar may not work very well in crochet.  Work a sample, perhaps on a larger hook size, to get the required drape." }
+  ],
+
+  "round_yoke_calculator": {
+    "_note": "Separate sub-calculator with its own rules. See reference/sweaters/constraints_raw.txt for the full list; these bound its inputs.",
+    "shaping_rounds": { "min": 2, "max": 6 },
+    "fixed_repeats": { "min": 1, "max": 2 },
+    "rules": [
+      "First shaping round must be at round 1 or greater.",
+      "Last shaping round must be at least one round less than total number of rounds in yoke.",
+      "Number of sts at top must be less than number of sts at bottom.",
+      "Total number of rows must be greater than 3 times the number of shaping rounds.",
+      "Rounds must be increasing order, at least 2 rounds between them.",
+      "Fixed Repeat 'above round' must match bottom round or an existing 'Shaping Round'."
+    ]
+  }
+}

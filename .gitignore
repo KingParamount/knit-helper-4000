@@ -1,0 +1,12 @@
+# Reference material — copyrighted decompiled manuals from Knitware 2.50 (2005).
+# Excluded deliberately and permanently. Read from disk locally; never commit.
+reference/
+
+# Dependencies & build output
+node_modules/
+dist/
+coverage/
+
+# Local overrides & OS cruft
+*.local
+.DS_Store
