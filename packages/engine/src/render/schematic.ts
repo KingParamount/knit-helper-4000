@@ -284,7 +284,6 @@ function trackBodyEdges(
   let lastR = bodyHalf;
   let lastL = -bodyHalf;
   let rDone = false;
-  let lDone = false;
   let underarmY = 0;
   for (const r of rows) {
     if (r.index >= stopY) break;
@@ -323,20 +322,19 @@ function trackBodyEdges(
     }
     const rx = r.section === 'rib' ? bodyHalf : rightSts;
     const lx = r.section === 'rib' ? -bodyHalf : -leftSts;
+    // On a change, first close off the plateau (a flat run holds until the row
+    // before), so a cast-off reads as a step and never a diagonal taper.
     if (rx !== lastR) {
+      if (rightPts[rightPts.length - 1].y < r.index - 1) rightPts.push({ x: lastR, y: r.index - 1 });
       if (!rDone && rx < bodyHalf) {
         underarmY = r.index - 1;
-        rightPts.push({ x: bodyHalf, y: r.index - 1 });
         rDone = true;
       }
       rightPts.push({ x: rx, y: r.index });
       lastR = rx;
     }
     if (lx !== lastL) {
-      if (!lDone && lx > -bodyHalf) {
-        leftPts.push({ x: -bodyHalf, y: r.index - 1 });
-        lDone = true;
-      }
+      if (leftPts[leftPts.length - 1].y < r.index - 1) leftPts.push({ x: lastL, y: r.index - 1 });
       leftPts.push({ x: lx, y: r.index });
       lastL = lx;
     }
@@ -400,11 +398,15 @@ export function sleeveSchematic(
     const rx = r.section === 'rib' ? cuffHalf : rightSts;
     const lx = r.section === 'rib' ? -cuffHalf : -leftSts;
     if (rx > maxHalf) maxHalf = rx;
+    // Close the plateau before a change, so the underarm cast-off steps in rather
+    // than sloping diagonally from the last taper increase.
     if (rx !== lastR) {
+      if (rightPts[rightPts.length - 1].y < r.index - 1) rightPts.push({ x: lastR, y: r.index - 1 });
       rightPts.push({ x: rx, y: r.index });
       lastR = rx;
     }
     if (lx !== lastL) {
+      if (leftPts[leftPts.length - 1].y < r.index - 1) leftPts.push({ x: lastL, y: r.index - 1 });
       leftPts.push({ x: lx, y: r.index });
       lastL = lx;
     }
@@ -483,9 +485,8 @@ export interface SvgOpts {
   pxPerUnit?: number;
 }
 
-/** The knit-chart key: decrease, increase, cast off, hold, rib. */
-function chartLegend(x: number, y: number): string {
-  const rowH = 15;
+/** The knit-chart key, laid out as a horizontal row (it sits above the grid). */
+function chartLegend(x0: number, y: number): string {
   const entries: { g: 'dec' | 'inc' | 'co' | 'hold' | 'rib'; c: string; label: string }[] = [
     { g: 'dec', c: '#243447', label: 'decrease' },
     { g: 'inc', c: '#2c6e49', label: 'increase' },
@@ -493,19 +494,19 @@ function chartLegend(x: number, y: number): string {
     { g: 'hold', c: '#9a7b1e', label: 'hold' },
     { g: 'rib', c: '#e9e4d6', label: '1×1 rib' },
   ];
-  const h = entries.length * rowH + 9;
-  const out = [`<g font-size="10" fill="#3a4653">`];
-  out.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="98" height="${h}" rx="4" fill="#fffffff2" stroke="#d5d0c4" stroke-width="0.9"/>`);
-  entries.forEach((e, i) => {
-    const gy = y + 13 + i * rowH;
-    const gx = x + 13;
-    if (e.g === 'dec') out.push(`<line x1="${gx - 4}" y1="${gy + 4}" x2="${gx + 4}" y2="${gy - 4}" stroke="${e.c}" stroke-width="1.6"/>`);
-    else if (e.g === 'inc') out.push(`<circle cx="${gx}" cy="${gy}" r="3.4" fill="none" stroke="${e.c}" stroke-width="1.4"/>`);
-    else if (e.g === 'co') out.push(`<rect x="${gx - 3.6}" y="${gy - 3.6}" width="7.2" height="7.2" rx="1.4" fill="${e.c}"/>`);
-    else if (e.g === 'hold') out.push(`<rect x="${gx - 3.6}" y="${gy - 3.6}" width="7.2" height="7.2" fill="none" stroke="${e.c}" stroke-width="1.4"/>`);
-    else out.push(`<rect x="${gx - 4.5}" y="${gy - 4.5}" width="9" height="9" fill="${e.c}" stroke="#c9c2b0" stroke-width="0.6"/>`);
-    out.push(`<text x="${gx + 13}" y="${gy + 3.4}">${e.label}</text>`);
-  });
+  const gy = y + 8;
+  const out = [`<g font-size="11" fill="#3a4653">`];
+  let x = x0;
+  for (const e of entries) {
+    const gx = x + 5;
+    if (e.g === 'dec') out.push(`<line x1="${gx - 4}" y1="${gy + 4}" x2="${gx + 4}" y2="${gy - 4}" stroke="${e.c}" stroke-width="1.7"/>`);
+    else if (e.g === 'inc') out.push(`<circle cx="${gx}" cy="${gy}" r="3.6" fill="none" stroke="${e.c}" stroke-width="1.5"/>`);
+    else if (e.g === 'co') out.push(`<rect x="${gx - 3.8}" y="${gy - 3.8}" width="7.6" height="7.6" rx="1.4" fill="${e.c}"/>`);
+    else if (e.g === 'hold') out.push(`<rect x="${gx - 3.8}" y="${gy - 3.8}" width="7.6" height="7.6" fill="none" stroke="${e.c}" stroke-width="1.5"/>`);
+    else out.push(`<rect x="${gx - 4.5}" y="${gy - 4.5}" width="9" height="9" fill="${e.c}" stroke="#c9c2b0" stroke-width="0.7"/>`);
+    out.push(`<text x="${gx + 11}" y="${(gy + 4).toFixed(1)}">${e.label}</text>`);
+    x += 24 + e.label.length * 6.4;
+  }
   out.push('</g>');
   return out.join('');
 }
@@ -538,16 +539,17 @@ export function schematicSvg(s: PieceSchematic, opts: SvgOpts = {}): string {
   const cellW = measured ? inPerSt * px * factor : px;
   const cellH = measured ? inPerRow * px * factor : px;
 
+  const chart = !measured && (opts.chart ?? false);
   const pad = 82;
+  const topExtra = chart ? 30 : 0; // a strip above the grid for the key
   const halfW = s.widthSts / 2;
   const W = s.widthSts * cellW + pad * 2;
-  const H = s.heightRows * cellH + pad * 2;
+  const H = s.heightRows * cellH + pad * 2 + topExtra;
 
   // stitch/row point → svg px (x centred, y flipped so cast-on is at the bottom).
   const X = (xSt: number): number => pad + (xSt + halfW) * cellW;
-  const Y = (yRow: number): number => pad + (s.heightRows - yRow) * cellH;
+  const Y = (yRow: number): number => pad + topExtra + (s.heightRows - yRow) * cellH;
 
-  const chart = !measured && (opts.chart ?? false);
   const parts: string[] = [];
   parts.push(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W.toFixed(1)}" height="${H.toFixed(1)}" viewBox="0 0 ${W.toFixed(1)} ${H.toFixed(1)}" font-family="system-ui, sans-serif">`,
@@ -649,7 +651,9 @@ export function schematicSvg(s: PieceSchematic, opts: SvgOpts = {}): string {
     parts.push(`<g fill="none" stroke="#fff" stroke-linecap="round">${strokes.map((g) => `<g stroke-width="${(g.sw + 2).toFixed(1)}">${g.d}</g>`).join('')}</g>`);
     parts.push(`<g fill="none" stroke-linecap="round">${strokes.map((g) => `<g stroke="${g.color}" stroke-width="${g.sw.toFixed(1)}">${g.d}</g>`).join('')}</g>`);
 
-    // Per-row annotations in the right margin: row number + net stitch change.
+    // Per-row annotations: row (or row range) + net stitch change. A run of the same
+    // change collapses to one range; the rest alternate left/right where they would
+    // otherwise overlap, so two never sit on top of each other.
     const byRow = new Map<number, ShapeMark[]>();
     for (const mk of s.marks) {
       const r = Math.round(mk.y + 0.5);
@@ -657,18 +661,46 @@ export function schematicSvg(s: PieceSchematic, opts: SvgOpts = {}): string {
       arr.push(mk);
       byRow.set(r, arr);
     }
-    const annos = [`<g font-size="9" fill="#8a7f68" paint-order="stroke" stroke="#fff" stroke-width="2.6">`];
-    for (const [row, ms] of byRow) {
-      const change = ms.reduce((n, m) => n + (m.kind === 'castoff' ? -(m.span ?? 1) : m.kind === 'dec' ? -1 : m.kind === 'inc' ? 1 : 0), 0);
-      const label = change !== 0 ? `${row}  ${change > 0 ? '+' : '-'}${Math.abs(change)}` : ms.some((m) => m.kind === 'hold') ? `${row}  hold` : '';
-      if (!label) continue;
-      annos.push(`<text x="${(X(halfW) + 10).toFixed(1)}" y="${(Y(row - 0.5) + 3.2).toFixed(1)}" text-anchor="start">${label}</text>`);
+    const info = [...byRow.entries()]
+      .map(([row, ms]) => {
+        const change = ms.reduce((n, m) => n + (m.kind === 'castoff' ? -(m.span ?? 1) : m.kind === 'dec' ? -1 : m.kind === 'inc' ? 1 : 0), 0);
+        const hold = change === 0 && ms.some((m) => m.kind === 'hold');
+        return { row, change, hold, key: change !== 0 ? String(change) : hold ? 'H' : '' };
+      })
+      .filter((r) => r.key)
+      .sort((a, b) => a.row - b.row);
+    const groups: { start: number; end: number; change: number; hold: boolean; count: number }[] = [];
+    for (const r of info) {
+      const g = groups[groups.length - 1];
+      if (g && (g.hold ? 'H' : String(g.change)) === r.key && r.row - g.end <= 2) {
+        g.end = r.row;
+        g.count += 1;
+      } else groups.push({ start: r.row, end: r.row, change: r.change, hold: r.hold, count: 1 });
+    }
+    const MINGAP = 4;
+    let lastR = -Infinity;
+    let lastL = -Infinity;
+    const annos = ['<g font-size="9" paint-order="stroke" stroke="#fff" stroke-width="2.6" fill="#7d735d">'];
+    for (const g of groups) {
+      const mid = (g.start + g.end) / 2;
+      const rng = g.count > 1 ? `${g.start}–${g.end}` : `${g.start}`;
+      const val = g.hold ? 'hold' : `${g.change > 0 ? '+' : '−'}${Math.abs(g.change)}`;
+      const label = `${rng}  ${val}${g.count > 1 ? ` ×${g.count}` : ''}`;
+      const right = mid - lastR >= MINGAP ? true : mid - lastL >= MINGAP ? false : mid - lastR >= mid - lastL;
+      const cy = (Y(mid - 0.5) + 3.2).toFixed(1);
+      if (right) {
+        lastR = mid;
+        annos.push(`<text x="${(X(halfW) + 10).toFixed(1)}" y="${cy}" text-anchor="start">${label}</text>`);
+      } else {
+        lastL = mid;
+        annos.push(`<text x="${(X(-halfW) - 28).toFixed(1)}" y="${cy}" text-anchor="end">${label}</text>`);
+      }
     }
     annos.push('</g>');
     parts.push(annos.join(''));
 
-    // Key (legend) in the top-left corner.
-    parts.push(chartLegend(X(-halfW) + 6, pad + 4));
+    // Key (legend) in the strip above the grid.
+    parts.push(chartLegend(X(-halfW), pad + 6));
   }
 
   // Dimension labels (measured / overview) — kept clear of the axis numbers: widths
