@@ -124,3 +124,72 @@ export function lowerBackRows(
   }
   return rows;
 }
+
+export interface ArmholeShaping {
+  bindOffPerSide: number; // underarm cast-off, each side
+  decPerSide: number; // single decreases each side, every other row
+  achievedSts: number; // stitches remaining after shaping
+}
+
+/**
+ * Standard set-in armhole shaping: cast off ~1" at the underarm each side, then
+ * decrease one stitch each side every other row until the back width is reached.
+ * The row array records "decrease n at edge" without prescribing the technique
+ * (fully-fashioned vs edge) — that is the knitter's choice.
+ */
+export function armholeShaping(
+  castOnSts: number,
+  targetSts: number,
+  gauge: Gauge,
+): ArmholeShaping {
+  const perSide = Math.round((castOnSts - targetSts) / 2);
+  const bindOffPerSide = Math.min(stitchesFor(1.0, gauge), perSide); // ~1" underarm
+  return {
+    bindOffPerSide,
+    decPerSide: perSide - bindOffPerSide,
+    achievedSts: castOnSts - 2 * perSide,
+  };
+}
+
+/**
+ * The back from cast-on through the armhole decreases (ends at the achieved back
+ * width). Above this is straight to the shoulder line, then short-row shoulders
+ * and the back neck — the next increment.
+ */
+export function backThroughArmhole(
+  size: SizeRecord,
+  style: EaseStyleId,
+  gauge: Gauge,
+): Row[] {
+  const plan = backPlan(size, style, gauge);
+  const rows = lowerBackRows(size, style, gauge);
+  const shaping = armholeShaping(plan.castOnSts, plan.upperBackSts, gauge);
+
+  let index = rows.length; // last body row (underarm)
+  let stitches = plan.castOnSts;
+  const push = (ops: Row['ops']): void => {
+    index += 1;
+    for (const op of ops) {
+      if (op.kind === 'bind_off') stitches -= op.count;
+      if (op.kind === 'decrease') stitches -= op.count * (op.side === 'both' ? 2 : 1);
+    }
+    rows.push({
+      index,
+      piece: 'back',
+      stitches,
+      carriage: carriageForRow(index),
+      ops,
+      section: 'armhole',
+    });
+  };
+
+  // Underarm cast-off, one side per row (a block cast-off follows the carriage).
+  push([{ kind: 'bind_off', count: shaping.bindOffPerSide, side: carriageForRow(index + 1) }]);
+  push([{ kind: 'bind_off', count: shaping.bindOffPerSide, side: carriageForRow(index + 1) }]);
+  // Single decreases each end, every other row (transfers at both edges).
+  for (let d = 0; d < shaping.decPerSide; d++) {
+    push([{ kind: 'decrease', count: 1, side: 'both' }]); // shaping row
+    if (d < shaping.decPerSide - 1) push([]); // plain row between
+  }
+  return rows;
+}

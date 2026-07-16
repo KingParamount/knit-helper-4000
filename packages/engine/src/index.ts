@@ -40,5 +40,10 @@ export type { Gauge } from './gauge';
 export { carriageForRow } from './row';
 export type { Row, Op, Carriage, Piece } from './row';
 
-export { backPlan, lowerBackRows } from './pieces/back';
-export type { BackPlan, PlanSection } from './pieces/back';
+export {
+  backPlan,
+  lowerBackRows,
+  armholeShaping,
+  backThroughArmhole,
+} from './pieces/back';
+export type { BackPlan, PlanSection, ArmholeShaping } from './pieces/back';

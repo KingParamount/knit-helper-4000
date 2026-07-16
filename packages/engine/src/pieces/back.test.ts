@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 declare const console: { log: (...args: unknown[]) => void };
 import { findSize } from '../data/sizes';
 import { DEFAULT_GAUGE } from '../gauge';
-import { backPlan, lowerBackRows } from './back';
+import { backPlan, lowerBackRows, armholeShaping, backThroughArmhole } from './back';
 
 const W36 = findSize('Woman', 36, 'in')!;
 const G = DEFAULT_GAUGE;
@@ -54,6 +54,39 @@ describe('lower back rows', () => {
   });
 });
 
+describe('armhole shaping', () => {
+  const s = armholeShaping(144, 99, DEFAULT_GAUGE);
+
+  it('casts off ~1" at the underarm then decreases the rest', () => {
+    expect(s.bindOffPerSide).toBe(8); // 1" × 30/4
+    expect(s.decPerSide).toBe(15); // round((144−99)/2)=23; 23−8
+    expect(s.achievedSts).toBe(98); // 144 − 2×23
+  });
+
+  const rows = backThroughArmhole(W36, 'moderate', DEFAULT_GAUGE);
+
+  it('reconciles to the achieved back width', () => {
+    expect(rows[rows.length - 1].stitches).toBe(98);
+    expect(rows).toHaveLength(187); // 156 lower + 2 cast-off + 29 (15 dec + 14 plain)
+  });
+
+  it('casts off each underarm on the row whose carriage is on that side', () => {
+    const castOffs = rows.filter((r) => r.ops.some((o) => o.kind === 'bind_off'));
+    expect(castOffs).toHaveLength(2);
+    for (const r of castOffs) {
+      const op = r.ops.find((o) => o.kind === 'bind_off')!;
+      if (op.kind === 'bind_off') expect(op.side).toBe(r.carriage);
+    }
+  });
+
+  it('never increases stitch count and keeps the carriage alternating', () => {
+    for (let i = 1; i < rows.length; i++) {
+      expect(rows[i].stitches).toBeLessThanOrEqual(rows[i - 1].stitches);
+      expect(rows[i].carriage).not.toBe(rows[i - 1].carriage);
+    }
+  });
+});
+
 it('CHECKPOINT: prints the back-piece knitting plan', () => {
   const p = backPlan(W36, 'moderate', G);
   const lines: string[] = [];
@@ -77,6 +110,15 @@ it('CHECKPOINT: prints the back-piece knitting plan', () => {
   );
   lines.push(
     `                top → 2 shoulders ≈ ${p.shaping.shoulderStsEachApprox} sts each + back neck ${p.backNeckSts} sts`,
+  );
+  const s = armholeShaping(p.castOnSts, p.upperBackSts, DEFAULT_GAUGE);
+  const rows = backThroughArmhole(W36, 'moderate', DEFAULT_GAUGE);
+  lines.push('');
+  lines.push(
+    `  ARMHOLE (generated): cast off ${s.bindOffPerSide} each underarm, then dec 1 st each end`,
+  );
+  lines.push(
+    `    every other row ×${s.decPerSide} → ${rows[rows.length - 1].stitches} sts at row ${rows.length}. NEXT: short-row shoulders + back neck.`,
   );
   lines.push('');
   console.log(lines.join('\n'));
