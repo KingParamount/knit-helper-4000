@@ -2,10 +2,11 @@
  * The sleeve (set-in, bottom-up: cuff → rib → taper → cap). Both sleeves are
  * identical for a plain garment, so `sleeveRows` takes the piece id.
  *
- * The taper increases evenly from the cuff to the sleeve top. The cap is a
- * FIRST CUT — a standard set-in cap (cast off the underarm to match the body,
- * then decrease every other row and cast off the top). Making the cap edge length
- * precisely match the armhole edge is a known refinement, flagged not hidden.
+ * The taper increases evenly from the cuff to the sleeve top. The cap follows
+ * standard set-in guidance (Craft Yarn Council / Sister Mountain): cast off the
+ * underarm to match the body, a bell-shaped decrease (fast every-row zones at the
+ * bottom and top, magic-formula even middle) over a height of ≈ armhole depth
+ * − 7.5 cm, and a crown cast-off of ≈ (upper arm ÷ 4 − 0.5 cm).
  */
 
 import type { SizeRecord, EaseStyleId } from '../data/types';
@@ -24,6 +25,11 @@ export function evenRows(count: number, span: number): number[] {
   return out;
 }
 
+/** The cap is this much shorter than the armhole depth (7.5 cm), per Sister Mountain. */
+const CAP_SHORTER_THAN_ARMHOLE_IN = 7.5 / 2.54;
+/** Decreases worked every row at each end of the cap (the fast bell ends). */
+const CAP_FAST_EACH_END = 3;
+
 export interface SleevePlan {
   castOnSts: number; // cuff
   ribRows: number;
@@ -31,6 +37,7 @@ export interface SleevePlan {
   incPerSide: number;
   sleeveTopSts: number; // achieved at the underarm
   underarmCastOff: number; // matches the body armhole
+  capHeightRows: number; // ≈ armhole depth − 7.5 cm
   capDecPerSide: number;
   capTopSts: number; // bound off at the top
 }
@@ -46,9 +53,10 @@ export function sleevePlan(size: SizeRecord, style: EaseStyleId, gauge: Gauge): 
   const sleeveTopSts = castOnSts + 2 * incPerSide;
 
   const underarmCastOff = armholeShaping(body.castOnSts, body.upperBackSts, gauge).castOffPerSide;
-  const afterUnderarm = sleeveTopSts - 2 * underarmCastOff;
-  const capDecPerSide = Math.round((afterUnderarm - stitchesFor(4.0, gauge)) / 2);
-  const capTopSts = afterUnderarm - 2 * capDecPerSide;
+  // Cap height ≈ armhole depth − 7.5 cm; top cast-off ≈ (upper arm ÷ 4 − 0.5 cm).
+  const capHeightRows = rowsFor(w.armholeDepth, gauge) - rowsFor(CAP_SHORTER_THAN_ARMHOLE_IN, gauge);
+  const capTopSts = stitchesFor(w.sleeveTop / 4 - 0.5 / 2.54, gauge);
+  const capDecPerSide = Math.round((sleeveTopSts - 2 * underarmCastOff - capTopSts) / 2);
 
   return {
     castOnSts,
@@ -57,6 +65,7 @@ export function sleevePlan(size: SizeRecord, style: EaseStyleId, gauge: Gauge): 
     incPerSide,
     sleeveTopSts,
     underarmCastOff,
+    capHeightRows,
     capDecPerSide,
     capTopSts,
   };
@@ -94,15 +103,23 @@ export function sleeveRows(
     push(incAt.has(t) ? [{ kind: 'increase', count: 1, side: 'both' }] : [], 'taper');
   }
 
-  // Cap: cast off the underarm (one side per row, following the carriage), then
-  // decrease each end every other row, then cast off the top.
+  // Cap: cast off the underarm (matching the body), then a bell-shaped decrease
+  // over a height of ≈ armhole depth − 7.5 cm — fast (every-row) zones at the
+  // bottom and top, and a magic-formula even spread through the gentle middle to
+  // fill the height. Finally cast off the crown.
   push([{ kind: 'bind_off', count: p.underarmCastOff, side: carriageForRow(index + 1) }], 'cap');
   push([{ kind: 'bind_off', count: p.underarmCastOff, side: carriageForRow(index + 1) }], 'cap');
-  for (let d = 0; d < p.capDecPerSide; d++) {
-    push([{ kind: 'decrease', count: 1, side: 'both' }], 'cap');
-    if (d < p.capDecPerSide - 1) push([], 'cap');
+
+  const fast = Math.min(CAP_FAST_EACH_END, p.capDecPerSide);
+  const middleDecs = Math.max(0, p.capDecPerSide - 2 * fast);
+  const middleRows = Math.max(middleDecs, p.capHeightRows - 2 - 2 * fast - 1);
+  for (let i = 0; i < fast; i++) push([{ kind: 'decrease', count: 1, side: 'both' }], 'cap'); // fast bottom
+  const decAt = new Set(evenRows(middleDecs, middleRows));
+  for (let r = 1; r <= middleRows; r++) {
+    push(decAt.has(r) ? [{ kind: 'decrease', count: 1, side: 'both' }] : [], 'cap'); // gentle middle
   }
-  push([{ kind: 'bind_off', count: p.capTopSts, side: 'center' }], 'cap');
+  for (let i = 0; i < fast; i++) push([{ kind: 'decrease', count: 1, side: 'both' }], 'cap'); // fast top
+  push([{ kind: 'bind_off', count: p.capTopSts, side: 'center' }], 'cap'); // crown
   return rows;
 }
 

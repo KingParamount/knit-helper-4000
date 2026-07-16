@@ -27,7 +27,15 @@ describe('sleeve plan (Woman 36", moderate, default gauge)', () => {
     expect(p.ribRows).toBe(25); // 2.5"
     expect(p.taperRows).toBe(143); // arm length 16.75" − rib
     expect(p.underarmCastOff).toBe(8); // matches the body armhole underarm
-    expect(p.capTopSts).toBe(29);
+    expect(p.capHeightRows).toBe(60); // armhole depth 9" − 7.5cm ≈ 6"
+    expect(p.capTopSts).toBe(21); // (upper arm ÷ 4 − 0.5cm)
+    expect(p.capDecPerSide).toBe(26); // (89 − 16 − 21) / 2
+  });
+
+  it('makes the cap roughly two-thirds of the armhole depth', () => {
+    // armhole depth is 90 rows; the cap fills it minus ~7.5cm (source guidance)
+    expect(p.capHeightRows / 90).toBeGreaterThan(0.6);
+    expect(p.capHeightRows / 90).toBeLessThan(0.72);
   });
 });
 
@@ -79,9 +87,8 @@ it('CHECKPOINT: prints the sleeve plan', () => {
     '  SLEEVE — Woman 36", moderate, set-in, 30×40 gauge',
     `  cast on ${p.castOnSts} (cuff) → rib ${p.ribRows} rows → taper +1 each end ×${p.incPerSide}`,
     `  → ${p.sleeveTopSts} sts at the underarm (upper arm)`,
-    `  CAP (first cut): cast off ${p.underarmCastOff} each underarm, dec 1 each end every other`,
-    `    row ×${p.capDecPerSide}, cast off top ${p.capTopSts}. Total ${rows.length} rows.`,
-    '  ⚠ cap edge is not yet length-matched to the armhole — flagged for review.',
+    `  CAP: cast off ${p.underarmCastOff} each underarm, then bell decrease over ${p.capHeightRows} rows`,
+    `    (≈ armhole depth − 7.5cm), cast off crown ${p.capTopSts}. Total ${rows.length} rows.`,
     '',
   ];
   console.log(lines.join('\n'));
