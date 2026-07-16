@@ -167,14 +167,15 @@ export function frontSchematic(
     for (const op of r.ops) {
       if (op.kind !== 'bind_off' && op.kind !== 'decrease') continue;
       if (op.side !== 'R') continue;
+      const before = nx;
+      nx -= op.count; // the neck opening widens away from the centre
+      // Close off the plateau (the return rows) so the edge steps rather than slopes.
+      if (leftNeck[leftNeck.length - 1].y < r.index - 1) leftNeck.push({ x: before, y: r.index - 1 });
+      leftNeck.push({ x: nx, y: r.index });
       if (op.kind === 'bind_off') {
-        nx -= op.count; // the neck opening widens away from the centre
-        leftNeck.push({ x: nx, y: r.index });
         marks.push({ kind: 'castoff', x: nx + op.count / 2, y: cy, span: op.count });
         marks.push({ kind: 'castoff', x: -(nx + op.count / 2), y: cy, span: op.count });
-      } else if (op.kind === 'decrease') {
-        nx -= op.count;
-        leftNeck.push({ x: nx, y: r.index });
+      } else {
         marks.push({ kind: 'dec', x: nx + 0.5, y: cy, lean: -1 });
         marks.push({ kind: 'dec', x: -(nx + 0.5), y: cy, lean: 1 });
       }
@@ -541,13 +542,14 @@ export function schematicSvg(s: PieceSchematic, opts: SvgOpts = {}): string {
 
   const chart = !measured && (opts.chart ?? false);
   const pad = 82;
+  const padX = chart ? 128 : 82; // wider side margins so the chart annotations fit
   const topExtra = chart ? 30 : 0; // a strip above the grid for the key
   const halfW = s.widthSts / 2;
-  const W = s.widthSts * cellW + pad * 2;
+  const W = s.widthSts * cellW + padX * 2;
   const H = s.heightRows * cellH + pad * 2 + topExtra;
 
   // stitch/row point → svg px (x centred, y flipped so cast-on is at the bottom).
-  const X = (xSt: number): number => pad + (xSt + halfW) * cellW;
+  const X = (xSt: number): number => padX + (xSt + halfW) * cellW;
   const Y = (yRow: number): number => pad + topExtra + (s.heightRows - yRow) * cellH;
 
   const parts: string[] = [];
@@ -567,39 +569,58 @@ export function schematicSvg(s: PieceSchematic, opts: SvgOpts = {}): string {
     );
   }
 
-  // Grid + axis numbers, spaced in the natural unit. Stitch mode: every 5 st/row
-  // (overview) or, as a chart, every 1 st/row (medium every 5, heavy+numbered every
-  // 10) to knit from. Measured: every 1 cm (heavy every 5) or every ½ in (heavy
-  // every 1). Numbers run from 0 at the cast-on / left edge; a tag names the unit.
+  // Grid + axis numbers. The chart draws a line through the CENTRE of every stitch
+  // and every row: stitches numbered outward from the centre gap (no line at 0 —
+  // it is the space between 1L and 1R), rows from 1 at the cast-on; heavy+numbered
+  // every 10, a middle tier at 5. The measured view is a physical ruler instead —
+  // every 1 cm (heavy every 5) or ½ in (heavy every 1) from the cast-on / left edge.
   if (grid) {
     const inch = measured && units === 'in';
-    const chart = !measured && (opts.chart ?? false);
-    const minorU = measured ? (inch ? 0.5 : 1) : chart ? 1 : 5;
-    const midU = chart ? 5 : 0; // a middle tier only on the per-stitch chart
-    const majorU = measured ? (inch ? 1 : 5) : chart ? 10 : 25;
-    const spuX = measured ? (inch ? s.gauge.bodySt / 4 : s.gauge.bodySt / 4 / 2.54) : 1;
-    const spuY = measured ? (inch ? s.gauge.bodyRow / 4 : s.gauge.bodyRow / 4 / 2.54) : 1;
     const mul = (u: number, m: number): boolean => m > 0 && Math.abs(u / m - Math.round(u / m)) < 1e-6;
-    const tier = (u: number): number => (mul(u, majorU) ? 2 : mul(u, midU) ? 1 : 0);
     const strokes = [
       'stroke="#e7ebef" stroke-width="0.5"',
       'stroke="#d4dbe1" stroke-width="0.8"',
       'stroke="#c0cad4" stroke-width="1.1"',
     ];
     const g: string[] = ['<g font-size="10" fill="#8a96a2">'];
-    for (let u = 0; u * spuX <= s.widthSts + 1e-6; u += minorU) {
-      const xs = -halfW + u * spuX;
-      const t = tier(u);
-      g.push(`<line x1="${X(xs).toFixed(1)}" y1="${Y(0).toFixed(1)}" x2="${X(xs).toFixed(1)}" y2="${Y(s.heightRows).toFixed(1)}" ${strokes[t]}/>`);
-      if (t === 2) g.push(`<text x="${X(xs).toFixed(1)}" y="${(Y(0) + 17).toFixed(1)}" text-anchor="middle">${Math.round(u)}</text>`);
+    if (chart) {
+      const tier = (k: number): number => (mul(k, 10) ? 2 : mul(k, 5) ? 1 : 0);
+      for (let k = 1; k - 0.5 <= halfW + 1e-6; k += 1) {
+        const t = tier(k);
+        for (const cx of [k - 0.5, -(k - 0.5)]) {
+          g.push(`<line x1="${X(cx).toFixed(1)}" y1="${Y(0).toFixed(1)}" x2="${X(cx).toFixed(1)}" y2="${Y(s.heightRows).toFixed(1)}" ${strokes[t]}/>`);
+        }
+        if (t === 2) {
+          g.push(`<text x="${X(k - 0.5).toFixed(1)}" y="${(Y(0) + 17).toFixed(1)}" text-anchor="middle">${k}R</text>`);
+          g.push(`<text x="${X(-(k - 0.5)).toFixed(1)}" y="${(Y(0) + 17).toFixed(1)}" text-anchor="middle">${k}L</text>`);
+        }
+      }
+      for (let k = 1; k - 0.5 <= s.heightRows + 1e-6; k += 1) {
+        const t = tier(k);
+        g.push(`<line x1="${X(-halfW).toFixed(1)}" y1="${Y(k - 0.5).toFixed(1)}" x2="${X(halfW).toFixed(1)}" y2="${Y(k - 0.5).toFixed(1)}" ${strokes[t]}/>`);
+        if (t === 2) g.push(`<text x="${(X(-halfW) - 8).toFixed(1)}" y="${(Y(k - 0.5) + 3.5).toFixed(1)}" text-anchor="end">${k}</text>`);
+      }
+      g.push(`<text x="${(X(-halfW) - 8).toFixed(1)}" y="${(Y(0) + 17).toFixed(1)}" text-anchor="end" fill="#5b6873">st · r</text>`);
+    } else {
+      const minorU = inch ? 0.5 : 1;
+      const majorU = inch ? 1 : 5;
+      const spuX = inch ? s.gauge.bodySt / 4 : s.gauge.bodySt / 4 / 2.54;
+      const spuY = inch ? s.gauge.bodyRow / 4 : s.gauge.bodyRow / 4 / 2.54;
+      const tier = (u: number): number => (mul(u, majorU) ? 2 : 0);
+      for (let u = 0; u * spuX <= s.widthSts + 1e-6; u += minorU) {
+        const xs = -halfW + u * spuX;
+        const t = tier(u);
+        g.push(`<line x1="${X(xs).toFixed(1)}" y1="${Y(0).toFixed(1)}" x2="${X(xs).toFixed(1)}" y2="${Y(s.heightRows).toFixed(1)}" ${strokes[t]}/>`);
+        if (t === 2) g.push(`<text x="${X(xs).toFixed(1)}" y="${(Y(0) + 17).toFixed(1)}" text-anchor="middle">${Math.round(u)}</text>`);
+      }
+      for (let u = 0; u * spuY <= s.heightRows + 1e-6; u += minorU) {
+        const ys = u * spuY;
+        const t = tier(u);
+        g.push(`<line x1="${X(-halfW).toFixed(1)}" y1="${Y(ys).toFixed(1)}" x2="${X(halfW).toFixed(1)}" y2="${Y(ys).toFixed(1)}" ${strokes[t]}/>`);
+        if (t === 2) g.push(`<text x="${(X(-halfW) - 8).toFixed(1)}" y="${(Y(ys) + 3.5).toFixed(1)}" text-anchor="end">${Math.round(u)}</text>`);
+      }
+      g.push(`<text x="${(X(-halfW) - 8).toFixed(1)}" y="${(Y(0) + 17).toFixed(1)}" text-anchor="end" fill="#5b6873">${inch ? 'in' : 'cm'}</text>`);
     }
-    for (let u = 0; u * spuY <= s.heightRows + 1e-6; u += minorU) {
-      const ys = u * spuY;
-      const t = tier(u);
-      g.push(`<line x1="${X(-halfW).toFixed(1)}" y1="${Y(ys).toFixed(1)}" x2="${X(halfW).toFixed(1)}" y2="${Y(ys).toFixed(1)}" ${strokes[t]}/>`);
-      if (t === 2) g.push(`<text x="${(X(-halfW) - 8).toFixed(1)}" y="${(Y(ys) + 3.5).toFixed(1)}" text-anchor="end">${Math.round(u)}</text>`);
-    }
-    g.push(`<text x="${(X(-halfW) - 8).toFixed(1)}" y="${(Y(0) + 17).toFixed(1)}" text-anchor="end" fill="#5b6873">${measured ? (inch ? 'in' : 'cm') : 'st / r'}</text>`);
     g.push('</g>');
     parts.push(g.join(''));
   }
