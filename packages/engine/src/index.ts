@@ -43,9 +43,14 @@ export type { Row, Op, Carriage, Piece } from './row';
 export {
   backPlan,
   lowerBackRows,
+  lowerPanelRows,
   armholeShaping,
   backThroughArmhole,
+  panelThroughArmhole,
   splitIntoSteps,
   backRows,
 } from './pieces/back';
 export type { BackPlan, PlanSection, ArmholeShaping, DecPhase } from './pieces/back';
+
+export { frontNeckDepthRows, frontNeckPlan, frontToNeck } from './pieces/front';
+export type { FrontNeckPlan } from './pieces/front';

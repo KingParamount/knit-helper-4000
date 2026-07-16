@@ -16,7 +16,7 @@ import {
   rowsFor,
   ribRowsFor,
 } from '../gauge';
-import { type Row, carriageForRow } from '../row';
+import { type Row, type Piece, carriageForRow } from '../row';
 
 export interface PlanSection {
   name: string;
@@ -101,10 +101,11 @@ export function backPlan(
 }
 
 /**
- * Row[] for the lower back: cast-on, rib, and plain body to the underarm.
- * Stops at the underarm; the array continues once shaping is added.
+ * Row[] for the lower body panel: cast-on, rib, and plain body to the underarm.
+ * Shared by front and back (identical below the neck for a straight pullover).
  */
-export function lowerBackRows(
+export function lowerPanelRows(
+  piece: Piece,
   size: SizeRecord,
   style: EaseStyleId,
   gauge: Gauge,
@@ -115,7 +116,7 @@ export function lowerBackRows(
   for (let index = 1; index <= lastPlainRow; index++) {
     rows.push({
       index,
-      piece: 'back',
+      piece,
       stitches: plan.castOnSts,
       carriage: carriageForRow(index),
       ops: index === 1 ? [{ kind: 'cast_on', count: plan.castOnSts }] : [],
@@ -123,6 +124,11 @@ export function lowerBackRows(
     });
   }
   return rows;
+}
+
+/** Lower back rows (thin wrapper over the shared panel). */
+export function lowerBackRows(size: SizeRecord, style: EaseStyleId, gauge: Gauge): Row[] {
+  return lowerPanelRows('back', size, style, gauge);
 }
 
 /** One phase of the graduated decrease: `times` single decreases, one every `everyRows` rows. */
@@ -165,17 +171,18 @@ export function armholeShaping(
 }
 
 /**
- * The back from cast-on through the armhole decreases (ends at the achieved back
- * width). Above this is straight to the shoulder line, then short-row shoulders
- * and the back neck — the next increment.
+ * A body panel from cast-on through the armhole decreases (ends at the achieved
+ * back width). Shared by front and back. Above this each piece differs: the back
+ * goes straight to the shoulders + flat neck; the front adds the neck curve.
  */
-export function backThroughArmhole(
+export function panelThroughArmhole(
+  piece: Piece,
   size: SizeRecord,
   style: EaseStyleId,
   gauge: Gauge,
 ): Row[] {
   const plan = backPlan(size, style, gauge);
-  const rows = lowerBackRows(size, style, gauge);
+  const rows = lowerPanelRows(piece, size, style, gauge);
   const shaping = armholeShaping(plan.castOnSts, plan.upperBackSts, gauge);
 
   let index = rows.length; // last body row (underarm)
@@ -186,7 +193,7 @@ export function backThroughArmhole(
       if (op.kind === 'bind_off') stitches -= op.count;
       if (op.kind === 'decrease') stitches -= op.count * (op.side === 'both' ? 2 : 1);
     }
-    rows.push({ index, piece: 'back', stitches, carriage: carriageForRow(index), ops, section: 'armhole' });
+    rows.push({ index, piece, stitches, carriage: carriageForRow(index), ops, section: 'armhole' });
   };
 
   // Underarm cast-off, one side per row (a block cast-off follows the carriage).
@@ -200,6 +207,11 @@ export function backThroughArmhole(
     }
   }
   return rows;
+}
+
+/** The back through the armhole (thin wrapper over the shared panel). */
+export function backThroughArmhole(size: SizeRecord, style: EaseStyleId, gauge: Gauge): Row[] {
+  return panelThroughArmhole('back', size, style, gauge);
 }
 
 /** Split `total` stitches into near-equal steps of roughly `target` each. */
