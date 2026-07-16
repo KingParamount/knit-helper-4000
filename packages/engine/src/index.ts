@@ -63,3 +63,6 @@ export type { FrontNeckPlan } from './pieces/front';
 
 export { CUFF_EASE_IN, evenRows, sleevePlan, sleeveRows, sleeves } from './pieces/sleeve';
 export type { SleevePlan } from './pieces/sleeve';
+
+export { PICKUP_PER_ROW, neckbandPlan, neckbandRows } from './pieces/neckband';
+export type { NeckbandPlan } from './pieces/neckband';

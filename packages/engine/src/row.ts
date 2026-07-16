@@ -15,6 +15,7 @@ export type Piece = 'back' | 'front' | 'sleeve_l' | 'sleeve_r' | 'collar';
  */
 export type Op =
   | { kind: 'cast_on'; count: number }
+  | { kind: 'pick_up'; count: number } // pick up and knit along an edge (e.g. a neckband)
   | { kind: 'bind_off'; count: number; side: 'L' | 'R' | 'both' | 'center' }
   | { kind: 'decrease'; count: number; side: 'L' | 'R' | 'both' }
   | { kind: 'increase'; count: number; side: 'L' | 'R' | 'both' }
