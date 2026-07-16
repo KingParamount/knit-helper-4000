@@ -11,7 +11,7 @@
 
 import type { SizeRecord, EaseStyleId } from '../data/types';
 import { garmentWidths } from '../dimensions';
-import { type Gauge, stitchesFor, rowsFor, ribRowsFor } from '../gauge';
+import { type Gauge, stitchesFor, evenStitchesFor, rowsFor, ribRowsFor } from '../gauge';
 import { type Row, type Piece, carriageForRow } from '../row';
 import { backPlan, armholeShaping } from './back';
 
@@ -31,7 +31,8 @@ const CAP_SHORTER_THAN_ARMHOLE_IN = 7.5 / 2.54;
 const CAP_FAST_EACH_END = 3;
 
 export interface SleevePlan {
-  castOnSts: number; // cuff
+  ribCastOnSts: number; // cuff rib, cast on odd (bodyCuffSts + 1, extra on the right)
+  bodyCuffSts: number; // even count after the rib drops one on the right
   ribRows: number;
   taperRows: number;
   incPerSide: number;
@@ -39,27 +40,31 @@ export interface SleevePlan {
   underarmCastOff: number; // matches the body armhole
   capHeightRows: number; // ≈ armhole depth − 7.5 cm
   capDecPerSide: number;
-  capTopSts: number; // bound off at the top
+  capTopSts: number; // bound off at the top (the crown)
 }
 
 export function sleevePlan(size: SizeRecord, style: EaseStyleId, gauge: Gauge): SleevePlan {
   const w = garmentWidths(size, style);
   const body = backPlan(size, style, gauge);
 
-  const castOnSts = stitchesFor(size.wrist + CUFF_EASE_IN, gauge);
+  const bodyCuffSts = evenStitchesFor(size.wrist + CUFF_EASE_IN, gauge); // even
+  const ribCastOnSts = bodyCuffSts + 1; // rib cast on odd, extra on the right
   const ribRows = ribRowsFor(size.rib_body, gauge);
   const taperRows = rowsFor(size.arm_length, gauge) - ribRows;
-  const incPerSide = Math.round((stitchesFor(w.sleeveTop, gauge) - castOnSts) / 2);
-  const sleeveTopSts = castOnSts + 2 * incPerSide;
+  const incPerSide = Math.round((stitchesFor(w.sleeveTop, gauge) - bodyCuffSts) / 2);
+  const sleeveTopSts = bodyCuffSts + 2 * incPerSide; // even
 
-  const underarmCastOff = armholeShaping(body.castOnSts, body.upperBackSts, gauge).castOffPerSide;
+  const underarmCastOff = armholeShaping(body.bodySts, body.upperBackSts, gauge).castOffPerSide;
   // Cap height ≈ armhole depth − 7.5 cm; top cast-off ≈ (upper arm ÷ 4 − 0.5 cm).
   const capHeightRows = rowsFor(w.armholeDepth, gauge) - rowsFor(CAP_SHORTER_THAN_ARMHOLE_IN, gauge);
-  const capTopSts = stitchesFor(w.sleeveTop / 4 - 0.5 / 2.54, gauge);
-  const capDecPerSide = Math.round((sleeveTopSts - 2 * underarmCastOff - capTopSts) / 2);
+  const capTopTarget = stitchesFor(w.sleeveTop / 4 - 0.5 / 2.54, gauge);
+  const capDecPerSide = Math.round((sleeveTopSts - 2 * underarmCastOff - capTopTarget) / 2);
+  // The crown is whatever is left after the symmetric shaping — even, by construction.
+  const capTopSts = sleeveTopSts - 2 * underarmCastOff - 2 * capDecPerSide;
 
   return {
-    castOnSts,
+    ribCastOnSts,
+    bodyCuffSts,
     ribRows,
     taperRows,
     incPerSide,
@@ -93,14 +98,16 @@ export function sleeveRows(
     rows.push({ index, piece, stitches, carriage: carriageForRow(index), ops, section });
   };
 
-  // Cuff cast-on + rib.
-  push([{ kind: 'cast_on', count: p.castOnSts }], 'rib');
+  // Cuff cast-on (odd rib) + rib.
+  push([{ kind: 'cast_on', count: p.ribCastOnSts }], 'rib');
   for (let i = 2; i <= p.ribRows; i++) push([], 'rib');
 
-  // Taper: increase 1 st each end on evenly spread rows.
+  // Taper: at the change to stocking, drop the rib's extra stitch on the right to
+  // reach the even cuff count; then increase 1 st each end on evenly spread rows.
   const incAt = new Set(evenRows(p.incPerSide, p.taperRows));
   for (let t = 1; t <= p.taperRows; t++) {
-    push(incAt.has(t) ? [{ kind: 'increase', count: 1, side: 'both' }] : [], 'taper');
+    if (t === 1) push([{ kind: 'decrease', count: 1, side: 'R' }], 'taper');
+    else push(incAt.has(t) ? [{ kind: 'increase', count: 1, side: 'both' }] : [], 'taper');
   }
 
   // Cap: cast off the underarm (matching the body), then a bell-shaped decrease

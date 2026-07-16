@@ -33,7 +33,7 @@ export function frontNeckPlan(
   gauge: Gauge,
 ): FrontNeckPlan {
   const plan = backPlan(size, style, gauge);
-  const bodySts = armholeShaping(plan.castOnSts, plan.upperBackSts, gauge).achievedSts;
+  const bodySts = armholeShaping(plan.bodySts, plan.upperBackSts, gauge).achievedSts;
   const shoulderSts = Math.round((bodySts - plan.backNeckSts) / 2); // match the back
   return {
     neckLineRow: plan.totalRows - frontNeckDepthRows(size, gauge),

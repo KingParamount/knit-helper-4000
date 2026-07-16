@@ -31,7 +31,10 @@ export function neckbandPlan(size: SizeRecord, style: EaseStyleId, gauge: Gauge)
   const fp = frontNeckPlan(size, style, gauge);
   const frontCentreSts = fp.frontNeckSts - 2 * stitchesFor(1.5, gauge); // the centre cast-off
   const frontSidePickup = Math.round(frontNeckDepthRows(size, gauge) * PICKUP_PER_ROW);
-  const pickupTotal = backNeckSts + frontCentreSts + 2 * frontSidePickup;
+  // A worked-flat 1x1 rib band picks up an odd number (extra on the right) so both
+  // selvedges are knit stitches; it is cast off in rib, with no drop to even.
+  const rawPickup = backNeckSts + frontCentreSts + 2 * frontSidePickup;
+  const pickupTotal = rawPickup % 2 === 0 ? rawPickup + 1 : rawPickup;
   return {
     backNeckSts,
     frontCentreSts,

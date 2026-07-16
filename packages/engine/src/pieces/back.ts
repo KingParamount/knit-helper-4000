@@ -13,6 +13,7 @@ import { garmentWidths } from '../dimensions';
 import {
   type Gauge,
   stitchesFor,
+  evenStitchesFor,
   rowsFor,
   ribRowsFor,
 } from '../gauge';
@@ -28,7 +29,8 @@ export interface PlanSection {
 }
 
 export interface BackPlan {
-  castOnSts: number; // hem = half the finished chest (flat back panel)
+  ribCastOnSts: number; // rib is cast on odd (body + 1, extra on the right)
+  bodySts: number; // even body panel = half the finished chest (after the rib drop)
   upperBackSts: number; // between the armholes
   backNeckSts: number;
   totalRows: number;
@@ -55,7 +57,8 @@ export function backPlan(
 ): BackPlan {
   const w = garmentWidths(size, style);
 
-  const castOnSts = stitchesFor(w.chest / 2, gauge);
+  const bodySts = evenStitchesFor(w.chest / 2, gauge); // even plain panel
+  const ribCastOnSts = bodySts + 1; // rib cast on odd, extra stitch on the right
   const upperBackSts = stitchesFor(size.back_width, gauge);
   const backNeckSts = stitchesFor(size.back_neck, gauge);
 
@@ -65,13 +68,13 @@ export function backPlan(
   const bodyRows = totalRows - armholeRows - ribRows;
 
   const sections: PlanSection[] = [
-    { name: 'rib', startRow: 1, endRow: ribRows, rows: ribRows, stitches: castOnSts },
+    { name: 'rib', startRow: 1, endRow: ribRows, rows: ribRows, stitches: ribCastOnSts },
     {
       name: 'body',
       startRow: ribRows + 1,
       endRow: ribRows + bodyRows,
       rows: bodyRows,
-      stitches: castOnSts,
+      stitches: bodySts,
     },
     {
       name: 'armhole+shoulder',
@@ -84,7 +87,8 @@ export function backPlan(
   ];
 
   return {
-    castOnSts,
+    ribCastOnSts,
+    bodySts,
     upperBackSts,
     backNeckSts,
     totalRows,
@@ -93,9 +97,9 @@ export function backPlan(
     armholeRows,
     sections,
     shaping: {
-      armholeDecTotal: castOnSts - upperBackSts,
+      armholeDecTotal: bodySts - upperBackSts,
       shoulderStsEachApprox: Math.round((upperBackSts - backNeckSts) / 2),
-      note: 'armhole narrows castOn->upperBack; top splits into two shoulders + back neck',
+      note: 'armhole narrows body->upperBack; top splits into two shoulders + back neck',
     },
   };
 }
@@ -112,15 +116,22 @@ export function lowerPanelRows(
 ): Row[] {
   const plan = backPlan(size, style, gauge);
   const lastPlainRow = plan.ribRows + plan.bodyRows; // underarm
+  const firstBodyRow = plan.ribRows + 1;
   const rows: Row[] = [];
   for (let index = 1; index <= lastPlainRow; index++) {
+    const inRib = index <= plan.ribRows;
+    // The rib is cast on odd (bodySts + 1); at the change to stocking the extra
+    // stitch is dropped on the right, so both rib selvedges are knit stitches.
+    let ops: Row['ops'] = [];
+    if (index === 1) ops = [{ kind: 'cast_on', count: plan.ribCastOnSts }];
+    else if (index === firstBodyRow) ops = [{ kind: 'decrease', count: 1, side: 'R' }];
     rows.push({
       index,
       piece,
-      stitches: plan.castOnSts,
+      stitches: inRib ? plan.ribCastOnSts : plan.bodySts,
       carriage: carriageForRow(index),
-      ops: index === 1 ? [{ kind: 'cast_on', count: plan.castOnSts }] : [],
-      section: index <= plan.ribRows ? 'rib' : 'body',
+      ops,
+      section: inRib ? 'rib' : 'body',
     });
   }
   return rows;
@@ -183,10 +194,10 @@ export function panelThroughArmhole(
 ): Row[] {
   const plan = backPlan(size, style, gauge);
   const rows = lowerPanelRows(piece, size, style, gauge);
-  const shaping = armholeShaping(plan.castOnSts, plan.upperBackSts, gauge);
+  const shaping = armholeShaping(plan.bodySts, plan.upperBackSts, gauge);
 
   let index = rows.length; // last body row (underarm)
-  let stitches = plan.castOnSts;
+  let stitches = plan.bodySts;
   const push = (ops: Row['ops']): void => {
     index += 1;
     for (const op of ops) {

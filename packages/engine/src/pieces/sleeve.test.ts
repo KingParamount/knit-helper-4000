@@ -18,9 +18,10 @@ describe('sleeve plan (Woman 36", moderate, default gauge)', () => {
   const p = sleevePlan(W36, 'moderate', G);
 
   it('casts on the cuff and tapers to the sleeve top', () => {
-    expect(p.castOnSts).toBe(51); // (wrist 5.75 + 1") × 30/4
-    expect(p.incPerSide).toBe(19); // (88 − 51)/2
-    expect(p.sleeveTopSts).toBe(89); // 51 + 2×19  (≈ upper arm 11.75")
+    expect(p.bodyCuffSts).toBe(50); // (wrist 5.75 + 1") × 30/4, rounded even
+    expect(p.ribCastOnSts).toBe(51); // rib cast on odd (cuff + 1, extra on the right)
+    expect(p.incPerSide).toBe(19); // (88 − 50)/2
+    expect(p.sleeveTopSts).toBe(88); // 50 + 2×19  (≈ upper arm 11.75"), even
   });
 
   it('lays out rib, taper and cap counts', () => {
@@ -28,8 +29,8 @@ describe('sleeve plan (Woman 36", moderate, default gauge)', () => {
     expect(p.taperRows).toBe(143); // arm length 16.75" − rib
     expect(p.underarmCastOff).toBe(8); // matches the body armhole underarm
     expect(p.capHeightRows).toBe(55); // armhole depth 8.5" − 7.5cm ≈ 5.5"
-    expect(p.capTopSts).toBe(21); // (upper arm ÷ 4 − 0.5cm)
-    expect(p.capDecPerSide).toBe(26); // (89 − 16 − 21) / 2
+    expect(p.capTopSts).toBe(20); // crown = what remains after symmetric shaping (even)
+    expect(p.capDecPerSide).toBe(26); // (88 − 16 − 21 target) / 2
   });
 
   it('makes the cap roughly two-thirds of the armhole depth', () => {
@@ -43,12 +44,15 @@ describe('sleeve rows', () => {
   const rows = sleeveRows('sleeve_l', W36, 'moderate', G);
 
   it('reaches the sleeve top then binds off the whole cap', () => {
-    expect(Math.max(...rows.map((r) => r.stitches))).toBe(89); // widest at the underarm
+    expect(Math.max(...rows.map((r) => r.stitches))).toBe(88); // widest at the underarm, even
     expect(rows[rows.length - 1].stitches).toBe(0); // cap fully cast off
   });
 
-  it('casts on the cuff and increases by 2 per increase row', () => {
-    expect(rows[0].ops).toEqual([{ kind: 'cast_on', count: 51 }]);
+  it('casts on the odd cuff, drops to even, and increases by 2 per increase row', () => {
+    expect(rows[0].ops).toEqual([{ kind: 'cast_on', count: 51 }]); // odd rib
+    expect(rows.find((r) => r.section === 'taper')!.ops).toEqual([
+      { kind: 'decrease', count: 1, side: 'R' }, // drop to even at the change to stocking
+    ]);
     const incRows = rows.filter((r) => r.ops.some((o) => o.kind === 'increase'));
     expect(incRows).toHaveLength(19);
   });
@@ -85,7 +89,7 @@ it('CHECKPOINT: prints the sleeve plan', () => {
   const lines = [
     '',
     '  SLEEVE — Woman 36", moderate, set-in, 30×40 gauge',
-    `  cast on ${p.castOnSts} (cuff) → rib ${p.ribRows} rows → taper +1 each end ×${p.incPerSide}`,
+    `  cast on ${p.ribCastOnSts} (odd cuff) → rib ${p.ribRows} rows, dec 1 to ${p.bodyCuffSts} → taper +1 each end ×${p.incPerSide}`,
     `  → ${p.sleeveTopSts} sts at the underarm (upper arm)`,
     `  CAP: cast off ${p.underarmCastOff} each underarm, then bell decrease over ${p.capHeightRows} rows`,
     `    (≈ armhole depth − 7.5cm), cast off crown ${p.capTopSts}. Total ${rows.length} rows.`,

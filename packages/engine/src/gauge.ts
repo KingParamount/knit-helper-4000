@@ -37,6 +37,17 @@ export function stitchesFor(inches: number, g: Gauge): number {
   return Math.round((inches * g.bodySt) / 4);
 }
 
+/**
+ * Stitches for a finished width, rounded to the nearest EVEN number. Extended
+ * lengths of plain (or patterned) knitting are worked on an even stitch count, and
+ * that parity discipline overrides the exact width — see the stitch-parity rules.
+ * (Ribbing is the exception: it is cast on odd, one more than the body, and dropped
+ * to this even count at the change to stocking stitch.)
+ */
+export function evenStitchesFor(inches: number, g: Gauge): number {
+  return Math.round((inches * g.bodySt) / 8) * 2;
+}
+
 /** Whole rows for a finished length, at the body row gauge. */
 export function rowsFor(inches: number, g: Gauge): number {
   return Math.round((inches * g.bodyRow) / 4);
