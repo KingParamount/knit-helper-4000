@@ -67,3 +67,9 @@ export type { SleevePlan } from './pieces/sleeve';
 
 export { PICKUP_PER_ROW, neckbandPlan, neckbandRows } from './pieces/neckband';
 export type { NeckbandPlan } from './pieces/neckband';
+
+export { assembleGarment } from './pieces/garment';
+export type { Garment } from './pieces/garment';
+
+export { renderPiece, renderPattern, patternText } from './render/prose';
+export type { PieceProse, Pattern } from './render/prose';
