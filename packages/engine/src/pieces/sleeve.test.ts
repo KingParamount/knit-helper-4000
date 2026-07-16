@@ -1,0 +1,89 @@
+import { describe, it, expect } from 'vitest';
+declare const console: { log: (...args: unknown[]) => void };
+import { findSize } from '../data/sizes';
+import { DEFAULT_GAUGE } from '../gauge';
+import { sleevePlan, sleeveRows, sleeves, evenRows } from './sleeve';
+
+const W36 = findSize('Woman', 36, 'in')!;
+const G = DEFAULT_GAUGE;
+
+describe('evenRows', () => {
+  it('spreads increases evenly across the span', () => {
+    expect(evenRows(19, 143)).toHaveLength(19);
+    expect(evenRows(3, 40)).toEqual([10, 20, 30]);
+  });
+});
+
+describe('sleeve plan (Woman 36", moderate, default gauge)', () => {
+  const p = sleevePlan(W36, 'moderate', G);
+
+  it('casts on the cuff and tapers to the sleeve top', () => {
+    expect(p.castOnSts).toBe(51); // (wrist 5.75 + 1") × 30/4
+    expect(p.incPerSide).toBe(19); // (88 − 51)/2
+    expect(p.sleeveTopSts).toBe(89); // 51 + 2×19  (≈ upper arm 11.75")
+  });
+
+  it('lays out rib, taper and cap counts', () => {
+    expect(p.ribRows).toBe(25); // 2.5"
+    expect(p.taperRows).toBe(143); // arm length 16.75" − rib
+    expect(p.underarmCastOff).toBe(8); // matches the body armhole underarm
+    expect(p.capTopSts).toBe(29);
+  });
+});
+
+describe('sleeve rows', () => {
+  const rows = sleeveRows('sleeve_l', W36, 'moderate', G);
+
+  it('reaches the sleeve top then binds off the whole cap', () => {
+    expect(Math.max(...rows.map((r) => r.stitches))).toBe(89); // widest at the underarm
+    expect(rows[rows.length - 1].stitches).toBe(0); // cap fully cast off
+  });
+
+  it('casts on the cuff and increases by 2 per increase row', () => {
+    expect(rows[0].ops).toEqual([{ kind: 'cast_on', count: 51 }]);
+    const incRows = rows.filter((r) => r.ops.some((o) => o.kind === 'increase'));
+    expect(incRows).toHaveLength(19);
+  });
+
+  it('casts off each underarm on its carriage-end side', () => {
+    const capCastOffs = rows.filter(
+      (r) => r.section === 'cap' && r.ops.some((o) => o.kind === 'bind_off' && o.side !== 'center'),
+    );
+    expect(capCastOffs).toHaveLength(2);
+    for (const r of capCastOffs) {
+      const op = r.ops.find((o) => o.kind === 'bind_off')!;
+      if (op.kind === 'bind_off') expect(op.side).toBe(r.carriage);
+    }
+  });
+
+  it('keeps the carriage alternating', () => {
+    for (let i = 1; i < rows.length; i++) {
+      expect(rows[i].carriage).not.toBe(rows[i - 1].carriage);
+    }
+  });
+
+  it('produces two identical sleeves', () => {
+    const { left, right } = sleeves(W36, 'moderate', G);
+    expect(left).toHaveLength(right.length);
+    expect(left.map((r) => r.stitches)).toEqual(right.map((r) => r.stitches));
+    expect(left[0].piece).toBe('sleeve_l');
+    expect(right[0].piece).toBe('sleeve_r');
+  });
+});
+
+it('CHECKPOINT: prints the sleeve plan', () => {
+  const p = sleevePlan(W36, 'moderate', G);
+  const rows = sleeveRows('sleeve_l', W36, 'moderate', G);
+  const lines = [
+    '',
+    '  SLEEVE — Woman 36", moderate, set-in, 30×40 gauge',
+    `  cast on ${p.castOnSts} (cuff) → rib ${p.ribRows} rows → taper +1 each end ×${p.incPerSide}`,
+    `  → ${p.sleeveTopSts} sts at the underarm (upper arm)`,
+    `  CAP (first cut): cast off ${p.underarmCastOff} each underarm, dec 1 each end every other`,
+    `    row ×${p.capDecPerSide}, cast off top ${p.capTopSts}. Total ${rows.length} rows.`,
+    '  ⚠ cap edge is not yet length-matched to the armhole — flagged for review.',
+    '',
+  ];
+  console.log(lines.join('\n'));
+  expect(true).toBe(true);
+});

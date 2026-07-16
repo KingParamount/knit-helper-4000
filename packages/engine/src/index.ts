@@ -60,3 +60,6 @@ export {
   frontRows,
 } from './pieces/front';
 export type { FrontNeckPlan } from './pieces/front';
+
+export { CUFF_EASE_IN, evenRows, sleevePlan, sleeveRows, sleeves } from './pieces/sleeve';
+export type { SleevePlan } from './pieces/sleeve';
