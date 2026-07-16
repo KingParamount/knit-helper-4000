@@ -74,5 +74,11 @@ export type { Garment } from './pieces/garment';
 export { renderPiece, renderPattern, patternText } from './render/prose';
 export type { PieceProse, Pattern, ProseStyle } from './render/prose';
 
-export { backSchematic, schematicSvg } from './render/schematic';
+export {
+  backSchematic,
+  frontSchematic,
+  sleeveSchematic,
+  neckbandSchematic,
+  schematicSvg,
+} from './render/schematic';
 export type { PieceSchematic, Pt, Measure, SvgOpts } from './render/schematic';

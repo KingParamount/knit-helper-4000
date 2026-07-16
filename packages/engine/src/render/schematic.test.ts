@@ -41,3 +41,38 @@ describe('schematicSvg', () => {
     expect(measured).toContain('10 cm'); // print calibration ruler
   });
 });
+
+import { frontRows, frontNeckPlan } from '../pieces/front';
+import { sleevePlan, sleeveRows } from '../pieces/sleeve';
+import { neckbandPlan, neckbandRows } from '../pieces/neckband';
+import { frontSchematic, sleeveSchematic, neckbandSchematic } from './schematic';
+
+describe('front / sleeve / neckband schematics', () => {
+  it('front: same body width, garment-height top, scooped neck', () => {
+    const f = frontSchematic(
+      frontRows(W36, 'moderate', DEFAULT_GAUGE),
+      plan,
+      frontNeckPlan(W36, 'moderate', DEFAULT_GAUGE),
+      DEFAULT_GAUGE,
+    );
+    expect(f.widthSts).toBe(144);
+    expect(f.heightRows).toBe(246); // from the plan, not the two halves' running index
+    expect(f.measures.find((m) => m.label === 'neck depth')?.rows).toBeGreaterThan(20);
+    expect(Math.max(...f.outline.map((p) => Math.abs(p.x)))).toBe(72);
+  });
+
+  it('sleeve: widens from cuff to the upper arm, then a cap', () => {
+    const sp = sleevePlan(W36, 'moderate', DEFAULT_GAUGE);
+    const s = sleeveSchematic(sleeveRows('sleeve_l', W36, 'moderate', DEFAULT_GAUGE), sp, DEFAULT_GAUGE);
+    expect(s.widthSts).toBe(88); // widest at the underarm
+    expect(s.measures.find((m) => m.label === 'cuff')?.sts).toBe(50);
+    expect(s.measures.find((m) => m.label === 'upper arm')?.sts).toBe(88);
+  });
+
+  it('neckband: a plain rib strip', () => {
+    const np = neckbandPlan(W36, 'moderate', DEFAULT_GAUGE);
+    const n = neckbandSchematic(neckbandRows(W36, 'moderate', DEFAULT_GAUGE), np, DEFAULT_GAUGE);
+    expect(n.widthSts).toBe(125);
+    expect(n.outline).toHaveLength(4);
+  });
+});

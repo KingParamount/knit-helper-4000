@@ -153,6 +153,231 @@ export function backSchematic(
 }
 
 // ---------------------------------------------------------------------------
+// The Front — body + armhole as the back, then a scooped neck between the shoulders.
+// ---------------------------------------------------------------------------
+
+export function frontSchematic(
+  rows: Row[],
+  plan: { bodySts: number; ribRows: number; totalRows: number },
+  fnp: { neckLineRow: number; frontNeckSts: number; shoulderSts: number },
+  gauge: Gauge,
+): PieceSchematic {
+  const bodyHalf = plan.bodySts / 2;
+  const split = rows.find((r) => r.section === 'neck_split');
+  const splitY = split ? split.index : fnp.neckLineRow;
+  const centreCastOff = split
+    ? ((split.ops[0] as { count: number }).count ?? 0)
+    : fnp.frontNeckSts;
+  // The two neck halves continue the row index past the garment top, so take the
+  // top from the plan rather than the last row index.
+  const topY = plan.totalRows;
+  // Below the split, the front is the back: track its true edges up to the split.
+  const { rightPts, leftPts, underarmY } = trackBodyEdges(rows, bodyHalf, splitY);
+  const achievedHalf = rightPts[rightPts.length - 1].x; // armhole width reached
+  const shoulderDropY = topY - 12; // the short-row shoulder occupies the top ~12 rows
+  const neckTopHalf = fnp.frontNeckSts / 2; // neck opening at the shoulders
+  const neckBottomHalf = centreCastOff / 2; // the centre cast-off at the neck base
+
+  // Right side: straight up to the shoulder, slope in to the neck, then the scoop
+  // down to the neck base (a quadratic through a corner control point).
+  rightPts.push({ x: achievedHalf, y: shoulderDropY });
+  rightPts.push({ x: neckTopHalf, y: topY });
+  for (const t of [0.35, 0.7, 1]) {
+    const x = (1 - t) * (1 - t) * neckTopHalf + 2 * (1 - t) * t * neckTopHalf + t * t * neckBottomHalf;
+    const y = (1 - t) * (1 - t) * topY + 2 * (1 - t) * t * splitY + t * t * splitY;
+    rightPts.push({ x, y });
+  }
+  leftPts.push({ x: -achievedHalf, y: shoulderDropY });
+  leftPts.push({ x: -neckTopHalf, y: topY });
+  for (const t of [0.35, 0.7, 1]) {
+    const x = (1 - t) * (1 - t) * neckTopHalf + 2 * (1 - t) * t * neckTopHalf + t * t * neckBottomHalf;
+    const y = (1 - t) * (1 - t) * topY + 2 * (1 - t) * t * splitY + t * t * splitY;
+    leftPts.push({ x: -x, y });
+  }
+
+  const outline = [...rightPts, ...leftPts.reverse()];
+  const measures: Measure[] = [
+    { kind: 'width', label: 'width', sts: plan.bodySts, at: 0, from: -bodyHalf, to: bodyHalf },
+    { kind: 'width', label: 'front neck', sts: fnp.frontNeckSts, at: topY, from: -neckTopHalf, to: neckTopHalf },
+    { kind: 'height', label: 'length', rows: topY, at: 0, from: 0, to: topY },
+    { kind: 'height', label: 'armhole', rows: topY - underarmY, at: 0, from: underarmY, to: topY },
+    { kind: 'height', label: 'neck depth', rows: topY - splitY, at: 0, from: splitY, to: topY },
+  ];
+  return {
+    piece: 'front',
+    title: 'The Front',
+    outline,
+    widthSts: plan.bodySts,
+    heightRows: topY,
+    ribRows: plan.ribRows,
+    gauge,
+    measures,
+  };
+}
+
+/** Track the true left/right edges of a bottom-up body panel from the ops, up to
+ *  `stopY` (exclusive). The rib is a stitch wider (odd cast-on); clamp it. */
+function trackBodyEdges(
+  rows: Row[],
+  bodyHalf: number,
+  stopY: number,
+): { rightPts: Pt[]; leftPts: Pt[]; underarmY: number } {
+  const rightPts: Pt[] = [{ x: bodyHalf, y: 0 }];
+  const leftPts: Pt[] = [{ x: -bodyHalf, y: 0 }];
+  let leftSts = 0;
+  let rightSts = 0;
+  let lastR = bodyHalf;
+  let lastL = -bodyHalf;
+  let rDone = false;
+  let lDone = false;
+  let underarmY = 0;
+  for (const r of rows) {
+    if (r.index >= stopY) break;
+    for (const op of r.ops) {
+      if (op.kind === 'cast_on') {
+        rightSts = Math.ceil(op.count / 2);
+        leftSts = Math.floor(op.count / 2);
+      } else if (op.kind === 'bind_off') {
+        if (op.side === 'R') rightSts -= op.count;
+        else if (op.side === 'L') leftSts -= op.count;
+      } else if (op.kind === 'decrease') {
+        if (op.side === 'R' || op.side === 'both') rightSts -= op.count;
+        if (op.side === 'L' || op.side === 'both') leftSts -= op.count;
+      } else if (op.kind === 'increase') {
+        if (op.side === 'R' || op.side === 'both') rightSts += op.count;
+        if (op.side === 'L' || op.side === 'both') leftSts += op.count;
+      }
+    }
+    const rx = r.section === 'rib' ? bodyHalf : rightSts;
+    const lx = r.section === 'rib' ? -bodyHalf : -leftSts;
+    if (rx !== lastR) {
+      if (!rDone && rx < bodyHalf) {
+        underarmY = r.index - 1;
+        rightPts.push({ x: bodyHalf, y: r.index - 1 });
+        rDone = true;
+      }
+      rightPts.push({ x: rx, y: r.index });
+      lastR = rx;
+    }
+    if (lx !== lastL) {
+      if (!lDone && lx > -bodyHalf) {
+        leftPts.push({ x: -bodyHalf, y: r.index - 1 });
+        lDone = true;
+      }
+      leftPts.push({ x: lx, y: r.index });
+      lastL = lx;
+    }
+  }
+  return { rightPts, leftPts, underarmY };
+}
+
+// ---------------------------------------------------------------------------
+// The Sleeve — cuff, taper out to the underarm, then the set-in cap to the crown.
+// ---------------------------------------------------------------------------
+
+export function sleeveSchematic(
+  rows: Row[],
+  plan: { bodyCuffSts: number; sleeveTopSts: number; capTopSts: number; ribRows: number },
+  gauge: Gauge,
+): PieceSchematic {
+  const cuffHalf = plan.bodyCuffSts / 2;
+  const crown = rows[rows.length - 1]; // centre cast-off of the crown
+  const topY = crown.index;
+  const rightPts: Pt[] = [{ x: cuffHalf, y: 0 }];
+  const leftPts: Pt[] = [{ x: -cuffHalf, y: 0 }];
+  let leftSts = 0;
+  let rightSts = 0;
+  let lastR = cuffHalf;
+  let lastL = -cuffHalf;
+  let capStartY = 0;
+  let maxHalf = cuffHalf;
+  for (const r of rows) {
+    if (r.index >= topY) break;
+    for (const op of r.ops) {
+      if (op.kind === 'cast_on') {
+        rightSts = Math.ceil(op.count / 2);
+        leftSts = Math.floor(op.count / 2);
+      } else if (op.kind === 'increase') {
+        rightSts += op.count;
+        leftSts += op.count;
+      } else if (op.kind === 'bind_off') {
+        if (op.side === 'R') rightSts -= op.count;
+        else if (op.side === 'L') leftSts -= op.count;
+      } else if (op.kind === 'decrease') {
+        if (op.side === 'R' || op.side === 'both') rightSts -= op.count;
+        if (op.side === 'L' || op.side === 'both') leftSts -= op.count;
+      }
+    }
+    if (r.section === 'cap' && capStartY === 0) capStartY = r.index - 1; // underarm
+    const rx = r.section === 'rib' ? cuffHalf : rightSts;
+    const lx = r.section === 'rib' ? -cuffHalf : -leftSts;
+    if (rx > maxHalf) maxHalf = rx;
+    if (rx !== lastR) {
+      rightPts.push({ x: rx, y: r.index });
+      lastR = rx;
+    }
+    if (lx !== lastL) {
+      leftPts.push({ x: lx, y: r.index });
+      lastL = lx;
+    }
+  }
+  rightPts.push({ x: plan.capTopSts / 2, y: topY });
+  leftPts.push({ x: -plan.capTopSts / 2, y: topY });
+  const outline = [...rightPts, ...leftPts.reverse()];
+
+  const measures: Measure[] = [
+    { kind: 'width', label: 'cuff', sts: plan.bodyCuffSts, at: 0, from: -cuffHalf, to: cuffHalf },
+    { kind: 'width', label: 'upper arm', sts: plan.sleeveTopSts, at: capStartY, from: -maxHalf, to: maxHalf },
+    { kind: 'width', label: 'crown', sts: plan.capTopSts, at: topY, from: -plan.capTopSts / 2, to: plan.capTopSts / 2 },
+    { kind: 'height', label: 'to underarm', rows: capStartY, at: 0, from: 0, to: capStartY },
+    { kind: 'height', label: 'cap', rows: topY - capStartY, at: 0, from: capStartY, to: topY },
+  ];
+  return {
+    piece: 'sleeve',
+    title: 'The Sleeves (make 2)',
+    outline,
+    widthSts: Math.round(maxHalf * 2),
+    heightRows: topY,
+    ribRows: plan.ribRows,
+    gauge,
+    measures,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The Neckband — a picked-up rib strip (worked flat, seamed at one shoulder).
+// ---------------------------------------------------------------------------
+
+export function neckbandSchematic(
+  rows: Row[],
+  plan: { pickupTotal: number; bandRows: number },
+  gauge: Gauge,
+): PieceSchematic {
+  const half = plan.pickupTotal / 2;
+  const h = plan.bandRows;
+  const outline: Pt[] = [
+    { x: half, y: 0 },
+    { x: half, y: h },
+    { x: -half, y: h },
+    { x: -half, y: 0 },
+  ];
+  const measures: Measure[] = [
+    { kind: 'width', label: 'pick-up', sts: plan.pickupTotal, at: 0, from: -half, to: half },
+    { kind: 'height', label: 'band', rows: h, at: 0, from: 0, to: h },
+  ];
+  return {
+    piece: 'neckband',
+    title: 'Neckband',
+    outline,
+    widthSts: plan.pickupTotal,
+    heightRows: h,
+    ribRows: h, // all rib
+    gauge,
+    measures,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // SVG rendering.
 // ---------------------------------------------------------------------------
 
