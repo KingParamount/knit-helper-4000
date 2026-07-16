@@ -13,7 +13,7 @@
 import type { SizeRecord, EaseStyleId } from '../data/types';
 import { type Gauge, rowsFor, stitchesFor } from '../gauge';
 import { type Row, carriageForRow } from '../row';
-import { backPlan, panelThroughArmhole, armholeShaping, splitIntoSteps } from './back';
+import { backPlan, panelThroughArmhole, armholeShaping, splitIntoSteps, SHOULDER_STEP_STS } from './back';
 
 /** Rows the front neck occupies below the shoulder line (crew depth). */
 export function frontNeckDepthRows(size: SizeRecord, gauge: Gauge): number {
@@ -84,7 +84,7 @@ export function frontRows(size: SizeRecord, style: EaseStyleId, gauge: Gauge): R
   const perSide = stitchesFor(1.5, gauge); // ~1.5" curve each neck edge
   const centreCastOff = fp.frontNeckSts - 2 * perSide;
   const shaping = frontNeckShaping(perSide);
-  const shoulderSteps = splitIntoSteps(fp.shoulderSts, 7);
+  const shoulderSteps = splitIntoSteps(fp.shoulderSts, SHOULDER_STEP_STS);
   const heightRows = frontNeckDepthRows(size, gauge);
 
   let index = rows.length;

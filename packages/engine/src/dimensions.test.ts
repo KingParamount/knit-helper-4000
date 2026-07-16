@@ -30,8 +30,8 @@ describe('garment widths (Woman 36", set-in, straight body)', () => {
     for (const s of STYLES) {
       const w = garmentWidths(W36, s);
       expect(w.backWidth).toBeCloseTo(13.25, 4); // 13.25 + 0
-      expect(w.armholeDepth).toBeCloseTo(9.0, 4); // 7.5 + 1.5
-      expect(w.armhole).toBeCloseTo(18.0, 4); // 2 × 9.0
+      expect(w.armholeDepth).toBeCloseTo(8.5, 4); // 7.5 + 1.0
+      expect(w.armhole).toBeCloseTo(17.0, 4); // 2 × 8.5
       expect(w.sleeveTop).toBeCloseTo(11.75, 4); // 10.75 + 1.0
     }
   });
@@ -56,7 +56,7 @@ it('CHECKPOINT: prints the Woman 36" dimensions table', () => {
   }
   lines.push('  └─────────────┴────────┴─────────┴──────────┴─────────┴───────────┘');
   lines.push('  chest = bust + ease (CYC ladder). back/armhole/sleeve = fixed set-in allowances');
-  lines.push('  (back +0, armhole depth +1.5" => 2×9.0, sleeve top +1"); armhole shown as around-measure');
+  lines.push('  (back +0, armhole depth +1" => 2×8.5, sleeve top +1"); armhole shown as around-measure');
   lines.push('');
   console.log(lines.join('\n'));
   expect(true).toBe(true);

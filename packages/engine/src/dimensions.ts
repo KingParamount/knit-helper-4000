@@ -25,7 +25,7 @@ import { easeBase } from './data/options';
  */
 export const SETIN_ALLOWANCE_IN = {
   backWidth: 0.0, // set-in shoulder seam sits on the shoulder tip — zero ease
-  armholeDepth: 1.5, // body arm depth + 1.5"
+  armholeDepth: 1.0, // body arm depth + 1" → ~8.5" finished, central vs (bust/6)+5cm
   upperArm: 1.0, // body upper arm + 1"
 } as const;
 

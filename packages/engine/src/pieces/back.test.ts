@@ -26,8 +26,8 @@ describe('back piece plan (Woman 36", moderate, default gauge)', () => {
   it('lays out row counts that sum to the body length', () => {
     expect(p.totalRows).toBe(246); // 24.55" × 40/4
     expect(p.ribRows).toBe(25); // 2.5" (rib gauge defaults to body)
-    expect(p.armholeRows).toBe(90); // 9" armhole depth
-    expect(p.bodyRows).toBe(131); // 246 − 90 − 25
+    expect(p.armholeRows).toBe(85); // 8.5" armhole depth
+    expect(p.bodyRows).toBe(136); // 246 − 85 − 25
     expect(p.ribRows + p.bodyRows + p.armholeRows).toBe(p.totalRows);
   });
 
@@ -40,7 +40,7 @@ describe('lower back rows', () => {
   const rows = lowerBackRows(W36, 'moderate', G);
 
   it('runs from cast-on to the underarm', () => {
-    expect(rows).toHaveLength(156); // rib 25 + body 131
+    expect(rows).toHaveLength(161); // rib 25 + body 136
     expect(rows[0].index).toBe(1);
     expect(rows[0].ops).toEqual([{ kind: 'cast_on', count: 144 }]);
     expect(rows.every((r) => r.stitches === 144)).toBe(true);
@@ -79,15 +79,15 @@ describe('armhole shaping (graduated / curved scye)', () => {
 
   it('reconciles to the achieved back width', () => {
     expect(rows[rows.length - 1].stitches).toBe(98);
-    // 156 lower + 2 cast-off + 5 (every row) + 14 (7 dec + 7 plain) + 12 (3 dec + 9 plain)
-    expect(rows).toHaveLength(189);
+    // 161 lower + 2 cast-off + 5 (every row) + 14 (7 dec + 7 plain) + 12 (3 dec + 9 plain)
+    expect(rows).toHaveLength(194);
   });
 
   it('decreases fastest at the bottom of the scye', () => {
     const decRows = rows.filter((r) => r.ops.some((o) => o.kind === 'decrease')).map((r) => r.index);
     expect(decRows).toHaveLength(15);
     // first five are consecutive (every row); gaps widen higher up
-    expect(decRows.slice(0, 5)).toEqual([159, 160, 161, 162, 163]);
+    expect(decRows.slice(0, 5)).toEqual([164, 165, 166, 167, 168]);
     expect(decRows[decRows.length - 1] - decRows[decRows.length - 2]).toBe(4); // every 4th near top
   });
 

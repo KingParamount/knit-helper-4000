@@ -100,7 +100,8 @@ Do not add it to armhole maths.
 *chest* in the manual, and for a **set-in sleeve** the other widths turn out to be fixed
 allowances rather than fractions of it (a set-in armhole/sleeve is fitted regardless of body
 looseness). Resolved against 2026 standards, not the manual — see `dimensions_model.md`:
-back width +0", armhole depth +1.5", sleeve top +1" (Sister Mountain); chest = bust + ease,
+back width +0", armhole depth +1" (trimmed from Sister Mountain's +1.5" to a central 8.5"),
+sleeve top +1" (Sister Mountain); chest = bust + ease,
 bust-only (CYC). The armhole *around*-measure is `2 × armhole_depth` (`manual.txt:257`,
 "use half of the measurement around the armhole"). The Basics `armhole` column is a *body*
 girth from a different program and is **not** an answer key — ignore it.

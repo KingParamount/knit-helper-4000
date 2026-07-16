@@ -214,6 +214,12 @@ export function backThroughArmhole(size: SizeRecord, style: EaseStyleId, gauge: 
   return panelThroughArmhole('back', size, style, gauge);
 }
 
+/**
+ * Stitches per short-row shoulder step. ~5 gives a ~1" shoulder slope at the
+ * target size (5 steps × 2 rows = 10 rows ≈ 1"), the standard set-in drop.
+ */
+export const SHOULDER_STEP_STS = 5;
+
 /** Split `total` stitches into near-equal steps of roughly `target` each. */
 export function splitIntoSteps(total: number, target: number): number[] {
   const steps = Math.max(1, Math.round(total / target));
@@ -239,7 +245,7 @@ export function backRows(size: SizeRecord, style: EaseStyleId, gauge: Gauge): Ro
   const achieved = rows[rows.length - 1].stitches;
   const backNeck = plan.backNeckSts;
   const shoulderSts = Math.round((achieved - backNeck) / 2);
-  const steps = splitIntoSteps(shoulderSts, 7); // ~7-st short-row groups
+  const steps = splitIntoSteps(shoulderSts, SHOULDER_STEP_STS);
 
   let index = rows.length;
   let stitches = achieved;

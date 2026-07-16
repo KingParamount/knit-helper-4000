@@ -27,15 +27,15 @@ describe('sleeve plan (Woman 36", moderate, default gauge)', () => {
     expect(p.ribRows).toBe(25); // 2.5"
     expect(p.taperRows).toBe(143); // arm length 16.75" − rib
     expect(p.underarmCastOff).toBe(8); // matches the body armhole underarm
-    expect(p.capHeightRows).toBe(60); // armhole depth 9" − 7.5cm ≈ 6"
+    expect(p.capHeightRows).toBe(55); // armhole depth 8.5" − 7.5cm ≈ 5.5"
     expect(p.capTopSts).toBe(21); // (upper arm ÷ 4 − 0.5cm)
     expect(p.capDecPerSide).toBe(26); // (89 − 16 − 21) / 2
   });
 
   it('makes the cap roughly two-thirds of the armhole depth', () => {
-    // armhole depth is 90 rows; the cap fills it minus ~7.5cm (source guidance)
-    expect(p.capHeightRows / 90).toBeGreaterThan(0.6);
-    expect(p.capHeightRows / 90).toBeLessThan(0.72);
+    // armhole depth is 85 rows; the cap fills it minus ~7.5cm (source guidance)
+    expect(p.capHeightRows / 85).toBeGreaterThan(0.6);
+    expect(p.capHeightRows / 85).toBeLessThan(0.72);
   });
 });
 

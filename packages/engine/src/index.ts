@@ -48,6 +48,7 @@ export {
   backThroughArmhole,
   panelThroughArmhole,
   splitIntoSteps,
+  SHOULDER_STEP_STS,
   backRows,
 } from './pieces/back';
 export type { BackPlan, PlanSection, ArmholeShaping, DecPhase } from './pieces/back';

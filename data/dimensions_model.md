@@ -53,7 +53,7 @@ measurements for a 36" woman match our size table — arm depth 7–7½" vs 7.5,
 |---|---|---|
 | **Chest** | `body_chest + base·ease_factor` (**bust-only**) | CYC fit ladder — very-close/close/classic/loose/oversized maps onto our five styles |
 | **Back width** | `body_back_width + 0` | set-in shoulder seam sits on the shoulder tip → zero ease (Sister Mountain) |
-| **Armhole depth** | `arm_depth + 1.5"` | Sister Mountain (set-in) |
+| **Armhole depth** | `arm_depth + 1"` | Sister Mountain +1.5" trimmed to +1" so finished ≈ 8.5" (central vs (bust÷6)+5cm); see CYC check |
 | **Armhole (around)** | `2 × armhole_depth` | geometry (`manual.txt:257`, `:506`) |
 | **Sleeve top** (upper arm) | `body_upper_arm + 1"` | Sister Mountain (set-in) |
 
