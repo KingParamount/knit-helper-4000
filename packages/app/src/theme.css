@@ -83,8 +83,8 @@ body {
   border-radius: var(--radius);
   box-shadow: 0 3px 0 var(--powder-dim);
   padding: 10px 12px;
-  display: inline-flex; flex-direction: column; align-items: center; gap: 6px;
-  min-height: 64px; min-width: 74px;
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  min-height: 64px; min-width: 74px; padding-top: 14px;
   transition: transform .05s, background .12s, box-shadow .12s;
 }
 .btn .ico { display: block; }
@@ -143,9 +143,15 @@ body {
   border-radius: 9px; box-shadow: 0 2px 0 #c3cbdb; overflow: hidden; vertical-align: middle; margin: 0 3px;
 }
 .numfield input { width: 3.4rem; border: none; font: inherit; font-weight: 700; text-align: right; padding: 6px 4px; color: var(--ink); }
+.numfield.inch input.whole { width: 2.4rem; }
 .numfield input:focus { outline: none; }
+.numfield input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+.numfield input::-webkit-outer-spin-button, .numfield input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .numfield .unit { padding: 0 8px 0 2px; color: var(--ink-soft); font-size: .82rem; }
-.stepper { display: inline-flex; flex-direction: column; border-left: 1px solid #e0e4ee; }
+.eighths { display: inline-flex; align-items: center; border-left: 1px solid #e0e4ee; padding: 0 2px 0 8px; }
+.frac { font-weight: 800; font-size: .95rem; color: var(--ink); }
+.frac .over { color: var(--ink-soft); font-size: .8rem; }
+.stepper { display: inline-flex; flex-direction: column; border-left: 1px solid #e0e4ee; margin-left: 6px; }
 .stepper button { appearance: none; border: none; background: #eef1f7; cursor: pointer; width: 22px; height: 17px; line-height: 1; font-size: .7rem; color: var(--navy); }
 .stepper button:hover { background: var(--copper-soft); }
 

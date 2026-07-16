@@ -8,6 +8,7 @@ import {
   buildSchematics,
   gaugeFromSwatch,
   gaugeReadout,
+  resolveSize,
   svgFor,
   type EaseId,
   type PieceId,
@@ -16,7 +17,7 @@ import {
 import {
   IconSweater, IconCardigan, IconSkirt, IconDog,
   IconBaby, IconChild, IconWoman, IconMan, IconCustom,
-  IconEase, IconCrew, IconVneck,
+  IconEase, IconCrew, IconVneck, IconShoulder, IconSleeve,
   IconDocFull, IconDocShort, IconChart, IconRoller, IconPrint,
 } from './icons';
 import './theme.css';
@@ -61,19 +62,36 @@ function Btn({
 // ---- swatch measurement field ----------------------------------------------
 
 function Measure({ inches, onChange, units }: { inches: number; onChange: (inches: number) => void; units: Units }): JSX.Element {
-  const shown = units === 'cm' ? inches * 2.54 : inches;
-  const step = units === 'cm' ? 0.25 : 0.125;
-  const set = (v: number): void => onChange(units === 'cm' ? v / 2.54 : v);
+  if (units === 'cm') {
+    // A plain decimal box, no steppers.
+    const cm = inches * 2.54;
+    return (
+      <span className="numfield">
+        <input
+          type="number" min={0} step={0.1} value={Number(cm.toFixed(1))}
+          onChange={(e) => onChange(Math.max(0, parseFloat(e.target.value) || 0) / 2.54)}
+        />
+        <span className="unit">cm</span>
+      </span>
+    );
+  }
+  // Inches: a typed whole-inches box, and a separate eighths stepper (arrows, no typing).
+  const whole = Math.floor(inches + 1e-9);
+  const eighths = Math.round((inches - whole) * 8);
+  const setTotalEighths = (t: number): void => onChange(Math.max(0, t) / 8);
   return (
-    <span className="numfield">
+    <span className="numfield inch">
       <input
-        type="number" value={Number(shown.toFixed(units === 'cm' ? 1 : 3))} step={step}
-        onChange={(e) => set(parseFloat(e.target.value) || 0)}
+        type="number" className="whole" min={0} step={1} value={whole}
+        onChange={(e) => onChange(Math.max(0, parseInt(e.target.value) || 0) + eighths / 8)}
       />
-      <span className="unit">{units === 'cm' ? 'cm' : 'in'}</span>
-      <span className="stepper">
-        <button onClick={() => set(shown + step)} aria-label="up">▲</button>
-        <button onClick={() => set(Math.max(step, shown - step))} aria-label="down">▼</button>
+      <span className="unit">in</span>
+      <span className="eighths">
+        <span className="frac">{eighths}<span className="over">⁄8</span></span>
+        <span className="stepper">
+          <button onClick={() => setTotalEighths(whole * 8 + eighths + 1)} aria-label="up an eighth">▲</button>
+          <button onClick={() => setTotalEighths(whole * 8 + eighths - 1)} aria-label="down an eighth">▼</button>
+        </span>
       </span>
     </span>
   );
@@ -113,6 +131,17 @@ export function App(): JSX.Element {
     if (!list.includes(chest)) setChest(list[Math.floor(list.length / 2)]);
   };
   const chestCm = Math.round(chest * 2.54);
+  // Babies and children are sized by age, adults by chest.
+  const young = category === 'Baby' || category === 'Child';
+  const sizeRec = resolveSize(category, chest);
+  const sizeVal = young
+    ? category === 'Baby'
+      ? (sizeRec?.age ?? '').replace('m', '')
+      : sizeRec?.age ?? ''
+    : units === 'cm'
+      ? chestCm
+      : chest;
+  const sizeUnit = young ? (category === 'Baby' ? 'months' : 'years') : units === 'cm' ? 'cm chest' : 'in chest';
 
   const input = { category, chest, units, ease, swatch };
   const gauge = gaugeReadout(gaugeFromSwatch(swatch));
@@ -172,7 +201,7 @@ export function App(): JSX.Element {
                   type="range" min={chests[0]} max={chests[chests.length - 1]} step={2} value={chest}
                   onChange={(e) => setChest(Number(e.target.value))} aria-label="Chest size"
                 />
-                <span className="size-read">{units === 'cm' ? chestCm : chest}<small>{units === 'cm' ? 'cm chest' : 'in chest'}</small></span>
+                <span className="size-read">{sizeVal}<small>{sizeUnit}</small></span>
               </div>
             </div>
           </Tile>
@@ -182,8 +211,8 @@ export function App(): JSX.Element {
         <Section label="Shape">
           <Tile title="Ease (how roomy)">
             <div className="btn-row">
-              {EASES.map((e) => (
-                <Btn key={e.id} icon={<IconEase />} label={e.label} state={ease === e.id ? 'selected' : 'normal'} onClick={() => setEase(e.id)} />
+              {EASES.map((e, i) => (
+                <Btn key={e.id} icon={<IconEase level={i} />} label={e.label} state={ease === e.id ? 'selected' : 'normal'} onClick={() => setEase(e.id)} />
               ))}
             </div>
           </Tile>
@@ -193,6 +222,25 @@ export function App(): JSX.Element {
               <Btn icon={<IconVneck />} label="V-neck" state="soon" />
               <Btn icon={<IconCrew />} label="Scoop" state="soon" />
               <Btn icon={<IconCrew />} label="Boat" state="soon" />
+            </div>
+          </Tile>
+          <Tile title="Shoulder">
+            <div className="btn-row">
+              <Btn icon={<IconShoulder />} label="Set-in" state="selected" />
+              <Btn icon={<IconShoulder />} label="Drop" state="soon" />
+              <Btn icon={<IconShoulder />} label="Raglan" state="soon" />
+              <Btn icon={<IconShoulder />} label="Saddle" state="soon" />
+              <Btn icon={<IconShoulder />} label="Round yoke" state="soon" />
+            </div>
+          </Tile>
+          <Tile title="Sleeve length">
+            <div className="btn-row">
+              <Btn icon={<IconSleeve />} label="Full" state="selected" />
+              <Btn icon={<IconSleeve />} label="¾ length" state="soon" />
+              <Btn icon={<IconSleeve />} label="Half" state="soon" />
+              <Btn icon={<IconSleeve />} label="Short" state="soon" />
+              <Btn icon={<IconSleeve />} label="Cap" state="soon" />
+              <Btn icon={<IconSleeve />} label="Sleeveless" state="soon" />
             </div>
           </Tile>
         </Section>
@@ -247,42 +295,28 @@ export function App(): JSX.Element {
         <Section label="Your pattern">
           {!schematics || !patternText ? (
             <Tile className="full"><div className="notice err">Couldn’t find that size. Try another.</div></Tile>
-          ) : templateOnly ? (
-            <Tile className="full plain">
-              <div className="piece-tabs seg">
+          ) : (
+            <div style={{ width: '100%' }}>
+              <div className="piece-tabs">
                 {PIECES.map((p) => (
-                  <button key={p.id} className={`pill ${piece === p.id ? 'on' : ''}`} style={{ color: piece === p.id ? undefined : 'var(--navy)' }} onClick={() => setPiece(p.id)}>{p.label}</button>
+                  <Btn key={p.id} label={p.label} state={piece === p.id ? 'selected' : 'normal'} onClick={() => setPiece(p.id)} />
                 ))}
               </div>
-              <div className="diagram" dangerouslySetInnerHTML={{ __html: diagramSvg(piece, scaleFactor) }} />
-              <p style={{ fontSize: '.85rem', color: 'var(--ink-soft)' }}>
-                Print at 100% (no scaling) and feed through the {output === 'knitleader' ? 'KnitLeader (½ scale)' : 'KnitRadar (¼ scale)'}. The 10&nbsp;cm line checks your print came out true.
-              </p>
-            </Tile>
-          ) : (
-            <div className="output-cols" style={{ width: '100%' }}>
-              <div>
-                {output === 'chart' && (
-                  <div className="piece-tabs">
-                    {PIECES.map((p) => (
-                      <Btn key={p.id} label={p.label} state={piece === p.id ? 'selected' : 'normal'} onClick={() => setPiece(p.id)} />
-                    ))}
-                  </div>
-                )}
-                {output === 'chart'
-                  ? <div className="diagram" dangerouslySetInnerHTML={{ __html: chartSvg(piece) }} />
-                  : <div className="pattern">{patternText}</div>}
-              </div>
-              <div>
-                {output !== 'chart' && (
-                  <div className="piece-tabs">
-                    {PIECES.map((p) => (
-                      <Btn key={p.id} label={p.label} state={piece === p.id ? 'selected' : 'normal'} onClick={() => setPiece(p.id)} />
-                    ))}
-                  </div>
-                )}
-                <div className="diagram" dangerouslySetInnerHTML={{ __html: diagramSvg(piece) }} />
-              </div>
+              {templateOnly ? (
+                <>
+                  <div className="diagram" dangerouslySetInnerHTML={{ __html: diagramSvg(piece, scaleFactor) }} />
+                  <p style={{ fontSize: '.85rem', color: 'var(--ink-soft)', marginTop: 10 }}>
+                    Print at 100% (no scaling) and feed through the {output === 'knitleader' ? 'KnitLeader (½ scale)' : 'KnitRadar (¼ scale)'}. The 10&nbsp;cm calibration line checks your print came out true.
+                  </p>
+                </>
+              ) : (
+                <div className="output-cols">
+                  {output === 'chart'
+                    ? <div className="diagram" dangerouslySetInnerHTML={{ __html: chartSvg(piece) }} />
+                    : <div className="pattern">{patternText}</div>}
+                  <div className="diagram" dangerouslySetInnerHTML={{ __html: diagramSvg(piece) }} />
+                </div>
+              )}
             </div>
           )}
         </Section>

@@ -9,10 +9,10 @@ const svg = (children: JSX.Element): JSX.Element => (
 );
 
 export const IconSweater = (): JSX.Element =>
-  svg(<><path d="M11 5 6 9l2 3 2-1v15h12V11l2 1 2-3-5-4-2 3h-6z" /></>);
+  svg(<><path d="M12 6 L20 6 L24 9 L27 22 L23 23 L21 12 L21 27 L11 27 L11 12 L9 23 L5 22 L8 9 Z" /></>);
 
 export const IconCardigan = (): JSX.Element =>
-  svg(<><path d="M11 5 6 9l2 3 2-1v15h12V11l2 1 2-3-5-4-2 3h-6z" /><path d="M16 7v19" /></>);
+  svg(<><path d="M12 6 L20 6 L24 9 L27 22 L23 23 L21 12 L21 27 L11 27 L11 12 L9 23 L5 22 L8 9 Z" /><path d="M16 6 V27" /></>);
 
 export const IconSkirt = (): JSX.Element =>
   svg(<><path d="M11 7h10l4 19H7z" /><path d="M11 7c0 3 10 3 10 0" /></>);
@@ -31,8 +31,16 @@ export const IconMan = (): JSX.Element =>
 export const IconCustom = (): JSX.Element =>
   svg(<><path d="M5 20 20 5l7 7L12 27H5z" /><path d="M15 10l7 7" /></>);
 
-export const IconEase = (): JSX.Element =>
-  svg(<><path d="M13 6h6v3l2 1v16h-10V10l2-1z" /><path d="M11 12v11M21 12v11" strokeDasharray="2 2" /></>);
+// The garment widens around a fixed body as the ease grows (level 0–4).
+export const IconEase = ({ level }: { level: number }): JSX.Element => {
+  const w = 4 + level * 2.4;
+  return svg(
+    <>
+      <rect x={16 - w} y={6} width={2 * w} height={20} rx={3} />
+      <rect x={13} y={9} width={6} height={15} rx={2} strokeDasharray="2 2" />
+    </>,
+  );
+};
 
 export const IconCrew = (): JSX.Element =>
   svg(<><path d="M6 8h20" /><path d="M11 8a5 5 0 0 0 10 0" /><path d="M6 8v18h20V8" /></>);
@@ -50,3 +58,8 @@ export const IconRoller = (): JSX.Element =>
 
 export const IconPrint = (): JSX.Element =>
   svg(<><path d="M9 12V5h14v7" /><rect x="6" y="12" width="20" height="9" rx="2" /><path d="M9 21v6h14v-6" /></>);
+
+export const IconShoulder = (): JSX.Element =>
+  svg(<><path d="M5 9h22" /><path d="M11 9c0 6-3 6-3 14M21 9c0 6 3 6 3 14" /></>);
+export const IconSleeve = (): JSX.Element =>
+  svg(<><path d="M10 6h12l-2 20h-8z" /><path d="M10 6 7 9M22 6l3 3" /></>);
