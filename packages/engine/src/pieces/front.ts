@@ -125,16 +125,16 @@ export function frontRows(size: SizeRecord, style: EaseStyleId, gauge: Gauge): R
       push([{ kind: 'decrease', count: 1, side: neckEdge }], 'neck');
       if (d < shaping.decs - 1) push([], 'neck');
     }
-    // Straight to the shoulder line, then short-row the shoulder: hold a group at
-    // the armhole edge every other row — same slope rate as the back, so the two
-    // graft together. (On the machine, set the armhole-edge needles to hold before
-    // the pass; the group need not be on the carriage side.)
-    const shoulderRows = 2 * shoulderSteps.length - 1;
-    const straight = Math.max(0, heightRows - used - shoulderRows);
+    // Straight to the shoulder line, then short-row the shoulder. Hold each group
+    // only on a row whose carriage ends at this half's armhole edge — that is the
+    // side away from the carriage when the hold is set, so it does not make a hole
+    // (see machine-holding-hole-rule). This can leave the two halves off by a row;
+    // that is the accepted small discrepancy. Slope rate matches the back.
+    const straight = Math.max(0, heightRows - used - 2 * shoulderSteps.length);
     for (let i = 0; i < straight; i++) push([], 'upper_front');
-    for (let i = 0; i < shoulderSteps.length; i++) {
-      push([{ kind: 'hold', count: shoulderSteps[i], side: armEdge }], 'shoulder');
-      if (i < shoulderSteps.length - 1) push([], 'shoulder'); // return row between holds
+    for (const s of shoulderSteps) {
+      if (carriageForRow(index + 1) !== armEdge) push([], 'shoulder'); // wait for the safe row
+      push([{ kind: 'hold', count: s, side: armEdge }], 'shoulder');
     }
   };
 
