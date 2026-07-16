@@ -15,7 +15,7 @@
  * Pure and I/O-free: outline model in, SVG string out.
  */
 
-import type { Row } from '../row';
+import type { Row, Carriage } from '../row';
 import type { Gauge } from '../gauge';
 
 /** A point in stitch/row space: x = stitches from the centre line, y = rows from cast-on. */
@@ -72,72 +72,30 @@ export function backSchematic(
   gauge: Gauge,
 ): PieceSchematic {
   const firstHold = rows.findIndex((r) => r.ops.some((o) => o.kind === 'hold'));
+  const holdY = firstHold >= 0 ? rows[firstHold].index : rows.length + 1;
   const shoulderStartY = firstHold >= 0 ? rows[firstHold].index - 1 : rows.length - 1;
   const topY = rows[rows.length - 1].index; // neck cast-off row
-  const achieved = firstHold >= 0 ? rows[firstHold - 1].stitches : rows[rows.length - 1].stitches;
+  const achievedHalf = (firstHold >= 0 ? rows[firstHold - 1].stitches : rows[rows.length - 1].stitches) / 2;
   const neckHalf = plan.backNeckSts / 2;
-
-  // Track the true left and right edges from the ops, so the two underarm cast-offs
-  // (right, then left one row later) show as the real one-row stagger rather than an
-  // averaged curve. The rib is a stitch wider (odd cast-on); clamp it to the body
-  // width — the ≤1-stitch overhang would only read as noise — and mark it with a band.
   const bodyHalf = plan.bodySts / 2;
-  const holdY = firstHold >= 0 ? rows[firstHold].index : Infinity;
-  const rightPts: Pt[] = [{ x: bodyHalf, y: 0 }];
-  const leftPts: Pt[] = [{ x: -bodyHalf, y: 0 }];
-  let leftSts = 0;
-  let rightSts = 0;
-  let lastR = bodyHalf;
-  let lastL = -bodyHalf;
-  let rDone = false;
-  let lDone = false;
-  let underarmY = 0;
-  for (const r of rows) {
-    if (r.index >= holdY) break;
-    for (const op of r.ops) {
-      if (op.kind === 'cast_on') {
-        rightSts = Math.ceil(op.count / 2); // odd cast-on: the extra stitch is on the right
-        leftSts = Math.floor(op.count / 2);
-      } else if (op.kind === 'bind_off') {
-        if (op.side === 'R') rightSts -= op.count;
-        else if (op.side === 'L') leftSts -= op.count;
-      } else if (op.kind === 'decrease') {
-        if (op.side === 'R' || op.side === 'both') rightSts -= op.count;
-        if (op.side === 'L' || op.side === 'both') leftSts -= op.count;
-      }
-    }
-    const rx = r.section === 'rib' ? bodyHalf : rightSts;
-    const lx = r.section === 'rib' ? -bodyHalf : -leftSts;
-    if (rx !== lastR) {
-      if (!rDone && rx < bodyHalf) {
-        underarmY = r.index - 1;
-        rightPts.push({ x: bodyHalf, y: r.index - 1 }); // top of the full-width body
-        rDone = true;
-      }
-      rightPts.push({ x: rx, y: r.index });
-      lastR = rx;
-    }
-    if (lx !== lastL) {
-      if (!lDone && lx > -bodyHalf) {
-        leftPts.push({ x: -bodyHalf, y: r.index - 1 });
-        lDone = true;
-      }
-      leftPts.push({ x: lx, y: r.index });
-      lastL = lx;
-    }
-  }
-  // The straight upper back and the (symmetric) shoulder slope up to the neck edge.
-  rightPts.push({ x: achieved / 2, y: shoulderStartY }, { x: neckHalf, y: topY });
-  leftPts.push({ x: -achieved / 2, y: shoulderStartY }, { x: -neckHalf, y: topY });
 
+  // Body + armhole edges true-to-side from the ops; the shoulders as the real
+  // short-row staircase from the hold groups; the flat back neck cast off across
+  // the top between them.
+  const { rightPts, leftPts, underarmY } = trackBodyEdges(rows, bodyHalf, holdY);
+  const holds = shoulderHolds(rows);
+  rightPts.push(...shoulderStaircase(holds.filter((h) => h.side === 'R'), achievedHalf, -1));
+  rightPts.push({ x: neckHalf, y: topY });
+  leftPts.push(...shoulderStaircase(holds.filter((h) => h.side === 'L'), -achievedHalf, 1));
+  leftPts.push({ x: -neckHalf, y: topY });
   const outline = [...rightPts, ...leftPts.reverse()];
 
   const measures: Measure[] = [
-    { kind: 'width', label: 'width', sts: plan.bodySts, at: 0, from: -plan.bodySts / 2, to: plan.bodySts / 2 },
-    { kind: 'width', label: 'upper back', sts: achieved, at: shoulderStartY, from: -achieved / 2, to: achieved / 2 },
+    { kind: 'width', label: 'width', sts: plan.bodySts, at: 0, from: -bodyHalf, to: bodyHalf },
+    { kind: 'width', label: 'upper back', sts: achievedHalf * 2, at: shoulderStartY, from: -achievedHalf, to: achievedHalf },
     { kind: 'width', label: 'back neck', sts: plan.backNeckSts, at: topY, from: -neckHalf, to: neckHalf },
-    { kind: 'height', label: 'length', rows: topY, at: plan.bodySts / 2, from: 0, to: topY },
-    { kind: 'height', label: 'armhole', rows: topY - underarmY, at: -plan.bodySts / 2, from: underarmY, to: topY },
+    { kind: 'height', label: 'length', rows: topY, at: 0, from: 0, to: topY },
+    { kind: 'height', label: 'armhole', rows: topY - underarmY, at: 0, from: underarmY, to: topY },
   ];
 
   return {
@@ -174,27 +132,33 @@ export function frontSchematic(
   // Below the split, the front is the back: track its true edges up to the split.
   const { rightPts, leftPts, underarmY } = trackBodyEdges(rows, bodyHalf, splitY);
   const achievedHalf = rightPts[rightPts.length - 1].x; // armhole width reached
-  const shoulderDropY = topY - 12; // the short-row shoulder occupies the top ~12 rows
   const neckTopHalf = fnp.frontNeckSts / 2; // neck opening at the shoulders
   const neckBottomHalf = centreCastOff / 2; // the centre cast-off at the neck base
 
-  // Right side: straight up to the shoulder, slope in to the neck, then the scoop
-  // down to the neck base (a quadratic through a corner control point).
-  rightPts.push({ x: achievedHalf, y: shoulderDropY });
-  rightPts.push({ x: neckTopHalf, y: topY });
-  for (const t of [0.35, 0.7, 1]) {
-    const x = (1 - t) * (1 - t) * neckTopHalf + 2 * (1 - t) * t * neckTopHalf + t * t * neckBottomHalf;
-    const y = (1 - t) * (1 - t) * topY + 2 * (1 - t) * t * splitY + t * t * splitY;
-    rightPts.push({ x, y });
+  // After the split the two halves are worked separately; the LEFT half is worked
+  // first, so its row index still equals the physical row. Read the true neck edge
+  // (its centre-facing R cast-offs/decreases) and shoulder (its armhole-edge holds)
+  // from the left half, and mirror them to the right.
+  const leftRows = rows.filter((r) => r.side === 'left');
+  const leftNeck: Pt[] = [{ x: -neckBottomHalf, y: splitY }];
+  let nx = -neckBottomHalf;
+  for (const r of leftRows) {
+    for (const op of r.ops) {
+      if ((op.kind === 'bind_off' || op.kind === 'decrease') && op.side === 'R') {
+        nx -= op.count; // the neck opening widens away from the centre
+        leftNeck.push({ x: nx, y: r.index });
+      }
+    }
   }
-  leftPts.push({ x: -achievedHalf, y: shoulderDropY });
-  leftPts.push({ x: -neckTopHalf, y: topY });
-  for (const t of [0.35, 0.7, 1]) {
-    const x = (1 - t) * (1 - t) * neckTopHalf + 2 * (1 - t) * t * neckTopHalf + t * t * neckBottomHalf;
-    const y = (1 - t) * (1 - t) * topY + 2 * (1 - t) * t * splitY + t * t * splitY;
-    leftPts.push({ x: -x, y });
-  }
+  const leftStair = shoulderStaircase(
+    shoulderHolds(leftRows).filter((h) => h.side === 'L'),
+    -achievedHalf,
+    1,
+  );
+  const mirror = (p: Pt): Pt => ({ x: -p.x, y: p.y });
 
+  rightPts.push(...leftStair.map(mirror), ...leftNeck.map(mirror).reverse());
+  leftPts.push(...leftStair, ...[...leftNeck].reverse());
   const outline = [...rightPts, ...leftPts.reverse()];
   const measures: Measure[] = [
     { kind: 'width', label: 'width', sts: plan.bodySts, at: 0, from: -bodyHalf, to: bodyHalf },
@@ -213,6 +177,43 @@ export function frontSchematic(
     gauge,
     measures,
   };
+}
+
+/** Every short-row hold group, in row order, as {count, side, y}. */
+function shoulderHolds(rows: Row[]): { count: number; side: Carriage; y: number }[] {
+  const out: { count: number; side: Carriage; y: number }[] = [];
+  for (const r of rows) {
+    for (const op of r.ops) {
+      if (op.kind === 'hold') out.push({ count: op.count, side: op.side, y: r.index });
+    }
+  }
+  return out;
+}
+
+/**
+ * A short-row shoulder as its true staircase: each held group is a horizontal run
+ * of `count` stitches ending at that group's row, with a vertical riser between
+ * rows. `inward` is −1 stepping in from the right edge, +1 from the left.
+ */
+function shoulderStaircase(
+  holds: { count: number; y: number }[],
+  startX: number,
+  inward: number,
+): Pt[] {
+  const pts: Pt[] = [];
+  if (holds.length === 0) return pts;
+  let x = startX;
+  let lastY = holds[0].y;
+  pts.push({ x, y: lastY });
+  for (const h of holds) {
+    if (h.y > lastY) {
+      pts.push({ x, y: h.y }); // riser up to this group's row
+      lastY = h.y;
+    }
+    x += inward * h.count; // step inward across the held stitches
+    pts.push({ x, y: h.y });
+  }
+  return pts;
 }
 
 /** Track the true left/right edges of a bottom-up body panel from the ops, up to
