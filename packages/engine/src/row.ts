@@ -7,12 +7,18 @@ export type Carriage = 'L' | 'R';
 
 export type Piece = 'back' | 'front' | 'sleeve_l' | 'sleeve_r' | 'collar';
 
-/** A shaping event on a row. `both` = the same at each end of the row. */
+/**
+ * A shaping event on a row. `both` = the same at each end of the row; `center`
+ * (bind-off only) = a block in the middle, e.g. a flat back neck. `hold` puts
+ * needles into holding position (short-row shaping) — they stay live on the
+ * needles for grafting, so they do not reduce the stitch count.
+ */
 export type Op =
   | { kind: 'cast_on'; count: number }
-  | { kind: 'bind_off'; count: number; side: 'L' | 'R' | 'both' }
+  | { kind: 'bind_off'; count: number; side: 'L' | 'R' | 'both' | 'center' }
   | { kind: 'decrease'; count: number; side: 'L' | 'R' | 'both' }
-  | { kind: 'increase'; count: number; side: 'L' | 'R' | 'both' };
+  | { kind: 'increase'; count: number; side: 'L' | 'R' | 'both' }
+  | { kind: 'hold'; count: number; side: 'L' | 'R' };
 
 export interface Row {
   /** 1-based, per piece. */

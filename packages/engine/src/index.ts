@@ -45,5 +45,7 @@ export {
   lowerBackRows,
   armholeShaping,
   backThroughArmhole,
+  splitIntoSteps,
+  backRows,
 } from './pieces/back';
 export type { BackPlan, PlanSection, ArmholeShaping, DecPhase } from './pieces/back';

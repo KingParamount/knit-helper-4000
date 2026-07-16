@@ -201,3 +201,59 @@ export function backThroughArmhole(
   }
   return rows;
 }
+
+/** Split `total` stitches into near-equal steps of roughly `target` each. */
+export function splitIntoSteps(total: number, target: number): number[] {
+  const steps = Math.max(1, Math.round(total / target));
+  const base = Math.floor(total / steps);
+  const extra = total - base * steps;
+  return Array.from({ length: steps }, (_, i) => base + (i < extra ? 1 : 0));
+}
+
+/**
+ * The complete back piece: cast-on → rib → body → curved armhole → straight to
+ * the shoulder line → short-row shoulders → flat back-neck cast-off.
+ *
+ * Shoulders are shaped by holding needle groups (the user's choice): the outer
+ * (armhole-edge) group is held first, working inward, so the shoulder slopes down
+ * toward the armhole. Held stitches stay live for grafting, so the piece ends with
+ * the two shoulders (≈half the non-neck stitches each) on hold; `stitches` counts
+ * live stitches on the needles, so holds do not change it. The flat back neck is a
+ * single centre cast-off.
+ */
+export function backRows(size: SizeRecord, style: EaseStyleId, gauge: Gauge): Row[] {
+  const plan = backPlan(size, style, gauge);
+  const rows = backThroughArmhole(size, style, gauge);
+  const achieved = rows[rows.length - 1].stitches;
+  const backNeck = plan.backNeckSts;
+  const shoulderSts = Math.round((achieved - backNeck) / 2);
+  const steps = splitIntoSteps(shoulderSts, 7); // ~7-st short-row groups
+
+  let index = rows.length;
+  let stitches = achieved;
+  const push = (ops: Row['ops'], section: string): void => {
+    index += 1;
+    for (const op of ops) {
+      if (op.kind === 'bind_off') stitches -= op.count;
+      if (op.kind === 'decrease') stitches -= op.count * (op.side === 'both' ? 2 : 1);
+      // hold: needles held but still live — no change to the stitch count
+    }
+    rows.push({ index, piece: 'back', stitches, carriage: carriageForRow(index), ops, section });
+  };
+
+  // Straight to the shoulder line (reserve rows for the shoulders + neck cast-off).
+  const shoulderRows = 2 * steps.length;
+  const straightRows = Math.max(0, plan.totalRows - rows.length - shoulderRows - 1);
+  for (let i = 0; i < straightRows; i++) push([], 'upper_back');
+
+  // Short-row shoulders: hold each group on one side, then the mirror group on the
+  // other, working outer→inner. Held at whichever side the carriage is on.
+  for (const s of steps) {
+    push([{ kind: 'hold', count: s, side: carriageForRow(index + 1) as 'L' | 'R' }], 'shoulder');
+    push([{ kind: 'hold', count: s, side: carriageForRow(index + 1) as 'L' | 'R' }], 'shoulder');
+  }
+
+  // Flat back neck: cast off the centre; the two shoulders stay held for grafting.
+  push([{ kind: 'bind_off', count: backNeck, side: 'center' }], 'neck');
+  return rows;
+}

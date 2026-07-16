@@ -2,7 +2,14 @@ import { describe, it, expect } from 'vitest';
 declare const console: { log: (...args: unknown[]) => void };
 import { findSize } from '../data/sizes';
 import { DEFAULT_GAUGE } from '../gauge';
-import { backPlan, lowerBackRows, armholeShaping, backThroughArmhole } from './back';
+import {
+  backPlan,
+  lowerBackRows,
+  armholeShaping,
+  backThroughArmhole,
+  splitIntoSteps,
+  backRows,
+} from './back';
 
 const W36 = findSize('Woman', 36, 'in')!;
 const G = DEFAULT_GAUGE;
@@ -97,6 +104,50 @@ describe('armhole shaping (graduated / curved scye)', () => {
     for (let i = 1; i < rows.length; i++) {
       expect(rows[i].stitches).toBeLessThanOrEqual(rows[i - 1].stitches);
       expect(rows[i].carriage).not.toBe(rows[i - 1].carriage);
+    }
+  });
+});
+
+describe('splitIntoSteps', () => {
+  it('splits into near-equal groups of ~target, larger groups first', () => {
+    expect(splitIntoSteps(26, 7)).toEqual([7, 7, 6, 6]);
+    expect(splitIntoSteps(20, 7)).toEqual([7, 7, 6]);
+    expect(splitIntoSteps(5, 7)).toEqual([5]);
+    expect(splitIntoSteps(0, 7)).toEqual([0]);
+  });
+});
+
+describe('complete back piece (short-row shoulders + flat back neck)', () => {
+  const rows = backRows(W36, 'moderate', DEFAULT_GAUGE);
+
+  it('runs the full body length and ends with the shoulders held for grafting', () => {
+    expect(rows).toHaveLength(246); // = plan body length
+    const last = rows[rows.length - 1];
+    expect(last.stitches).toBe(52); // 98 − 46 neck cast-off = two 26-st shoulders, held
+    expect(last.section).toBe('neck');
+    expect(last.ops).toEqual([{ kind: 'bind_off', count: 46, side: 'center' }]);
+  });
+
+  it('holds all shoulder stitches, balanced across the two sides', () => {
+    const holds = rows.flatMap((r) => r.ops).filter((o) => o.kind === 'hold');
+    const total = holds.reduce((n, o) => n + (o.kind === 'hold' ? o.count : 0), 0);
+    expect(total).toBe(52); // 26 each shoulder
+    const perSide = (s: 'L' | 'R'): number =>
+      holds.filter((o) => o.kind === 'hold' && o.side === s).reduce((n, o) => n + (o.kind === 'hold' ? o.count : 0), 0);
+    expect(perSide('L')).toBe(26);
+    expect(perSide('R')).toBe(26);
+  });
+
+  it('holds do not change the live stitch count; only the neck cast-off does', () => {
+    const firstHoldIdx = rows.findIndex((r) => r.ops.some((o) => o.kind === 'hold'));
+    expect(rows[firstHoldIdx - 1].stitches).toBe(98);
+    expect(rows[rows.length - 2].stitches).toBe(98); // still 98 right before the neck cast-off
+  });
+
+  it('keeps the carriage alternating and never gains stitches', () => {
+    for (let i = 1; i < rows.length; i++) {
+      expect(rows[i].carriage).not.toBe(rows[i - 1].carriage);
+      expect(rows[i].stitches).toBeLessThanOrEqual(rows[i - 1].stitches);
     }
   });
 });
