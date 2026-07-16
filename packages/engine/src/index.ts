@@ -71,6 +71,15 @@ export type { NeckbandPlan } from './pieces/neckband';
 export { assembleGarment } from './pieces/garment';
 export type { Garment } from './pieces/garment';
 
+export {
+  seamEdgeLength,
+  armholeOpening,
+  capPerimeter,
+  capEase,
+  assemblyReport,
+} from './pieces/assembly';
+export type { Invariant, AssemblyReport } from './pieces/assembly';
+
 export { renderPiece, renderPattern, patternText } from './render/prose';
 export type { PieceProse, Pattern, ProseStyle } from './render/prose';
 

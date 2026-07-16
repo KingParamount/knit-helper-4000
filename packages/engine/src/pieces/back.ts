@@ -18,6 +18,7 @@ import {
   ribRowsFor,
 } from '../gauge';
 import { type Row, type Piece, carriageForRow } from '../row';
+import { seamEdgeLength, ARMHOLE_SECTIONS } from './seams';
 
 export interface PlanSection {
   name: string;
@@ -285,4 +286,14 @@ export function backRows(size: SizeRecord, style: EaseStyleId, gauge: Gauge): Ro
   // Flat back neck: cast off the centre; the two shoulders stay held for grafting.
   push([{ kind: 'bind_off', count: backNeck, side: 'center' }], 'neck');
   return rows;
+}
+
+/** Length (inches) of one curved armhole edge, underarm to shoulder — what the cap sews to. */
+export function armholeSeamLength(size: SizeRecord, style: EaseStyleId, gauge: Gauge): number {
+  return seamEdgeLength(backRows(size, style, gauge), ARMHOLE_SECTIONS, gauge);
+}
+
+/** The armhole opening the sleeve eases into: back edge + front edge (identical shaping). */
+export function armholeOpening(size: SizeRecord, style: EaseStyleId, gauge: Gauge): number {
+  return 2 * armholeSeamLength(size, style, gauge);
 }

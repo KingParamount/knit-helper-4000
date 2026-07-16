@@ -28,13 +28,13 @@ describe('sleeve plan (Woman 36", moderate, default gauge)', () => {
     expect(p.ribRows).toBe(25); // 2.5"
     expect(p.taperRows).toBe(143); // arm length 16.75" − rib
     expect(p.underarmCastOff).toBe(8); // matches the body armhole underarm
-    expect(p.capHeightRows).toBe(55); // armhole depth 8.5" − 7.5cm ≈ 5.5"
+    expect(p.capHeightRows).toBe(58); // solved so the cap perimeter eases +5% over the armhole
     expect(p.capTopSts).toBe(20); // crown = what remains after symmetric shaping (even)
     expect(p.capDecPerSide).toBe(26); // (88 − 16 − 21 target) / 2
   });
 
-  it('makes the cap roughly two-thirds of the armhole depth', () => {
-    // armhole depth is 85 rows; the cap fills it minus ~7.5cm (source guidance)
+  it('makes the cap a sensible fraction of the armhole depth', () => {
+    // armhole depth is 85 rows; the solved cap height lands around two-thirds of it
     expect(p.capHeightRows / 85).toBeGreaterThan(0.6);
     expect(p.capHeightRows / 85).toBeLessThan(0.72);
   });
@@ -92,7 +92,7 @@ it('CHECKPOINT: prints the sleeve plan', () => {
     `  cast on ${p.ribCastOnSts} (odd cuff) → rib ${p.ribRows} rows, dec 1 to ${p.bodyCuffSts} → taper +1 each end ×${p.incPerSide}`,
     `  → ${p.sleeveTopSts} sts at the underarm (upper arm)`,
     `  CAP: cast off ${p.underarmCastOff} each underarm, then bell decrease over ${p.capHeightRows} rows`,
-    `    (≈ armhole depth − 7.5cm), cast off crown ${p.capTopSts}. Total ${rows.length} rows.`,
+    `    (solved to fit the armhole), cast off crown ${p.capTopSts}. Total ${rows.length} rows.`,
     '',
   ];
   console.log(lines.join('\n'));
