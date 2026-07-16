@@ -595,6 +595,8 @@ export function schematicSvg(s: PieceSchematic, opts: SvgOpts = {}): string {
           g.push(`<text x="${X(-(k - 0.5)).toFixed(1)}" y="${(Y(0) + 17).toFixed(1)}" text-anchor="middle">${k}L</text>`);
         }
       }
+      // The centre gap itself (between 1L and 1R) is 0 — a label, not a line.
+      g.push(`<text x="${X(0).toFixed(1)}" y="${(Y(0) + 17).toFixed(1)}" text-anchor="middle" fill="#5b6873">0</text>`);
       for (let k = 1; k - 0.5 <= s.heightRows + 1e-6; k += 1) {
         const t = tier(k);
         g.push(`<line x1="${X(-halfW).toFixed(1)}" y1="${Y(k - 0.5).toFixed(1)}" x2="${X(halfW).toFixed(1)}" y2="${Y(k - 0.5).toFixed(1)}" ${strokes[t]}/>`);
