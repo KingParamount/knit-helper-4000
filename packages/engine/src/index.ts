@@ -52,5 +52,11 @@ export {
 } from './pieces/back';
 export type { BackPlan, PlanSection, ArmholeShaping, DecPhase } from './pieces/back';
 
-export { frontNeckDepthRows, frontNeckPlan, frontToNeck } from './pieces/front';
+export {
+  frontNeckDepthRows,
+  frontNeckPlan,
+  frontToNeck,
+  frontNeckShaping,
+  frontRows,
+} from './pieces/front';
 export type { FrontNeckPlan } from './pieces/front';

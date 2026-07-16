@@ -21,15 +21,21 @@ export type Op =
   | { kind: 'hold'; count: number; side: 'L' | 'R' };
 
 export interface Row {
-  /** 1-based, per piece. */
+  /** 1-based, per piece (continues across a divided piece's two halves). */
   index: number;
   piece: Piece;
-  /** Stitch count AFTER this row's ops. */
+  /**
+   * Live stitches AFTER this row's ops. For a divided piece (e.g. a front neck),
+   * this is the count in the half currently being worked; the other half is on
+   * hold and not counted on these rows.
+   */
   stitches: number;
   /** Side the carriage ends on (matters for machine shaping). */
   carriage: Carriage;
   ops: Op[];
   section?: string;
+  /** Which half of a divided piece this row belongs to (front neck split). */
+  side?: 'left' | 'right';
 }
 
 function other(c: Carriage): Carriage {
