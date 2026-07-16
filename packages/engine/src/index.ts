@@ -46,4 +46,4 @@ export {
   armholeShaping,
   backThroughArmhole,
 } from './pieces/back';
-export type { BackPlan, PlanSection, ArmholeShaping } from './pieces/back';
+export type { BackPlan, PlanSection, ArmholeShaping, DecPhase } from './pieces/back';

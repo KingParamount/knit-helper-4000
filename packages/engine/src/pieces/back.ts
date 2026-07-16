@@ -125,17 +125,25 @@ export function lowerBackRows(
   return rows;
 }
 
+/** One phase of the graduated decrease: `times` single decreases, one every `everyRows` rows. */
+export interface DecPhase {
+  everyRows: number; // 1 = every row, 2 = every other row, 4 = every 4th row
+  times: number;
+}
+
 export interface ArmholeShaping {
-  bindOffPerSide: number; // underarm cast-off, each side
-  decPerSide: number; // single decreases each side, every other row
+  castOffPerSide: number; // underarm cast-off, each side (single step — see machine-castoff note)
+  phases: DecPhase[]; // graduated: steep at the underarm, easing toward the shoulder
   achievedSts: number; // stitches remaining after shaping
 }
 
 /**
- * Standard set-in armhole shaping: cast off ~1" at the underarm each side, then
- * decrease one stitch each side every other row until the back width is reached.
- * The row array records "decrease n at edge" without prescribing the technique
- * (fully-fashioned vs edge) — that is the knitter's choice.
+ * Graduated set-in armhole shaping for a curved scye: cast off ~1" at the underarm
+ * each side, then decrease one stitch each end at a rate that eases as it climbs —
+ * fast at the bottom (every row), then every other row, then every 4th near the top.
+ * A curved armhole cups the sleeve cap better than a straight taper. Standard
+ * three-phase set-in construction (steep→gentle); the sleeve cap is generated to
+ * match. Decreases are recorded technique-neutrally ("dec 1 st each end").
  */
 export function armholeShaping(
   castOnSts: number,
@@ -143,12 +151,17 @@ export function armholeShaping(
   gauge: Gauge,
 ): ArmholeShaping {
   const perSide = Math.round((castOnSts - targetSts) / 2);
-  const bindOffPerSide = Math.min(stitchesFor(1.0, gauge), perSide); // ~1" underarm
-  return {
-    bindOffPerSide,
-    decPerSide: perSide - bindOffPerSide,
-    achievedSts: castOnSts - 2 * perSide,
-  };
+  const castOffPerSide = Math.min(stitchesFor(1.0, gauge), perSide); // ~1" underarm
+  const d = Math.max(0, perSide - castOffPerSide);
+  const fast = Math.round(d * 0.3); // every row
+  const gentle = Math.round(d * 0.2); // every 4th row
+  const medium = d - fast - gentle; // every other row (the bulk)
+  const phases: DecPhase[] = [
+    { everyRows: 1, times: fast },
+    { everyRows: 2, times: medium },
+    { everyRows: 4, times: gentle },
+  ].filter((p) => p.times > 0);
+  return { castOffPerSide, phases, achievedSts: castOnSts - 2 * perSide };
 }
 
 /**
@@ -173,23 +186,18 @@ export function backThroughArmhole(
       if (op.kind === 'bind_off') stitches -= op.count;
       if (op.kind === 'decrease') stitches -= op.count * (op.side === 'both' ? 2 : 1);
     }
-    rows.push({
-      index,
-      piece: 'back',
-      stitches,
-      carriage: carriageForRow(index),
-      ops,
-      section: 'armhole',
-    });
+    rows.push({ index, piece: 'back', stitches, carriage: carriageForRow(index), ops, section: 'armhole' });
   };
 
   // Underarm cast-off, one side per row (a block cast-off follows the carriage).
-  push([{ kind: 'bind_off', count: shaping.bindOffPerSide, side: carriageForRow(index + 1) }]);
-  push([{ kind: 'bind_off', count: shaping.bindOffPerSide, side: carriageForRow(index + 1) }]);
-  // Single decreases each end, every other row (transfers at both edges).
-  for (let d = 0; d < shaping.decPerSide; d++) {
-    push([{ kind: 'decrease', count: 1, side: 'both' }]); // shaping row
-    if (d < shaping.decPerSide - 1) push([]); // plain row between
+  push([{ kind: 'bind_off', count: shaping.castOffPerSide, side: carriageForRow(index + 1) }]);
+  push([{ kind: 'bind_off', count: shaping.castOffPerSide, side: carriageForRow(index + 1) }]);
+  // Graduated single decreases each end: (everyRows-1) plain rows, then a decrease row.
+  for (const phase of shaping.phases) {
+    for (let t = 0; t < phase.times; t++) {
+      for (let p = 0; p < phase.everyRows - 1; p++) push([]); // plain rows
+      push([{ kind: 'decrease', count: 1, side: 'both' }]); // decrease row
+    }
   }
   return rows;
 }

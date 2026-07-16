@@ -54,12 +54,17 @@ describe('lower back rows', () => {
   });
 });
 
-describe('armhole shaping', () => {
+describe('armhole shaping (graduated / curved scye)', () => {
   const s = armholeShaping(144, 99, DEFAULT_GAUGE);
 
-  it('casts off ~1" at the underarm then decreases the rest', () => {
-    expect(s.bindOffPerSide).toBe(8); // 1" × 30/4
-    expect(s.decPerSide).toBe(15); // round((144−99)/2)=23; 23−8
+  it('casts off ~1" then decreases at an easing rate', () => {
+    expect(s.castOffPerSide).toBe(8); // 1" × 30/4
+    // d = 23 − 8 = 15 → fast 5 (every row), medium 7 (every other), gentle 3 (every 4th)
+    expect(s.phases).toEqual([
+      { everyRows: 1, times: 5 },
+      { everyRows: 2, times: 7 },
+      { everyRows: 4, times: 3 },
+    ]);
     expect(s.achievedSts).toBe(98); // 144 − 2×23
   });
 
@@ -67,7 +72,16 @@ describe('armhole shaping', () => {
 
   it('reconciles to the achieved back width', () => {
     expect(rows[rows.length - 1].stitches).toBe(98);
-    expect(rows).toHaveLength(187); // 156 lower + 2 cast-off + 29 (15 dec + 14 plain)
+    // 156 lower + 2 cast-off + 5 (every row) + 14 (7 dec + 7 plain) + 12 (3 dec + 9 plain)
+    expect(rows).toHaveLength(189);
+  });
+
+  it('decreases fastest at the bottom of the scye', () => {
+    const decRows = rows.filter((r) => r.ops.some((o) => o.kind === 'decrease')).map((r) => r.index);
+    expect(decRows).toHaveLength(15);
+    // first five are consecutive (every row); gaps widen higher up
+    expect(decRows.slice(0, 5)).toEqual([159, 160, 161, 162, 163]);
+    expect(decRows[decRows.length - 1] - decRows[decRows.length - 2]).toBe(4); // every 4th near top
   });
 
   it('casts off each underarm on the row whose carriage is on that side', () => {
@@ -113,12 +127,13 @@ it('CHECKPOINT: prints the back-piece knitting plan', () => {
   );
   const s = armholeShaping(p.castOnSts, p.upperBackSts, DEFAULT_GAUGE);
   const rows = backThroughArmhole(W36, 'moderate', DEFAULT_GAUGE);
+  const phaseTxt = s.phases
+    .map((ph) => `${ph.times}× every ${ph.everyRows === 1 ? 'row' : `${ph.everyRows}${ph.everyRows === 2 ? 'nd' : 'th'} row`}`)
+    .join(', ');
   lines.push('');
+  lines.push(`  ARMHOLE (curved scye): cast off ${s.castOffPerSide} each underarm, then dec 1 st each end:`);
   lines.push(
-    `  ARMHOLE (generated): cast off ${s.bindOffPerSide} each underarm, then dec 1 st each end`,
-  );
-  lines.push(
-    `    every other row ×${s.decPerSide} → ${rows[rows.length - 1].stitches} sts at row ${rows.length}. NEXT: short-row shoulders + back neck.`,
+    `    ${phaseTxt} → ${rows[rows.length - 1].stitches} sts at row ${rows.length}. NEXT: short-row shoulders + back neck.`,
   );
   lines.push('');
   console.log(lines.join('\n'));
