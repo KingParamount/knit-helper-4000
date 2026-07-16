@@ -44,11 +44,12 @@ export interface Measure {
  * `castoff` spans `span` cells.
  */
 export interface ShapeMark {
-  kind: 'dec' | 'inc' | 'castoff';
+  kind: 'dec' | 'inc' | 'castoff' | 'hold';
   x: number;
   y: number;
   span?: number;
   lean?: number; // dec only: +1 leans one way, −1 the other
+  centre?: boolean; // a centre cast-off (offset above the row, not out to a side)
 }
 
 export interface PieceSchematic {
@@ -104,7 +105,8 @@ export function backSchematic(
   leftPts.push(...shoulderStaircase(holds.filter((h) => h.side === 'L'), -achievedHalf, 1));
   leftPts.push({ x: -neckHalf, y: topY });
   const outline = [...rightPts, ...leftPts.reverse()];
-  marks.push({ kind: 'castoff', x: 0, y: topY - 0.5, span: plan.backNeckSts }); // back neck
+  marks.push({ kind: 'castoff', x: 0, y: topY - 0.5, span: plan.backNeckSts, centre: true }); // back neck
+  marks.push(...holdMarks(holds, achievedHalf));
 
   const measures: Measure[] = [
     { kind: 'width', label: 'width', sts: plan.bodySts, at: 0, from: -bodyHalf, to: bodyHalf },
@@ -156,7 +158,7 @@ export function frontSchematic(
   // first, so its row index still equals the physical row. Read the true neck edge
   // (its centre-facing R cast-offs/decreases) and shoulder (its armhole-edge holds)
   // from the left half, and mirror them to the right.
-  marks.push({ kind: 'castoff', x: 0, y: splitY - 0.5, span: centreCastOff }); // divide
+  marks.push({ kind: 'castoff', x: 0, y: splitY - 0.5, span: centreCastOff, centre: true }); // divide
   const leftRows = rows.filter((r) => r.side === 'left');
   const leftNeck: Pt[] = [{ x: -neckBottomHalf, y: splitY }];
   let nx = -neckBottomHalf;
@@ -188,6 +190,8 @@ export function frontSchematic(
   rightPts.push(...leftStair.map(mirror), ...leftNeck.map(mirror).reverse());
   leftPts.push(...leftStair, ...[...leftNeck].reverse());
   const outline = [...rightPts, ...leftPts.reverse()];
+  const lhm = holdMarks(shoulderHolds(leftRows), achievedHalf); // left-half shoulder holds
+  marks.push(...lhm, ...lhm.map((m) => ({ ...m, x: -m.x })));
   const measures: Measure[] = [
     { kind: 'width', label: 'width', sts: plan.bodySts, at: 0, from: -bodyHalf, to: bodyHalf },
     { kind: 'width', label: 'front neck', sts: fnp.frontNeckSts, at: topY, from: -neckTopHalf, to: neckTopHalf },
@@ -214,6 +218,26 @@ function shoulderHolds(rows: Row[]): { count: number; side: Carriage; y: number 
   for (const r of rows) {
     for (const op of r.ops) {
       if (op.kind === 'hold') out.push({ count: op.count, side: op.side, y: r.index });
+    }
+  }
+  return out;
+}
+
+/** A hold glyph per short-row group, at the group's centre (from the armhole edge in). */
+function holdMarks(
+  holds: { count: number; side: Carriage; y: number }[],
+  startHalf: number,
+): ShapeMark[] {
+  const out: ShapeMark[] = [];
+  let rx = startHalf;
+  let lx = -startHalf;
+  for (const h of holds) {
+    if (h.side === 'R') {
+      out.push({ kind: 'hold', x: rx - h.count / 2, y: h.y - 0.5, span: h.count });
+      rx -= h.count;
+    } else {
+      out.push({ kind: 'hold', x: lx + h.count / 2, y: h.y - 0.5, span: h.count });
+      lx += h.count;
     }
   }
   return out;
@@ -388,7 +412,7 @@ export function sleeveSchematic(
   rightPts.push({ x: plan.capTopSts / 2, y: topY });
   leftPts.push({ x: -plan.capTopSts / 2, y: topY });
   const outline = [...rightPts, ...leftPts.reverse()];
-  marks.push({ kind: 'castoff', x: 0, y: topY - 0.5, span: plan.capTopSts }); // crown
+  marks.push({ kind: 'castoff', x: 0, y: topY - 0.5, span: plan.capTopSts, centre: true }); // crown
 
   const measures: Measure[] = [
     { kind: 'width', label: 'cuff', sts: plan.bodyCuffSts, at: 0, from: -cuffHalf, to: cuffHalf },
@@ -459,6 +483,33 @@ export interface SvgOpts {
   pxPerUnit?: number;
 }
 
+/** The knit-chart key: decrease, increase, cast off, hold, rib. */
+function chartLegend(x: number, y: number): string {
+  const rowH = 15;
+  const entries: { g: 'dec' | 'inc' | 'co' | 'hold' | 'rib'; c: string; label: string }[] = [
+    { g: 'dec', c: '#243447', label: 'decrease' },
+    { g: 'inc', c: '#2c6e49', label: 'increase' },
+    { g: 'co', c: '#b23a3a', label: 'cast off' },
+    { g: 'hold', c: '#9a7b1e', label: 'hold' },
+    { g: 'rib', c: '#e9e4d6', label: '1×1 rib' },
+  ];
+  const h = entries.length * rowH + 9;
+  const out = [`<g font-size="10" fill="#3a4653">`];
+  out.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="98" height="${h}" rx="4" fill="#fffffff2" stroke="#d5d0c4" stroke-width="0.9"/>`);
+  entries.forEach((e, i) => {
+    const gy = y + 13 + i * rowH;
+    const gx = x + 13;
+    if (e.g === 'dec') out.push(`<line x1="${gx - 4}" y1="${gy + 4}" x2="${gx + 4}" y2="${gy - 4}" stroke="${e.c}" stroke-width="1.6"/>`);
+    else if (e.g === 'inc') out.push(`<circle cx="${gx}" cy="${gy}" r="3.4" fill="none" stroke="${e.c}" stroke-width="1.4"/>`);
+    else if (e.g === 'co') out.push(`<rect x="${gx - 3.6}" y="${gy - 3.6}" width="7.2" height="7.2" rx="1.4" fill="${e.c}"/>`);
+    else if (e.g === 'hold') out.push(`<rect x="${gx - 3.6}" y="${gy - 3.6}" width="7.2" height="7.2" fill="none" stroke="${e.c}" stroke-width="1.4"/>`);
+    else out.push(`<rect x="${gx - 4.5}" y="${gy - 4.5}" width="9" height="9" fill="${e.c}" stroke="#c9c2b0" stroke-width="0.6"/>`);
+    out.push(`<text x="${gx + 13}" y="${gy + 3.4}">${e.label}</text>`);
+  });
+  out.push('</g>');
+  return out.join('');
+}
+
 function fmtLen(inches: number, units: 'in' | 'cm' | 'both'): string {
   const cm = inches * 2.54;
   const inTxt = `${inches.toFixed(1)}in`;
@@ -496,11 +547,23 @@ export function schematicSvg(s: PieceSchematic, opts: SvgOpts = {}): string {
   const X = (xSt: number): number => pad + (xSt + halfW) * cellW;
   const Y = (yRow: number): number => pad + (s.heightRows - yRow) * cellH;
 
+  const chart = !measured && (opts.chart ?? false);
   const parts: string[] = [];
   parts.push(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W.toFixed(1)}" height="${H.toFixed(1)}" viewBox="0 0 ${W.toFixed(1)} ${H.toFixed(1)}" font-family="system-ui, sans-serif">`,
   );
   parts.push(`<rect width="${W.toFixed(1)}" height="${H.toFixed(1)}" fill="white"/>`);
+
+  // Rib vs stocking: tint the rib band and label it (the rest is stocking stitch).
+  if (s.ribRows > 0) {
+    const ribTop = Y(s.ribRows);
+    parts.push(
+      `<rect x="${X(-halfW).toFixed(1)}" y="${ribTop.toFixed(1)}" width="${(s.widthSts * cellW).toFixed(1)}" height="${(Y(0) - ribTop).toFixed(1)}" fill="#e9e4d6"/>`,
+    );
+    parts.push(
+      `<text x="${(X(-halfW) + 4).toFixed(1)}" y="${(Y(0) - 5).toFixed(1)}" font-size="11" fill="#7c745f">1×1 rib</text>`,
+    );
+  }
 
   // Grid + axis numbers, spaced in the natural unit. Stitch mode: every 5 st/row
   // (overview) or, as a chart, every 1 st/row (medium every 5, heavy+numbered every
@@ -539,69 +602,83 @@ export function schematicSvg(s: PieceSchematic, opts: SvgOpts = {}): string {
     parts.push(g.join(''));
   }
 
-  // Outline.
+  // Outline (thinner on the chart so it reads as a row edge, not a heavy border).
   const d = s.outline
     .map((p, k) => `${k === 0 ? 'M' : 'L'} ${X(p.x).toFixed(1)} ${Y(p.y).toFixed(1)}`)
     .join(' ');
-  parts.push(`<path d="${d} Z" fill="#4f6d8c22" stroke="#33475b" stroke-width="2" stroke-linejoin="round"/>`);
-
-  // Rib band marker.
   parts.push(
-    `<line x1="${X(-halfW).toFixed(1)}" y1="${Y(s.ribRows).toFixed(1)}" x2="${X(halfW).toFixed(1)}" y2="${Y(s.ribRows).toFixed(1)}" stroke="#33475b" stroke-width="1" stroke-dasharray="4 3"/>`,
+    `<path d="${d} Z" fill="#4f6d8c1e" stroke="#33475b" stroke-width="${chart ? 1 : 2}" stroke-linejoin="round"/>`,
   );
 
-  // Shaping symbols on the per-stitch chart: a decrease is a leaning stroke, an
-  // increase a small ring, a cast-off a bar over its run. Each is drawn with a white
-  // underlay first so it stays legible over the grid and never obscures a neighbour.
-  if ((opts.chart ?? false) && !measured && s.marks.length) {
-    const glyph = (
-      mk: ShapeMark,
-    ): { d: string; sw: number; color: string } => {
-      const cx = X(mk.x);
-      const cy = Y(mk.y);
+  // Chart: shaping symbols nudged just off the cell they refer to, per-row
+  // annotations (row number + net stitch change) down the right margin, and a key.
+  if (chart && s.marks.length) {
+    const DEC = '#243447';
+    const INC = '#2c6e49';
+    const CO = '#b23a3a';
+    const HOLD = '#9a7b1e';
+    // Offset a symbol clear of its cell: cast-offs and holds sit above the row,
+    // edge decreases/increases just outside the edge.
+    const at = (mk: ShapeMark): { cx: number; cy: number } =>
+      mk.centre
+        ? { cx: X(mk.x), cy: Y(mk.y + 1.3) }
+        : mk.kind === 'hold'
+          ? { cx: X(mk.x), cy: Y(mk.y + 1.0) }
+          : { cx: X(mk.x + Math.sign(mk.x) * 1.3), cy: Y(mk.y) };
+    const fills: string[] = [];
+    const strokes: { d: string; sw: number; color: string }[] = [];
+    for (const mk of s.marks) {
+      const { cx, cy } = at(mk);
       if (mk.kind === 'castoff') {
-        const w = (mk.span ?? 1) * cellW;
-        return {
-          d: `<line x1="${(cx - w / 2).toFixed(1)}" y1="${cy.toFixed(1)}" x2="${(cx + w / 2).toFixed(1)}" y2="${cy.toFixed(1)}"/>`,
-          sw: Math.max(1.6, cellH * 0.5),
-          color: '#b23a3a',
-        };
-      }
-      if (mk.kind === 'dec') {
-        const d = cellW * 0.34;
+        const r = cellW * 0.34;
+        fills.push(
+          `<rect x="${(cx - r).toFixed(1)}" y="${(cy - r).toFixed(1)}" width="${(2 * r).toFixed(1)}" height="${(2 * r).toFixed(1)}" rx="${(r * 0.4).toFixed(1)}" fill="${CO}" stroke="#fff" stroke-width="2" paint-order="stroke"/>`,
+        );
+      } else if (mk.kind === 'dec') {
+        const r = cellW * 0.36;
         const l = mk.lean ?? 1;
-        return {
-          d: `<line x1="${(cx - l * d).toFixed(1)}" y1="${(cy + d).toFixed(1)}" x2="${(cx + l * d).toFixed(1)}" y2="${(cy - d).toFixed(1)}"/>`,
-          sw: Math.max(1, cellW * 0.32),
-          color: '#243447',
-        };
+        strokes.push({ d: `<line x1="${(cx - l * r).toFixed(1)}" y1="${(cy + r).toFixed(1)}" x2="${(cx + l * r).toFixed(1)}" y2="${(cy - r).toFixed(1)}"/>`, sw: Math.max(1.2, cellW * 0.34), color: DEC });
+      } else if (mk.kind === 'inc') {
+        strokes.push({ d: `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${(cellW * 0.3).toFixed(1)}"/>`, sw: Math.max(1.1, cellW * 0.26), color: INC });
+      } else {
+        const r = cellW * 0.36;
+        strokes.push({ d: `<rect x="${(cx - r).toFixed(1)}" y="${(cy - r).toFixed(1)}" width="${(2 * r).toFixed(1)}" height="${(2 * r).toFixed(1)}"/>`, sw: Math.max(1.1, cellW * 0.26), color: HOLD });
       }
-      return {
-        d: `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${(cellW * 0.3).toFixed(1)}"/>`,
-        sw: Math.max(1, cellW * 0.26),
-        color: '#2c6e49',
-      };
-    };
-    const items = s.marks.map(glyph);
-    parts.push(
-      `<g fill="none" stroke="#ffffff" stroke-linecap="round">` +
-        items.map((i) => `<g stroke-width="${(i.sw + 2).toFixed(1)}">${i.d}</g>`).join('') +
-        `</g>`,
-    );
-    parts.push(
-      `<g fill="none" stroke-linecap="round">` +
-        items.map((i) => `<g stroke="${i.color}" stroke-width="${i.sw.toFixed(1)}">${i.d}</g>`).join('') +
-        `</g>`,
-    );
+    }
+    parts.push(`<g>${fills.join('')}</g>`);
+    parts.push(`<g fill="none" stroke="#fff" stroke-linecap="round">${strokes.map((g) => `<g stroke-width="${(g.sw + 2).toFixed(1)}">${g.d}</g>`).join('')}</g>`);
+    parts.push(`<g fill="none" stroke-linecap="round">${strokes.map((g) => `<g stroke="${g.color}" stroke-width="${g.sw.toFixed(1)}">${g.d}</g>`).join('')}</g>`);
+
+    // Per-row annotations in the right margin: row number + net stitch change.
+    const byRow = new Map<number, ShapeMark[]>();
+    for (const mk of s.marks) {
+      const r = Math.round(mk.y + 0.5);
+      const arr = byRow.get(r) ?? [];
+      arr.push(mk);
+      byRow.set(r, arr);
+    }
+    const annos = [`<g font-size="9" fill="#8a7f68" paint-order="stroke" stroke="#fff" stroke-width="2.6">`];
+    for (const [row, ms] of byRow) {
+      const change = ms.reduce((n, m) => n + (m.kind === 'castoff' ? -(m.span ?? 1) : m.kind === 'dec' ? -1 : m.kind === 'inc' ? 1 : 0), 0);
+      const label = change !== 0 ? `${row}  ${change > 0 ? '+' : '-'}${Math.abs(change)}` : ms.some((m) => m.kind === 'hold') ? `${row}  hold` : '';
+      if (!label) continue;
+      annos.push(`<text x="${(X(halfW) + 10).toFixed(1)}" y="${(Y(row - 0.5) + 3.2).toFixed(1)}" text-anchor="start">${label}</text>`);
+    }
+    annos.push('</g>');
+    parts.push(annos.join(''));
+
+    // Key (legend) in the top-left corner.
+    parts.push(chartLegend(X(-halfW) + 6, pad + 4));
   }
 
-  // Dimension labels — kept clear of the axis numbers: widths sit just ABOVE their
-  // line (the bottom / left margins are the ruler's); heights run down the RIGHT
-  // margin (the full length outermost). A white halo keeps them legible over the grid.
+  // Dimension labels (measured / overview) — kept clear of the axis numbers: widths
+  // sit just ABOVE their line (the bottom / left margins are the ruler's); heights
+  // run down the RIGHT margin (the full length outermost). The chart uses the
+  // per-row annotations instead, so it skips these. A white halo keeps them legible.
   const labels: string[] = [
     `<g fill="#1b2733" font-size="13" paint-order="stroke" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round">`,
   ];
-  for (const m of s.measures) {
+  for (const m of chart ? [] : s.measures) {
     if (m.kind === 'width' && m.sts != null) {
       const text = measured ? fmtLen(m.sts * inPerSt, units) : `${m.sts} sts`;
       const cx = X((m.from + m.to) / 2);
