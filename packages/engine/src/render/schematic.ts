@@ -38,6 +38,19 @@ export interface Measure {
   to: number; // width: x1; height: y1
 }
 
+/**
+ * A shaping event to mark on the knit chart, in stitch/row cell coordinates
+ * (x, y at the cell centre). `dec`/`inc` are single cells (lean shows the side);
+ * `castoff` spans `span` cells.
+ */
+export interface ShapeMark {
+  kind: 'dec' | 'inc' | 'castoff';
+  x: number;
+  y: number;
+  span?: number;
+  lean?: number; // dec only: +1 leans one way, −1 the other
+}
+
 export interface PieceSchematic {
   piece: string;
   title: string;
@@ -48,6 +61,8 @@ export interface PieceSchematic {
   ribRows: number;
   gauge: Gauge;
   measures: Measure[];
+  /** Shaping symbols for the per-stitch chart. */
+  marks: ShapeMark[];
 }
 
 // ---------------------------------------------------------------------------
@@ -82,13 +97,14 @@ export function backSchematic(
   // Body + armhole edges true-to-side from the ops; the shoulders as the real
   // short-row staircase from the hold groups; the flat back neck cast off across
   // the top between them.
-  const { rightPts, leftPts, underarmY } = trackBodyEdges(rows, bodyHalf, holdY);
+  const { rightPts, leftPts, underarmY, marks } = trackBodyEdges(rows, bodyHalf, holdY);
   const holds = shoulderHolds(rows);
   rightPts.push(...shoulderStaircase(holds.filter((h) => h.side === 'R'), achievedHalf, -1));
   rightPts.push({ x: neckHalf, y: topY });
   leftPts.push(...shoulderStaircase(holds.filter((h) => h.side === 'L'), -achievedHalf, 1));
   leftPts.push({ x: -neckHalf, y: topY });
   const outline = [...rightPts, ...leftPts.reverse()];
+  marks.push({ kind: 'castoff', x: 0, y: topY - 0.5, span: plan.backNeckSts }); // back neck
 
   const measures: Measure[] = [
     { kind: 'width', label: 'width', sts: plan.bodySts, at: 0, from: -bodyHalf, to: bodyHalf },
@@ -107,6 +123,7 @@ export function backSchematic(
     ribRows: plan.ribRows,
     gauge,
     measures,
+    marks,
   };
 }
 
@@ -130,7 +147,7 @@ export function frontSchematic(
   // top from the plan rather than the last row index.
   const topY = plan.totalRows;
   // Below the split, the front is the back: track its true edges up to the split.
-  const { rightPts, leftPts, underarmY } = trackBodyEdges(rows, bodyHalf, splitY);
+  const { rightPts, leftPts, underarmY, marks } = trackBodyEdges(rows, bodyHalf, splitY);
   const achievedHalf = rightPts[rightPts.length - 1].x; // armhole width reached
   const neckTopHalf = fnp.frontNeckSts / 2; // neck opening at the shoulders
   const neckBottomHalf = centreCastOff / 2; // the centre cast-off at the neck base
@@ -139,14 +156,25 @@ export function frontSchematic(
   // first, so its row index still equals the physical row. Read the true neck edge
   // (its centre-facing R cast-offs/decreases) and shoulder (its armhole-edge holds)
   // from the left half, and mirror them to the right.
+  marks.push({ kind: 'castoff', x: 0, y: splitY - 0.5, span: centreCastOff }); // divide
   const leftRows = rows.filter((r) => r.side === 'left');
   const leftNeck: Pt[] = [{ x: -neckBottomHalf, y: splitY }];
   let nx = -neckBottomHalf;
   for (const r of leftRows) {
+    const cy = r.index - 0.5;
     for (const op of r.ops) {
-      if ((op.kind === 'bind_off' || op.kind === 'decrease') && op.side === 'R') {
+      if (op.kind !== 'bind_off' && op.kind !== 'decrease') continue;
+      if (op.side !== 'R') continue;
+      if (op.kind === 'bind_off') {
         nx -= op.count; // the neck opening widens away from the centre
         leftNeck.push({ x: nx, y: r.index });
+        marks.push({ kind: 'castoff', x: nx + op.count / 2, y: cy, span: op.count });
+        marks.push({ kind: 'castoff', x: -(nx + op.count / 2), y: cy, span: op.count });
+      } else if (op.kind === 'decrease') {
+        nx -= op.count;
+        leftNeck.push({ x: nx, y: r.index });
+        marks.push({ kind: 'dec', x: nx + 0.5, y: cy, lean: -1 });
+        marks.push({ kind: 'dec', x: -(nx + 0.5), y: cy, lean: 1 });
       }
     }
   }
@@ -176,6 +204,7 @@ export function frontSchematic(
     ribRows: plan.ribRows,
     gauge,
     measures,
+    marks,
   };
 }
 
@@ -222,9 +251,10 @@ function trackBodyEdges(
   rows: Row[],
   bodyHalf: number,
   stopY: number,
-): { rightPts: Pt[]; leftPts: Pt[]; underarmY: number } {
+): { rightPts: Pt[]; leftPts: Pt[]; underarmY: number; marks: ShapeMark[] } {
   const rightPts: Pt[] = [{ x: bodyHalf, y: 0 }];
   const leftPts: Pt[] = [{ x: -bodyHalf, y: 0 }];
+  const marks: ShapeMark[] = [];
   let leftSts = 0;
   let rightSts = 0;
   let lastR = bodyHalf;
@@ -234,19 +264,37 @@ function trackBodyEdges(
   let underarmY = 0;
   for (const r of rows) {
     if (r.index >= stopY) break;
+    const cy = r.index - 0.5;
     for (const op of r.ops) {
       if (op.kind === 'cast_on') {
         rightSts = Math.ceil(op.count / 2);
         leftSts = Math.floor(op.count / 2);
       } else if (op.kind === 'bind_off') {
-        if (op.side === 'R') rightSts -= op.count;
-        else if (op.side === 'L') leftSts -= op.count;
+        if (op.side === 'R') {
+          rightSts -= op.count;
+          marks.push({ kind: 'castoff', x: rightSts + op.count / 2, y: cy, span: op.count });
+        } else if (op.side === 'L') {
+          leftSts -= op.count;
+          marks.push({ kind: 'castoff', x: -(leftSts + op.count / 2), y: cy, span: op.count });
+        }
       } else if (op.kind === 'decrease') {
-        if (op.side === 'R' || op.side === 'both') rightSts -= op.count;
-        if (op.side === 'L' || op.side === 'both') leftSts -= op.count;
+        if (op.side === 'R' || op.side === 'both') {
+          rightSts -= op.count;
+          marks.push({ kind: 'dec', x: rightSts - 0.5, y: cy, lean: 1 });
+        }
+        if (op.side === 'L' || op.side === 'both') {
+          leftSts -= op.count;
+          marks.push({ kind: 'dec', x: -leftSts + 0.5, y: cy, lean: -1 });
+        }
       } else if (op.kind === 'increase') {
-        if (op.side === 'R' || op.side === 'both') rightSts += op.count;
-        if (op.side === 'L' || op.side === 'both') leftSts += op.count;
+        if (op.side === 'R' || op.side === 'both') {
+          rightSts += op.count;
+          marks.push({ kind: 'inc', x: rightSts - 0.5, y: cy });
+        }
+        if (op.side === 'L' || op.side === 'both') {
+          leftSts += op.count;
+          marks.push({ kind: 'inc', x: -leftSts + 0.5, y: cy });
+        }
       }
     }
     const rx = r.section === 'rib' ? bodyHalf : rightSts;
@@ -269,7 +317,7 @@ function trackBodyEdges(
       lastL = lx;
     }
   }
-  return { rightPts, leftPts, underarmY };
+  return { rightPts, leftPts, underarmY, marks };
 }
 
 // ---------------------------------------------------------------------------
@@ -286,6 +334,7 @@ export function sleeveSchematic(
   const topY = crown.index;
   const rightPts: Pt[] = [{ x: cuffHalf, y: 0 }];
   const leftPts: Pt[] = [{ x: -cuffHalf, y: 0 }];
+  const marks: ShapeMark[] = [];
   let leftSts = 0;
   let rightSts = 0;
   let lastR = cuffHalf;
@@ -294,6 +343,7 @@ export function sleeveSchematic(
   let maxHalf = cuffHalf;
   for (const r of rows) {
     if (r.index >= topY) break;
+    const cy = r.index - 0.5;
     for (const op of r.ops) {
       if (op.kind === 'cast_on') {
         rightSts = Math.ceil(op.count / 2);
@@ -301,12 +351,25 @@ export function sleeveSchematic(
       } else if (op.kind === 'increase') {
         rightSts += op.count;
         leftSts += op.count;
+        marks.push({ kind: 'inc', x: rightSts - 0.5, y: cy });
+        marks.push({ kind: 'inc', x: -leftSts + 0.5, y: cy });
       } else if (op.kind === 'bind_off') {
-        if (op.side === 'R') rightSts -= op.count;
-        else if (op.side === 'L') leftSts -= op.count;
+        if (op.side === 'R') {
+          rightSts -= op.count;
+          marks.push({ kind: 'castoff', x: rightSts + op.count / 2, y: cy, span: op.count });
+        } else if (op.side === 'L') {
+          leftSts -= op.count;
+          marks.push({ kind: 'castoff', x: -(leftSts + op.count / 2), y: cy, span: op.count });
+        }
       } else if (op.kind === 'decrease') {
-        if (op.side === 'R' || op.side === 'both') rightSts -= op.count;
-        if (op.side === 'L' || op.side === 'both') leftSts -= op.count;
+        if (op.side === 'R' || op.side === 'both') {
+          rightSts -= op.count;
+          marks.push({ kind: 'dec', x: rightSts - 0.5, y: cy, lean: 1 });
+        }
+        if (op.side === 'L' || op.side === 'both') {
+          leftSts -= op.count;
+          marks.push({ kind: 'dec', x: -leftSts + 0.5, y: cy, lean: -1 });
+        }
       }
     }
     if (r.section === 'cap' && capStartY === 0) capStartY = r.index - 1; // underarm
@@ -325,6 +388,7 @@ export function sleeveSchematic(
   rightPts.push({ x: plan.capTopSts / 2, y: topY });
   leftPts.push({ x: -plan.capTopSts / 2, y: topY });
   const outline = [...rightPts, ...leftPts.reverse()];
+  marks.push({ kind: 'castoff', x: 0, y: topY - 0.5, span: plan.capTopSts }); // crown
 
   const measures: Measure[] = [
     { kind: 'width', label: 'cuff', sts: plan.bodyCuffSts, at: 0, from: -cuffHalf, to: cuffHalf },
@@ -342,6 +406,7 @@ export function sleeveSchematic(
     ribRows: plan.ribRows,
     gauge,
     measures,
+    marks,
   };
 }
 
@@ -375,6 +440,7 @@ export function neckbandSchematic(
     ribRows: h, // all rib
     gauge,
     measures,
+    marks: [],
   };
 }
 
@@ -483,6 +549,51 @@ export function schematicSvg(s: PieceSchematic, opts: SvgOpts = {}): string {
   parts.push(
     `<line x1="${X(-halfW).toFixed(1)}" y1="${Y(s.ribRows).toFixed(1)}" x2="${X(halfW).toFixed(1)}" y2="${Y(s.ribRows).toFixed(1)}" stroke="#33475b" stroke-width="1" stroke-dasharray="4 3"/>`,
   );
+
+  // Shaping symbols on the per-stitch chart: a decrease is a leaning stroke, an
+  // increase a small ring, a cast-off a bar over its run. Each is drawn with a white
+  // underlay first so it stays legible over the grid and never obscures a neighbour.
+  if ((opts.chart ?? false) && !measured && s.marks.length) {
+    const glyph = (
+      mk: ShapeMark,
+    ): { d: string; sw: number; color: string } => {
+      const cx = X(mk.x);
+      const cy = Y(mk.y);
+      if (mk.kind === 'castoff') {
+        const w = (mk.span ?? 1) * cellW;
+        return {
+          d: `<line x1="${(cx - w / 2).toFixed(1)}" y1="${cy.toFixed(1)}" x2="${(cx + w / 2).toFixed(1)}" y2="${cy.toFixed(1)}"/>`,
+          sw: Math.max(1.6, cellH * 0.5),
+          color: '#b23a3a',
+        };
+      }
+      if (mk.kind === 'dec') {
+        const d = cellW * 0.34;
+        const l = mk.lean ?? 1;
+        return {
+          d: `<line x1="${(cx - l * d).toFixed(1)}" y1="${(cy + d).toFixed(1)}" x2="${(cx + l * d).toFixed(1)}" y2="${(cy - d).toFixed(1)}"/>`,
+          sw: Math.max(1, cellW * 0.32),
+          color: '#243447',
+        };
+      }
+      return {
+        d: `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${(cellW * 0.3).toFixed(1)}"/>`,
+        sw: Math.max(1, cellW * 0.26),
+        color: '#2c6e49',
+      };
+    };
+    const items = s.marks.map(glyph);
+    parts.push(
+      `<g fill="none" stroke="#ffffff" stroke-linecap="round">` +
+        items.map((i) => `<g stroke-width="${(i.sw + 2).toFixed(1)}">${i.d}</g>`).join('') +
+        `</g>`,
+    );
+    parts.push(
+      `<g fill="none" stroke-linecap="round">` +
+        items.map((i) => `<g stroke="${i.color}" stroke-width="${i.sw.toFixed(1)}">${i.d}</g>`).join('') +
+        `</g>`,
+    );
+  }
 
   // Dimension labels — kept clear of the axis numbers: widths sit just ABOVE their
   // line (the bottom / left margins are the ruler's); heights run down the RIGHT
