@@ -37,6 +37,13 @@ export const MIN_UPPER_ARM_EASE_IN = 0.5;
 export const MAX_UPPER_ARM_EASE_IN = 2.5;
 
 /**
+ * A drop shoulder's armhole is a deep square notch (arm depth + this). The straight
+ * sleeve top sews to it, so the sleeve is 2× the depth — loose and wide, per real
+ * drop patterns (Tier C: sleeve top ≈ 2 × armhole depth, armhole ≈ the arm depth).
+ */
+export const DROP_ARMHOLE_ALLOWANCE_IN = 0.5;
+
+/**
  * Ease around the upper arm, scaled to the fit style. A snug (skintight/tight) fit is
  * snug over the bicep; a standard fit is comfortable; a loose fit is roomy — clamped
  * so the sleeve always clears the arm and never asks more cap than the armhole can take.
@@ -74,11 +81,18 @@ export function garmentWidths(
   shoulder: ShoulderStyle = 'set_in',
 ): GarmentWidths {
   const ease = chestEase(size, style);
-  const sleeveTop = size.upper_arm + upperArmEase(size, style);
-  // Set-in: a shaped-scye depth from the arm. Drop: the straight sleeve top (width)
-  // sews to the front+back armhole edges, so the armhole depth is half that width.
-  const armholeDepth =
-    shoulder === 'drop' ? sleeveTop / 2 : size.arm_depth + SETIN_ALLOWANCE_IN.armholeDepth;
+  let armholeDepth: number;
+  let sleeveTop: number;
+  if (shoulder === 'drop') {
+    // Armhole-driven: a deep square notch, and the straight sleeve top = 2 × depth
+    // (never narrower than the arm needs).
+    armholeDepth = size.arm_depth + DROP_ARMHOLE_ALLOWANCE_IN;
+    sleeveTop = Math.max(2 * armholeDepth, size.upper_arm + upperArmEase(size, style));
+  } else {
+    // Set-in: a shaped-scye depth from the arm; a fitted, style-scaled sleeve.
+    armholeDepth = size.arm_depth + SETIN_ALLOWANCE_IN.armholeDepth;
+    sleeveTop = size.upper_arm + upperArmEase(size, style);
+  }
   return {
     unit: 'in',
     chestEase: ease,

@@ -10,13 +10,15 @@
 
 import type { SizeRecord, EaseStyleId, NeckStyle, ShoulderStyle } from './data/types';
 import { garmentWidths, MIN_UPPER_ARM_EASE_IN } from './dimensions';
-import { VNECK_POINT_ABOVE_UNDERARM_IN } from './pieces/front';
 import {
   NECK_OPENING_STRETCH,
   NECK_STRETCH_MAX,
   crewSuitable,
   neckOpeningPerimeter,
   backNeckDepthIn,
+  vNeckDepthIn,
+  maxVDepthIn,
+  MIN_V_DEPTH_IN,
 } from './neckopening';
 
 // Home of the dial and crew policy is the leaf neckopening.ts; re-exported for callers.
@@ -61,26 +63,10 @@ export function neckFitVerdict(size: SizeRecord): { verdict: NeckFitVerdict; fit
 export const HIP_STRETCH = 1.08;
 /** Each shoulder should be at least this wide, or the neck slides off. */
 export const MIN_SHOULDER_IN = 1.25;
-/** A V should drop at least this far to read as a V (not a deep crew). */
-export const MIN_V_DEPTH_IN = 2.5;
 
-/**
- * ...and no deeper than a modesty cap that varies by who's wearing it: men wear
- * markedly shallower Vs than women, and a large bust shouldn't plunge into
- * cleavage-revealing territory. Provisional bands — to confirm at Tier C.
- */
-export function maxVDepthIn(size: SizeRecord): number {
-  switch (size.category) {
-    case 'Man':
-      return 5.5;
-    case 'Woman':
-      return 7.0;
-    case 'Child':
-      return 5.0;
-    default:
-      return 4.0; // Baby
-  }
-}
+// The V-depth rule (fraction/floor/cap) lives in the leaf neckopening.ts, so the front
+// can build it and the check can read it from one source; re-exported for callers.
+export { MIN_V_DEPTH_IN, maxVDepthIn, vNeckDepthIn } from './neckopening';
 
 export interface FitCheck {
   label: string;
@@ -144,24 +130,25 @@ export function fitReport(
     },
   ];
 
-  // V depth (choice 1): a V should read as a V — deep enough, but modest.
+  // V depth (choice 1): proportional to the armhole, floored to read as a V, capped
+  // for modesty on adults (kids are bounded by head-fit, not modesty). Tier-C-validated.
   if (neck === 'v') {
-    const vDepth = Math.max(size.neck_depth, w.armholeDepth - VNECK_POINT_ABOVE_UNDERARM_IN);
+    const vDepth = vNeckDepthIn(w.armholeDepth, size);
+    const capped = Number.isFinite(maxVDepthIn(size));
     checks.push({
       label: 'v depth sensible',
       ok: vDepth >= MIN_V_DEPTH_IN && vDepth <= maxVDepthIn(size),
-      detail: `V drops ${vDepth.toFixed(1)}" (max ${maxVDepthIn(size)}")${vDepth <= size.neck_depth + 0.01 ? ' — clamped to crew!' : ''}`,
+      detail: `V drops ${vDepth.toFixed(1)}" (${capped ? `cap ${maxVDepthIn(size)}"` : 'head-fit'})`,
     });
   }
 
-  // Drop armhole (choice 3): a drop shoulder is LOOSER, so its armhole should be at
-  // least as deep as a fitted set-in one — currently it comes out shallower.
+  // Drop armhole (choice 3): a drop's armhole must be deep enough for the arm — at
+  // least the body arm depth, so the straight sleeve reaches the armpit.
   if (shoulder === 'drop') {
-    const setinDepth = garmentWidths(size, style, 'set_in').armholeDepth;
     checks.push({
       label: 'drop armhole deep enough',
-      ok: w.armholeDepth >= setinDepth,
-      detail: `drop ${w.armholeDepth.toFixed(1)}" vs set-in ${setinDepth.toFixed(1)}"`,
+      ok: w.armholeDepth >= size.arm_depth,
+      detail: `drop ${w.armholeDepth.toFixed(1)}" vs arm depth ${size.arm_depth}"`,
     });
   }
 

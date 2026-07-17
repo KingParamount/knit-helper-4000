@@ -100,11 +100,14 @@ const STYLE_CONFIGS = [
   { neck: 'v', shoulder: 'drop', label: 'v+drop' },
 ] as const;
 
-describe('Tier-B fit — body-fit checks hold for v-neck and drop shoulder', () => {
+// After the Tier-C-validated fixes, every check holds for the new styles EXCEPT the
+// accepted hip-clearance red — including the style-specific 'v depth sensible' and
+// 'drop armhole deep enough'. Assert all of them but hip.
+describe('Tier-B fit — all checks hold for v-neck and drop shoulder (bar hip)', () => {
   for (const cfg of STYLE_CONFIGS) {
     for (const style of styles) {
       for (const size of inSizes) {
-        for (const c of fitReport(size, style, cfg.neck, cfg.shoulder).checks.filter((c) => GREEN.has(c.label))) {
+        for (const c of fitReport(size, style, cfg.neck, cfg.shoulder).checks.filter((c) => c.label !== 'hip clearance')) {
           it(`${cfg.label} ${style} ${size.category} ${size.chest}" — ${c.label}`, () => {
             expect(c.ok).toBe(true);
           });

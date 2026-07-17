@@ -26,6 +26,40 @@ export function crewSuitable(size: SizeRecord): boolean {
   return size.category !== 'Baby';
 }
 
+// --- V-neck depth (validated at Tier C: women ×2, men ×2, kid ×1) ---------------
+// Real patterns anchor the V a distance above the underarm that grows with size, so
+// the depth is ~a fraction of the armhole, floored to read as a V, and capped for
+// MODESTY on adults. Kids have no modesty cap — their V just needs to clear the head.
+
+/** V depth ≈ this fraction of the armhole depth (real patterns cluster ~0.6–0.7). */
+export const VNECK_DEPTH_FRACTION = 0.7;
+/** A V should drop at least this far to read as a V (not a deep crew). */
+export const MIN_V_DEPTH_IN = 2.5;
+
+/**
+ * Modesty cap on the V depth, by who wears it. Men wear shallower Vs than women; a
+ * large bust shouldn't plunge. Kids get no modesty cap (their concern is head-fit).
+ * Adult bands nudged +0.5" less conservative than the first cut, per real patterns.
+ */
+export function maxVDepthIn(size: SizeRecord): number {
+  switch (size.category) {
+    case 'Man':
+      return 6.0;
+    case 'Woman':
+      return 7.5;
+    default:
+      return Infinity; // Child / Baby — bounded by head-fit, not modesty
+  }
+}
+
+/** The V depth (inches) for an armhole of this depth: proportional, floored, capped. */
+export function vNeckDepthIn(armholeDepthIn: number, size: SizeRecord): number {
+  return Math.min(
+    maxVDepthIn(size),
+    Math.max(MIN_V_DEPTH_IN, armholeDepthIn * VNECK_DEPTH_FRACTION),
+  );
+}
+
 /** Geometric neck-opening circumference (inches): ellipse of width W, total depth D. */
 export function neckOpeningPerimeter(widthIn: number, depthIn: number): number {
   const a = widthIn / 2;

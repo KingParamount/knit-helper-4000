@@ -13,9 +13,7 @@ import type { SizeRecord, EaseStyleId, NeckStyle, ShoulderStyle } from '../data/
 import { type Gauge, rowsFor, stitchesFor } from '../gauge';
 import { type Row, carriageForRow } from '../row';
 import { backPlan, panelThroughArmhole, armholeShaping, splitIntoSteps, SHOULDER_STEP_STS } from './back';
-
-/** A V-neck point sits this far above the underarm. Design choice — tunable. */
-export const VNECK_POINT_ABOVE_UNDERARM_IN = 2.5;
+import { vNeckDepthIn } from '../neckopening';
 
 /** Rows the crew neck occupies below the shoulder line. */
 export function frontNeckDepthRows(size: SizeRecord, gauge: Gauge): number {
@@ -47,14 +45,11 @@ export function frontNeckPlan(
   const plan = backPlan(size, style, gauge, shoulder);
   const bodySts = armholeShaping(plan.bodySts, plan.upperBackSts, gauge).achievedSts;
   const shoulderSts = Math.round((bodySts - plan.backNeckSts) / 2); // match the back
-  // A V splits low — the point sits a set distance above the underarm; a crew is shallow.
+  // A V's depth is ~a fraction of the armhole, floored to read as a V and capped for
+  // modesty on adults (vNeckDepthIn); a crew is a shallow scoop.
+  const armholeDepthIn = plan.armholeRows * (4 / gauge.bodyRow);
   const neckDepthRows =
-    neck === 'v'
-      ? Math.max(
-          frontNeckDepthRows(size, gauge),
-          plan.armholeRows - rowsFor(VNECK_POINT_ABOVE_UNDERARM_IN, gauge),
-        )
-      : frontNeckDepthRows(size, gauge);
+    neck === 'v' ? rowsFor(vNeckDepthIn(armholeDepthIn, size), gauge) : frontNeckDepthRows(size, gauge);
   return {
     neckLineRow: plan.totalRows - neckDepthRows,
     neckDepthRows,
