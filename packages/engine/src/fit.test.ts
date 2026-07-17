@@ -89,3 +89,43 @@ it('CHECKPOINT: neck opening vs head across every category', () => {
   console.log(lines.join('\n'));
   expect(true).toBe(true);
 });
+
+// The style-INDEPENDENT body-fit checks must hold for the new styles too — a new style
+// just runs through the same harness. The style-SPECIFIC reds ('v depth sensible',
+// 'drop armhole deep enough') are open findings pending fixes informed by Tier C; the
+// checkpoint prints them, they are not asserted.
+const STYLE_CONFIGS = [
+  { neck: 'v', shoulder: 'set_in', label: 'v-neck' },
+  { neck: 'round', shoulder: 'drop', label: 'drop' },
+  { neck: 'v', shoulder: 'drop', label: 'v+drop' },
+] as const;
+
+describe('Tier-B fit — body-fit checks hold for v-neck and drop shoulder', () => {
+  for (const cfg of STYLE_CONFIGS) {
+    for (const style of styles) {
+      for (const size of inSizes) {
+        for (const c of fitReport(size, style, cfg.neck, cfg.shoulder).checks.filter((c) => GREEN.has(c.label))) {
+          it(`${cfg.label} ${style} ${size.category} ${size.chest}" — ${c.label}`, () => {
+            expect(c.ok).toBe(true);
+          });
+        }
+      }
+    }
+  }
+});
+
+it('CHECKPOINT: Tier-B style sweep — v-neck & drop findings (open, pending Tier C)', () => {
+  const lines = ['', '  TIER-B STYLE SWEEP — moderate (✓/✗ across 35 sizes)'];
+  for (const cfg of STYLE_CONFIGS) {
+    lines.push(`  — ${cfg.label} —`);
+    const labels = fitReport(inSizes[0], 'moderate', cfg.neck, cfg.shoulder).checks.map((c) => c.label);
+    for (const label of labels) {
+      let pass = 0;
+      let fail = 0;
+      for (const s of inSizes) (fitReport(s, 'moderate', cfg.neck, cfg.shoulder).checks.find((c) => c.label === label)!.ok ? pass++ : fail++);
+      lines.push(`    ${fail === 0 ? '✓' : '✗'} ${label.padEnd(24)} ${pass}/${pass + fail}`);
+    }
+  }
+  console.log(lines.join('\n'));
+  expect(true).toBe(true);
+});

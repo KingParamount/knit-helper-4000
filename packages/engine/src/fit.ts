@@ -8,8 +8,9 @@
  * back-neck scoop (neckopening.ts) opens it, solved to a comfortable stretch.
  */
 
-import type { SizeRecord, EaseStyleId } from './data/types';
+import type { SizeRecord, EaseStyleId, NeckStyle, ShoulderStyle } from './data/types';
 import { garmentWidths, MIN_UPPER_ARM_EASE_IN } from './dimensions';
+import { VNECK_POINT_ABOVE_UNDERARM_IN } from './pieces/front';
 import {
   NECK_OPENING_STRETCH,
   NECK_STRETCH_MAX,
@@ -60,6 +61,26 @@ export function neckFitVerdict(size: SizeRecord): { verdict: NeckFitVerdict; fit
 export const HIP_STRETCH = 1.08;
 /** Each shoulder should be at least this wide, or the neck slides off. */
 export const MIN_SHOULDER_IN = 1.25;
+/** A V should drop at least this far to read as a V (not a deep crew). */
+export const MIN_V_DEPTH_IN = 2.5;
+
+/**
+ * ...and no deeper than a modesty cap that varies by who's wearing it: men wear
+ * markedly shallower Vs than women, and a large bust shouldn't plunge into
+ * cleavage-revealing territory. Provisional bands — to confirm at Tier C.
+ */
+export function maxVDepthIn(size: SizeRecord): number {
+  switch (size.category) {
+    case 'Man':
+      return 5.5;
+    case 'Woman':
+      return 7.0;
+    case 'Child':
+      return 5.0;
+    default:
+      return 4.0; // Baby
+  }
+}
 
 export interface FitCheck {
   label: string;
@@ -78,23 +99,31 @@ export interface FitReport {
  * shoulder/neck style, so this one report serves them all — a new style just has to
  * pass it. Checks read finished dimensions against the body measurement + a band.
  */
-export function fitReport(size: SizeRecord, style: EaseStyleId): FitReport {
-  const w = garmentWidths(size, style);
-  const neck = neckFitVerdict(size);
+export function fitReport(
+  size: SizeRecord,
+  style: EaseStyleId,
+  neck: NeckStyle = 'round',
+  shoulder: ShoulderStyle = 'set_in',
+): FitReport {
+  const w = garmentWidths(size, style, shoulder);
+  const neckFit = neckFitVerdict(size);
   const upperArmEase = w.sleeveTop - size.upper_arm;
-  const shoulder = (size.back_width - size.back_neck) / 2;
+  const shoulderWidth = (size.back_width - size.back_neck) / 2;
   const chestEase = w.chest - size.chest;
 
   const checks: FitCheck[] = [
-    {
-      label: 'neck clears head',
-      ok: !crewSuitable(size) || neck.fit.fits,
-      detail: crewSuitable(size) ? `${(neck.fit.headCirc / neck.fit.opening).toFixed(2)}×` : 'n/a → placket',
-    },
+    // A crew must clear the head; a V is open, so head-clearance does not apply.
+    neck === 'v'
+      ? { label: 'neck clears head', ok: true, detail: 'n/a (open V)' }
+      : {
+          label: 'neck clears head',
+          ok: !crewSuitable(size) || neckFit.fit.fits,
+          detail: crewSuitable(size) ? `${(neckFit.fit.headCirc / neckFit.fit.opening).toFixed(2)}×` : 'n/a → placket',
+        },
     {
       label: 'neck not too wide',
-      ok: shoulder >= MIN_SHOULDER_IN,
-      detail: `shoulder ${shoulder.toFixed(2)}"`,
+      ok: shoulderWidth >= MIN_SHOULDER_IN,
+      detail: `shoulder ${shoulderWidth.toFixed(2)}"`,
     },
     {
       label: 'chest ease sane',
@@ -114,5 +143,27 @@ export function fitReport(size: SizeRecord, style: EaseStyleId): FitReport {
       detail: `hip ${size.hip}" vs finished ${w.chest.toFixed(1)}"`,
     },
   ];
+
+  // V depth (choice 1): a V should read as a V — deep enough, but modest.
+  if (neck === 'v') {
+    const vDepth = Math.max(size.neck_depth, w.armholeDepth - VNECK_POINT_ABOVE_UNDERARM_IN);
+    checks.push({
+      label: 'v depth sensible',
+      ok: vDepth >= MIN_V_DEPTH_IN && vDepth <= maxVDepthIn(size),
+      detail: `V drops ${vDepth.toFixed(1)}" (max ${maxVDepthIn(size)}")${vDepth <= size.neck_depth + 0.01 ? ' — clamped to crew!' : ''}`,
+    });
+  }
+
+  // Drop armhole (choice 3): a drop shoulder is LOOSER, so its armhole should be at
+  // least as deep as a fitted set-in one — currently it comes out shallower.
+  if (shoulder === 'drop') {
+    const setinDepth = garmentWidths(size, style, 'set_in').armholeDepth;
+    checks.push({
+      label: 'drop armhole deep enough',
+      ok: w.armholeDepth >= setinDepth,
+      detail: `drop ${w.armholeDepth.toFixed(1)}" vs set-in ${setinDepth.toFixed(1)}"`,
+    });
+  }
+
   return { size: `${size.category} ${size.chest}"`, checks, allOk: checks.every((c) => c.ok) };
 }
