@@ -538,7 +538,7 @@ function chartLegend(x0: number, y: number): string {
     { g: 'inc', c: '#2c6e49', label: 'increase' },
     { g: 'co', c: '#b23a3a', label: 'cast off' },
     { g: 'hold', c: '#9a7b1e', label: 'hold' },
-    { g: 'rib', c: '#e9e4d6', label: '1×1 rib' },
+    { g: 'rib', c: '#e9e4d6', label: 'rib' },
   ];
   const gy = y + 8;
   const out = [`<g font-size="11" fill="#3a4653">`];
@@ -610,7 +610,7 @@ export function schematicSvg(s: PieceSchematic, opts: SvgOpts = {}): string {
       `<rect x="${X(-halfW).toFixed(1)}" y="${ribTop.toFixed(1)}" width="${(s.widthSts * cellW).toFixed(1)}" height="${(Y(0) - ribTop).toFixed(1)}" fill="#e9e4d6"/>`,
     );
     parts.push(
-      `<text x="${(X(-halfW) + 4).toFixed(1)}" y="${(Y(0) - 5).toFixed(1)}" font-size="11" fill="#7c745f">1×1 rib</text>`,
+      `<text x="${(X(-halfW) + 4).toFixed(1)}" y="${(Y(0) - 5).toFixed(1)}" font-size="11" fill="#7c745f">rib</text>`,
     );
   }
 

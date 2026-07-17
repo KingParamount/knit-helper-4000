@@ -129,10 +129,10 @@ function corT(side: Carriage): string {
 const VERBOSE: Vocab = {
   carr: (side) => ` The carriage should be on the ${sideWord(side)}.`,
   castOn: (n, ce) =>
-    `Cast on ${n} stitches in 1x1 rib ${splitV(n)}, ending with the carriage on the ${sideWord(ce)}.`,
+    `Cast on ${n} stitches in rib ${splitV(n)}, ending with the carriage on the ${sideWord(ce)}. (Any rib pattern is fine — the count suits 1×1; adjust for 2×2 etc. to taste.)`,
   ribTension: () => 'Set the tension to main tension, minus 2 whole numbers.',
   setCounter: () => 'Set the row counter to 000.',
-  ribUntil: (rc) => `Knit 1x1 rib until the row counter reads ${pad(rc)}.`,
+  ribUntil: (rc) => `Knit rib until the row counter reads ${pad(rc)}.`,
   resetToStocking: (drop, carriage) =>
     'Reset the row counter to 000, change to stocking stitch, set the tension back to main tension' +
     (drop ? `, and decrease 1 stitch at the ${sideWord(drop)} hand edge.` : '.') +
@@ -188,7 +188,7 @@ const VERBOSE: Vocab = {
 
 const TERSE: Vocab = {
   carr: (side) => ` ${corT(side)}.`,
-  castOn: (n, ce) => `CO ${n} st in 1x1 rib ${splitT(n)}, ${corT(ce)}.`,
+  castOn: (n, ce) => `CO ${n} st in rib ${splitT(n)}, ${corT(ce)}.`,
   ribTension: () => 'Set to MT-2.',
   setCounter: () => 'RC to 000.',
   ribUntil: (rc) => `Rib to RC ${pad(rc)}.`,

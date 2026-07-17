@@ -16,11 +16,11 @@ const has = (piece: { lines: string[] }, text: string): boolean =>
 describe('cast-on, tension and counter (verbose)', () => {
   it('casts on odd rib, sets rib tension, then the counter', () => {
     expect(back.lines[0]).toBe(
-      'Cast on 145 stitches in 1x1 rib (72 left, 73 right), ending with the carriage on the right.',
+      'Cast on 145 stitches in rib (72 left, 73 right), ending with the carriage on the right. (Any rib pattern is fine — the count suits 1×1; adjust for 2×2 etc. to taste.)',
     );
     expect(back.lines[1]).toBe('Set the tension to main tension, minus 2 whole numbers.');
     expect(back.lines[2]).toBe('Set the row counter to 000.');
-    expect(has(back, 'Knit 1x1 rib until the row counter reads 025.')).toBe(true);
+    expect(has(back, 'Knit rib until the row counter reads 025.')).toBe(true);
   });
 
   it('drops the odd stitch and resets tension at the change to stocking', () => {
@@ -68,7 +68,7 @@ describe('back neck scoop + shoulders (verbose) — holds phrased as shaping', (
 
 describe('abbreviated mode', () => {
   it('abbreviates cast-on, tension, counter and rib', () => {
-    expect(backT.lines[0]).toBe('CO 145 st in 1x1 rib (72L, 73R), COR.');
+    expect(backT.lines[0]).toBe('CO 145 st in rib (72L, 73R), COR.');
     expect(backT.lines[1]).toBe('Set to MT-2.');
     expect(backT.lines[2]).toBe('RC to 000.');
     expect(has(backT, 'Rib to RC 025.')).toBe(true);
