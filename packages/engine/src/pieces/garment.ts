@@ -6,7 +6,7 @@
  * renderer (prose, schematic, device feed), which walks each piece in turn.
  */
 
-import type { SizeRecord, EaseStyleId, NeckStyle } from '../data/types';
+import type { SizeRecord, EaseStyleId, NeckStyle, ShoulderStyle } from '../data/types';
 import type { Gauge } from '../gauge';
 import type { Row } from '../row';
 import { backRows } from './back';
@@ -28,13 +28,14 @@ export function assembleGarment(
   style: EaseStyleId,
   gauge: Gauge,
   neck: NeckStyle = 'round',
+  shoulder: ShoulderStyle = 'set_in',
 ): Garment {
-  const s = sleeves(size, style, gauge);
+  const s = sleeves(size, style, gauge, shoulder);
   return {
-    back: backRows(size, style, gauge),
-    front: frontRows(size, style, gauge, neck),
+    back: backRows(size, style, gauge, shoulder),
+    front: frontRows(size, style, gauge, neck, shoulder),
     sleeveLeft: s.left,
     sleeveRight: s.right,
-    neckband: neckbandRows(size, style, gauge, neck),
+    neckband: neckbandRows(size, style, gauge, neck, shoulder),
   };
 }

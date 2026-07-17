@@ -71,3 +71,10 @@ export type EaseStyleId =
  * so the constraint validator and option list line up. Distinct from EaseStyleId.
  */
 export type NeckStyle = 'round' | 'v';
+
+/**
+ * Shoulder / sleeve-join style. 'set_in' has a shaped armhole and a fitted cap;
+ * 'drop' knits the body straight (no armhole shaping) and the sleeve to a straight
+ * wide top (no cap) that sews to the armhole edge. Distinct from EaseStyleId.
+ */
+export type ShoulderStyle = 'set_in' | 'drop';

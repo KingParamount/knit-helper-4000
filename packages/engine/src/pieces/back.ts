@@ -8,7 +8,7 @@
  * (they need the sourced shaping method — see dimensions_model.md, next step).
  */
 
-import type { SizeRecord, EaseStyleId } from '../data/types';
+import type { SizeRecord, EaseStyleId, ShoulderStyle } from '../data/types';
 import { garmentWidths } from '../dimensions';
 import {
   type Gauge,
@@ -59,12 +59,15 @@ export function backPlan(
   size: SizeRecord,
   style: EaseStyleId,
   gauge: Gauge,
+  shoulder: ShoulderStyle = 'set_in',
 ): BackPlan {
-  const w = garmentWidths(size, style);
+  const w = garmentWidths(size, style, shoulder);
 
   const bodySts = evenStitchesFor(w.chest / 2, gauge); // even plain panel
   const ribCastOnSts = bodySts + 1; // rib cast on odd, extra stitch on the right
-  const upperBackSts = stitchesFor(size.back_width, gauge);
+  // A drop shoulder knits the body straight — no armhole narrowing — so the "upper
+  // back" is the full body width; a set-in narrows to the across-back measurement.
+  const upperBackSts = shoulder === 'drop' ? bodySts : stitchesFor(size.back_width, gauge);
   const backNeckSts = stitchesFor(size.back_neck, gauge);
 
   const totalRows = rowsFor(bodyLengthInches(size), gauge);
@@ -138,8 +141,9 @@ export function lowerPanelRows(
   size: SizeRecord,
   style: EaseStyleId,
   gauge: Gauge,
+  shoulder: ShoulderStyle = 'set_in',
 ): Row[] {
-  const plan = backPlan(size, style, gauge);
+  const plan = backPlan(size, style, gauge, shoulder);
   const lastPlainRow = plan.ribRows + plan.bodyRows; // underarm
   const firstBodyRow = plan.ribRows + 1;
   const rows: Row[] = [];
@@ -163,8 +167,13 @@ export function lowerPanelRows(
 }
 
 /** Lower back rows (thin wrapper over the shared panel). */
-export function lowerBackRows(size: SizeRecord, style: EaseStyleId, gauge: Gauge): Row[] {
-  return lowerPanelRows('back', size, style, gauge);
+export function lowerBackRows(
+  size: SizeRecord,
+  style: EaseStyleId,
+  gauge: Gauge,
+  shoulder: ShoulderStyle = 'set_in',
+): Row[] {
+  return lowerPanelRows('back', size, style, gauge, shoulder);
 }
 
 /** One phase of the graduated decrease: `times` single decreases, one every `everyRows` rows. */
@@ -216,9 +225,13 @@ export function panelThroughArmhole(
   size: SizeRecord,
   style: EaseStyleId,
   gauge: Gauge,
+  shoulder: ShoulderStyle = 'set_in',
 ): Row[] {
-  const plan = backPlan(size, style, gauge);
-  const rows = lowerPanelRows(piece, size, style, gauge);
+  const plan = backPlan(size, style, gauge, shoulder);
+  const rows = lowerPanelRows(piece, size, style, gauge, shoulder);
+  // A drop shoulder has no armhole shaping — the body runs straight; the armhole
+  // region is just the upper part of the straight side, added above by the piece.
+  if (shoulder === 'drop') return rows;
   const shaping = armholeShaping(plan.bodySts, plan.upperBackSts, gauge);
 
   let index = rows.length; // last body row (underarm)
@@ -246,8 +259,13 @@ export function panelThroughArmhole(
 }
 
 /** The back through the armhole (thin wrapper over the shared panel). */
-export function backThroughArmhole(size: SizeRecord, style: EaseStyleId, gauge: Gauge): Row[] {
-  return panelThroughArmhole('back', size, style, gauge);
+export function backThroughArmhole(
+  size: SizeRecord,
+  style: EaseStyleId,
+  gauge: Gauge,
+  shoulder: ShoulderStyle = 'set_in',
+): Row[] {
+  return panelThroughArmhole('back', size, style, gauge, shoulder);
 }
 
 /**
@@ -275,9 +293,14 @@ export function splitIntoSteps(total: number, target: number): number[] {
  * (perSide) is capped so it fits inside that depth alongside the short-row shoulders.
  * Held shoulder stitches stay live for grafting, so `stitches` counts live needles.
  */
-export function backRows(size: SizeRecord, style: EaseStyleId, gauge: Gauge): Row[] {
-  const plan = backPlan(size, style, gauge);
-  const rows = backThroughArmhole(size, style, gauge);
+export function backRows(
+  size: SizeRecord,
+  style: EaseStyleId,
+  gauge: Gauge,
+  shoulder: ShoulderStyle = 'set_in',
+): Row[] {
+  const plan = backPlan(size, style, gauge, shoulder);
+  const rows = backThroughArmhole(size, style, gauge, shoulder);
   const achieved = rows[rows.length - 1].stitches;
   const backNeck = plan.backNeckSts;
   const shoulderSts = Math.round((achieved - backNeck) / 2);

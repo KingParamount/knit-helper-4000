@@ -16,6 +16,7 @@ export type {
   EaseOption,
   EaseStyleId,
   NeckStyle,
+  ShoulderStyle,
 } from './data/types';
 
 export { sizes, findSize, availableChests } from './data/sizes';

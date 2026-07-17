@@ -10,7 +10,7 @@
  * which keeps the sleeve knittable across every body shape (see sleevePlan).
  */
 
-import type { SizeRecord, EaseStyleId } from '../data/types';
+import type { SizeRecord, EaseStyleId, ShoulderStyle } from '../data/types';
 import { garmentWidths } from '../dimensions';
 import { type Gauge, stitchesFor, evenStitchesFor, rowsFor, ribRowsFor } from '../gauge';
 import { type Row, type Piece, carriageForRow } from '../row';
@@ -51,9 +51,14 @@ export interface SleevePlan {
   capTopSts: number; // bound off at the top (the crown)
 }
 
-export function sleevePlan(size: SizeRecord, style: EaseStyleId, gauge: Gauge): SleevePlan {
-  const w = garmentWidths(size, style);
-  const body = backPlan(size, style, gauge);
+export function sleevePlan(
+  size: SizeRecord,
+  style: EaseStyleId,
+  gauge: Gauge,
+  shoulder: ShoulderStyle = 'set_in',
+): SleevePlan {
+  const w = garmentWidths(size, style, shoulder);
+  const body = backPlan(size, style, gauge, shoulder);
 
   const bodyCuffSts = evenStitchesFor(size.wrist + CUFF_EASE_IN, gauge); // even
   const ribCastOnSts = bodyCuffSts + 1; // rib cast on odd, extra on the right
@@ -62,6 +67,23 @@ export function sleevePlan(size: SizeRecord, style: EaseStyleId, gauge: Gauge): 
   const taperRows = rowsFor(size.arm_length + size.ease_arml, gauge) - ribRows;
   const incPerSide = Math.round((stitchesFor(w.sleeveTop, gauge) - bodyCuffSts) / 2);
   const sleeveTopSts = bodyCuffSts + 2 * incPerSide; // even
+
+  // A drop sleeve has no cap: it tapers to the top and binds off straight. The whole
+  // top width becomes the sewn edge (capTopSts), the cap-shaping fields are 0.
+  if (shoulder === 'drop') {
+    return {
+      ribCastOnSts,
+      bodyCuffSts,
+      ribRows,
+      taperRows,
+      incPerSide,
+      sleeveTopSts,
+      underarmCastOff: 0,
+      capHeightRows: 0,
+      capDecPerSide: 0,
+      capTopSts: sleeveTopSts,
+    };
+  }
 
   const underarmCastOff = armholeShaping(body.bodySts, body.upperBackSts, gauge).castOffPerSide;
   // Crown cast-off ≈ upper arm ÷ 4 − 0.5 cm; the cap width (and so the per-side
@@ -107,8 +129,9 @@ export function sleeveRows(
   size: SizeRecord,
   style: EaseStyleId,
   gauge: Gauge,
+  shoulder: ShoulderStyle = 'set_in',
 ): Row[] {
-  const p = sleevePlan(size, style, gauge);
+  const p = sleevePlan(size, style, gauge, shoulder);
   const rows: Row[] = [];
   let index = 0;
   let stitches = 0;
@@ -135,6 +158,12 @@ export function sleeveRows(
     else push(incAt.has(t) ? [{ kind: 'increase', count: 1, side: 'both' }] : [], 'taper');
   }
 
+  // Drop shoulder: no cap — bind off the whole top straight (it sews to the armhole edge).
+  if (shoulder === 'drop') {
+    push([{ kind: 'bind_off', count: p.sleeveTopSts, side: 'center' }], 'cap');
+    return rows;
+  }
+
   // Cap: cast off the underarm (matching the body), then a bell-shaped decrease
   // over the solved cap height — fast (every-row) zones at the bottom and top, and
   // a magic-formula even spread through the gentle middle to fill the height.
@@ -156,9 +185,14 @@ export function sleeveRows(
 }
 
 /** Both sleeves (identical for a plain garment). */
-export function sleeves(size: SizeRecord, style: EaseStyleId, gauge: Gauge): { left: Row[]; right: Row[] } {
+export function sleeves(
+  size: SizeRecord,
+  style: EaseStyleId,
+  gauge: Gauge,
+  shoulder: ShoulderStyle = 'set_in',
+): { left: Row[]; right: Row[] } {
   return {
-    left: sleeveRows('sleeve_l', size, style, gauge),
-    right: sleeveRows('sleeve_r', size, style, gauge),
+    left: sleeveRows('sleeve_l', size, style, gauge, shoulder),
+    right: sleeveRows('sleeve_r', size, style, gauge, shoulder),
   };
 }

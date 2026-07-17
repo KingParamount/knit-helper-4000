@@ -9,7 +9,7 @@
  * Both halves must end at the back's shoulder count, to graft.
  */
 
-import type { SizeRecord, EaseStyleId, NeckStyle } from '../data/types';
+import type { SizeRecord, EaseStyleId, NeckStyle, ShoulderStyle } from '../data/types';
 import { type Gauge, rowsFor, stitchesFor } from '../gauge';
 import { type Row, carriageForRow } from '../row';
 import { backPlan, panelThroughArmhole, armholeShaping, splitIntoSteps, SHOULDER_STEP_STS } from './back';
@@ -42,8 +42,9 @@ export function frontNeckPlan(
   style: EaseStyleId,
   gauge: Gauge,
   neck: NeckStyle = 'round',
+  shoulder: ShoulderStyle = 'set_in',
 ): FrontNeckPlan {
-  const plan = backPlan(size, style, gauge);
+  const plan = backPlan(size, style, gauge, shoulder);
   const bodySts = armholeShaping(plan.bodySts, plan.upperBackSts, gauge).achievedSts;
   const shoulderSts = Math.round((bodySts - plan.backNeckSts) / 2); // match the back
   // A V splits low — the point sits a set distance above the underarm; a crew is shallow.
@@ -69,9 +70,10 @@ export function frontToNeck(
   style: EaseStyleId,
   gauge: Gauge,
   neck: NeckStyle = 'round',
+  shoulder: ShoulderStyle = 'set_in',
 ): Row[] {
-  const rows = panelThroughArmhole('front', size, style, gauge);
-  const { neckLineRow } = frontNeckPlan(size, style, gauge, neck);
+  const rows = panelThroughArmhole('front', size, style, gauge, shoulder);
+  const { neckLineRow } = frontNeckPlan(size, style, gauge, neck, shoulder);
   let index = rows.length;
   const stitches = rows[rows.length - 1].stitches;
   while (index < neckLineRow) {
@@ -106,9 +108,10 @@ export function frontRows(
   style: EaseStyleId,
   gauge: Gauge,
   neck: NeckStyle = 'round',
+  shoulder: ShoulderStyle = 'set_in',
 ): Row[] {
-  const rows = frontToNeck(size, style, gauge, neck);
-  const fp = frontNeckPlan(size, style, gauge, neck);
+  const rows = frontToNeck(size, style, gauge, neck, shoulder);
+  const fp = frontNeckPlan(size, style, gauge, neck, shoulder);
   const shoulderSteps = splitIntoSteps(fp.shoulderSts, SHOULDER_STEP_STS);
   const perSide = stitchesFor(1.5, gauge); // crew: ~1.5" curve each neck edge
   // Crew removes a centre chunk; a V divides at a single point (no centre cast-off).

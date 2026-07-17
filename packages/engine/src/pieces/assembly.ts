@@ -14,8 +14,9 @@
  * Prose is ours; the geometric fact is not authored, so we check it.
  */
 
-import type { SizeRecord, EaseStyleId, NeckStyle } from '../data/types';
+import type { SizeRecord, EaseStyleId, NeckStyle, ShoulderStyle } from '../data/types';
 import type { Gauge } from '../gauge';
+import { garmentWidths } from '../dimensions';
 import { backPlan, armholeShaping, lowerPanelRows, armholeOpening } from './back';
 import { frontNeckPlan } from './front';
 import { sleevePlan, sleeveRows } from './sleeve';
@@ -60,18 +61,39 @@ export function assemblyReport(
   style: EaseStyleId,
   gauge: Gauge,
   neck: NeckStyle = 'round',
+  shoulder: ShoulderStyle = 'set_in',
 ): AssemblyReport {
-  const bp = backPlan(size, style, gauge);
+  const bp = backPlan(size, style, gauge, shoulder);
   const shaping = armholeShaping(bp.bodySts, bp.upperBackSts, gauge);
   const achieved = shaping.achievedSts;
   const backShoulder = Math.round((achieved - bp.backNeckSts) / 2);
-  const front = frontNeckPlan(size, style, gauge, neck);
-  const sleeve = sleevePlan(size, style, gauge);
+  const front = frontNeckPlan(size, style, gauge, neck, shoulder);
+  const sleeve = sleevePlan(size, style, gauge, shoulder);
 
-  const backSide = lowerPanelRows('back', size, style, gauge).length;
-  const frontSide = lowerPanelRows('front', size, style, gauge).length;
+  const backSide = lowerPanelRows('back', size, style, gauge, shoulder).length;
+  const frontSide = lowerPanelRows('front', size, style, gauge, shoulder).length;
 
-  const easePct = capEase(size, style, gauge) * 100;
+  // The sleeve↔body join. Set-in eases a fitted cap into the shaped armhole; drop
+  // sews a straight sleeve top (its width) to the armhole opening (2 × depth).
+  const sw = 4 / gauge.bodySt;
+  let join: Invariant;
+  if (shoulder === 'drop') {
+    const sleeveTopIn = sleeve.sleeveTopSts * sw;
+    const armholeOpenIn = 2 * garmentWidths(size, style, 'drop').armholeDepth;
+    const dPct = ((sleeveTopIn - armholeOpenIn) / armholeOpenIn) * 100;
+    join = {
+      label: 'sleeve top fits armhole',
+      ok: Math.abs(dPct) <= 4,
+      detail: `sleeve top ${sleeveTopIn.toFixed(1)}" ≈ armhole ${armholeOpenIn.toFixed(1)}"`,
+    };
+  } else {
+    const easePct = capEase(size, style, gauge) * 100;
+    join = {
+      label: 'cap fits armhole',
+      ok: easePct >= -1 && easePct <= 10,
+      detail: `ease ${easePct >= 0 ? '+' : ''}${easePct.toFixed(1)}%`,
+    };
+  }
 
   const invariants: Invariant[] = [
     {
@@ -94,11 +116,7 @@ export function assemblyReport(
       ok: Math.abs(achieved - (2 * backShoulder + bp.backNeckSts)) <= 1,
       detail: `2×${backShoulder} + ${bp.backNeckSts} ≈ ${achieved}`,
     },
-    {
-      label: 'cap fits armhole',
-      ok: easePct >= -1 && easePct <= 10,
-      detail: `ease ${easePct >= 0 ? '+' : ''}${easePct.toFixed(1)}%`,
-    },
+    join,
   ];
 
   return {

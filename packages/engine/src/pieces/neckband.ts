@@ -10,7 +10,7 @@
  * Worked flat here (seam one shoulder last); the count is the same as in the round.
  */
 
-import type { SizeRecord, EaseStyleId, NeckStyle } from '../data/types';
+import type { SizeRecord, EaseStyleId, NeckStyle, ShoulderStyle } from '../data/types';
 import { type Gauge, stitchesFor, ribRowsFor } from '../gauge';
 import { type Row, carriageForRow } from '../row';
 import { backPlan } from './back';
@@ -33,11 +33,12 @@ export function neckbandPlan(
   style: EaseStyleId,
   gauge: Gauge,
   neck: NeckStyle = 'round',
+  shoulder: ShoulderStyle = 'set_in',
 ): NeckbandPlan {
-  const bp = backPlan(size, style, gauge);
+  const bp = backPlan(size, style, gauge, shoulder);
   const backCentreSts = bp.backNeckCentreSts; // centre cast-off of the back scoop
   const backSidePickup = Math.round(bp.backNeckRows * PICKUP_PER_ROW);
-  const fp = frontNeckPlan(size, style, gauge, neck);
+  const fp = frontNeckPlan(size, style, gauge, neck, shoulder);
   // A crew picks up along its front centre cast-off; a V has no centre — the two long
   // V edges meet at the point (frontCentre = 0), so its side pick-up runs the deep V.
   const frontCentreSts = neck === 'v' ? 0 : fp.frontNeckSts - 2 * stitchesFor(1.5, gauge);
@@ -61,8 +62,9 @@ export function neckbandRows(
   style: EaseStyleId,
   gauge: Gauge,
   neck: NeckStyle = 'round',
+  shoulder: ShoulderStyle = 'set_in',
 ): Row[] {
-  const p = neckbandPlan(size, style, gauge, neck);
+  const p = neckbandPlan(size, style, gauge, neck, shoulder);
   const rows: Row[] = [];
   let index = 0;
   let stitches = 0;

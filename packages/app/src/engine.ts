@@ -23,6 +23,7 @@ import type {
   Units,
   Gauge,
   NeckStyle,
+  ShoulderStyle,
   ProseStyle,
   Pattern,
   PieceSchematic,
@@ -63,6 +64,8 @@ export interface BuildInput {
   ease: EaseId;
   /** Front neck style; defaults to a crew ('round') when omitted. */
   neck?: NeckStyle;
+  /** Shoulder / sleeve-join style; defaults to 'set_in' when omitted. */
+  shoulder?: ShoulderStyle;
   swatch: Swatch;
 }
 
@@ -75,7 +78,8 @@ export function buildPatternText(input: BuildInput, style: ProseStyle): string |
   if (!size) return null;
   const g = gaugeFromSwatch(input.swatch);
   const neck = input.neck ?? 'round';
-  const pattern: Pattern = renderPattern(assembleGarment(size, input.ease, g, neck), style);
+  const shoulder = input.shoulder ?? 'set_in';
+  const pattern: Pattern = renderPattern(assembleGarment(size, input.ease, g, neck, shoulder), style);
   return pattern.pieces.map((p) => `${p.title}\n${p.lines.join('\n')}`).join('\n\n\n');
 }
 
@@ -84,15 +88,16 @@ export function buildSchematics(input: BuildInput): Record<PieceId, PieceSchemat
   if (!size) return null;
   const g = gaugeFromSwatch(input.swatch);
   const neck = input.neck ?? 'round';
-  const bp = backPlan(size, input.ease, g);
-  const fnp = frontNeckPlan(size, input.ease, g, neck);
-  const sp = sleevePlan(size, input.ease, g);
-  const np = neckbandPlan(size, input.ease, g, neck);
+  const shoulder = input.shoulder ?? 'set_in';
+  const bp = backPlan(size, input.ease, g, shoulder);
+  const fnp = frontNeckPlan(size, input.ease, g, neck, shoulder);
+  const sp = sleevePlan(size, input.ease, g, shoulder);
+  const np = neckbandPlan(size, input.ease, g, neck, shoulder);
   return {
-    back: backSchematic(backRows(size, input.ease, g), bp, g),
-    front: frontSchematic(frontRows(size, input.ease, g, neck), bp, fnp, g),
-    sleeve: sleeveSchematic(sleeveRows('sleeve_l', size, input.ease, g), sp, g),
-    neckband: neckbandSchematic(neckbandRows(size, input.ease, g, neck), np, g),
+    back: backSchematic(backRows(size, input.ease, g, shoulder), bp, g),
+    front: frontSchematic(frontRows(size, input.ease, g, neck, shoulder), bp, fnp, g),
+    sleeve: sleeveSchematic(sleeveRows('sleeve_l', size, input.ease, g, shoulder), sp, g),
+    neckband: neckbandSchematic(neckbandRows(size, input.ease, g, neck, shoulder), np, g),
   };
 }
 

@@ -14,7 +14,7 @@
  * different allowances and are not modelled yet.
  */
 
-import type { SizeRecord, EaseStyleId } from './data/types';
+import type { SizeRecord, EaseStyleId, ShoulderStyle } from './data/types';
 import { easeBase } from './data/options';
 
 /**
@@ -67,10 +67,18 @@ export function chestEase(size: SizeRecord, style: EaseStyleId): number {
   return easeBase(style) * size.ease_factor;
 }
 
-/** The finished widths for a set-in-sleeve, straight-body garment. */
-export function garmentWidths(size: SizeRecord, style: EaseStyleId): GarmentWidths {
+/** The finished widths for a straight-body garment, for the given shoulder style. */
+export function garmentWidths(
+  size: SizeRecord,
+  style: EaseStyleId,
+  shoulder: ShoulderStyle = 'set_in',
+): GarmentWidths {
   const ease = chestEase(size, style);
-  const armholeDepth = size.arm_depth + SETIN_ALLOWANCE_IN.armholeDepth;
+  const sleeveTop = size.upper_arm + upperArmEase(size, style);
+  // Set-in: a shaped-scye depth from the arm. Drop: the straight sleeve top (width)
+  // sews to the front+back armhole edges, so the armhole depth is half that width.
+  const armholeDepth =
+    shoulder === 'drop' ? sleeveTop / 2 : size.arm_depth + SETIN_ALLOWANCE_IN.armholeDepth;
   return {
     unit: 'in',
     chestEase: ease,
@@ -78,6 +86,6 @@ export function garmentWidths(size: SizeRecord, style: EaseStyleId): GarmentWidt
     backWidth: size.back_width + SETIN_ALLOWANCE_IN.backWidth,
     armholeDepth,
     armhole: 2 * armholeDepth, // manual.txt:257,506 — around = twice the depth
-    sleeveTop: size.upper_arm + upperArmEase(size, style),
+    sleeveTop,
   };
 }
