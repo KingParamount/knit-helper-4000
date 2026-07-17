@@ -57,6 +57,10 @@ or documentation beyond the historical references in `reference/`.
   We're free to add what it couldn't (top-down set-in, short-row bust darts, etc).
 - **No backend.** No server, no accounts, no database, no API. Static site only.
   Everything client-side. This is not a temporary constraint — it's the design.
+- **No waist / hip / A-line body shaping.** The body is a straight tube to the
+  armholes, which is what the overwhelming majority of patterns do. The Tier-B
+  hip-clearance check stays (it flags where a deliberately-snug fit runs tight at
+  the hem), but there is no waist/hip shaping feature to build. Decided, not deferred.
 
 ## Architecture rules
 
