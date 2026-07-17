@@ -1,27 +1,37 @@
 /**
- * The front piece. Identical to the back from cast-on through the curved armhole
- * and straight up to the neck line; then it differs — a crew neck is a deep,
- * curved (scooped) neckline, and the piece splits into a left and right half that
- * are worked separately up to their shoulders (which must end at the same stitch
- * count as the back shoulders, to graft).
- *
- * This module currently builds the front up to the neck line. The neck curve and
- * the two-sided shoulders come next — the split is a genuine new structure (the
- * first time a piece divides), so its representation is being settled first.
+ * The front piece. Shared with the back from cast-on through the armhole; then the
+ * neck, in one of two styles:
+ *   - 'round' (crew): a shallow scoop near the top — cast off the centre, curve each
+ *     side down, then short-row the shoulders.
+ *   - 'v': the split happens low (the V point sits ~VNECK_POINT_ABOVE_UNDERARM_IN
+ *     above the underarm) with no centre cast-off; each side decreases steadily up to
+ *     the shoulder, forming the long V.
+ * Both halves must end at the back's shoulder count, to graft.
  */
 
-import type { SizeRecord, EaseStyleId } from '../data/types';
+import type { SizeRecord, EaseStyleId, NeckStyle } from '../data/types';
 import { type Gauge, rowsFor, stitchesFor } from '../gauge';
 import { type Row, carriageForRow } from '../row';
 import { backPlan, panelThroughArmhole, armholeShaping, splitIntoSteps, SHOULDER_STEP_STS } from './back';
 
-/** Rows the front neck occupies below the shoulder line (crew depth). */
+/** A V-neck point sits this far above the underarm. Design choice — tunable. */
+export const VNECK_POINT_ABOVE_UNDERARM_IN = 2.5;
+
+/** Rows the crew neck occupies below the shoulder line. */
 export function frontNeckDepthRows(size: SizeRecord, gauge: Gauge): number {
   return rowsFor(size.neck_depth, gauge);
 }
 
+/** `count` events spread as evenly as possible across `span` rows. */
+function evenlySpread(count: number, span: number): number[] {
+  const out: number[] = [];
+  for (let i = 1; i <= count; i++) out.push(Math.round((i * span) / (count + 1)));
+  return out;
+}
+
 export interface FrontNeckPlan {
   neckLineRow: number; // last full-width row before the neck splits
+  neckDepthRows: number; // rows from the split to the shoulder line
   bodySts: number; // live stitches at the neck line
   frontNeckSts: number; // total removed for the neck (centre + the two edges)
   shoulderSts: number; // each shoulder — must equal the back shoulder to graft
@@ -31,12 +41,22 @@ export function frontNeckPlan(
   size: SizeRecord,
   style: EaseStyleId,
   gauge: Gauge,
+  neck: NeckStyle = 'round',
 ): FrontNeckPlan {
   const plan = backPlan(size, style, gauge);
   const bodySts = armholeShaping(plan.bodySts, plan.upperBackSts, gauge).achievedSts;
   const shoulderSts = Math.round((bodySts - plan.backNeckSts) / 2); // match the back
+  // A V splits low — the point sits a set distance above the underarm; a crew is shallow.
+  const neckDepthRows =
+    neck === 'v'
+      ? Math.max(
+          frontNeckDepthRows(size, gauge),
+          plan.armholeRows - rowsFor(VNECK_POINT_ABOVE_UNDERARM_IN, gauge),
+        )
+      : frontNeckDepthRows(size, gauge);
   return {
-    neckLineRow: plan.totalRows - frontNeckDepthRows(size, gauge),
+    neckLineRow: plan.totalRows - neckDepthRows,
+    neckDepthRows,
     bodySts,
     frontNeckSts: bodySts - 2 * shoulderSts,
     shoulderSts,
@@ -44,9 +64,14 @@ export function frontNeckPlan(
 }
 
 /** The front from cast-on up to the neck line (before the neck splits). */
-export function frontToNeck(size: SizeRecord, style: EaseStyleId, gauge: Gauge): Row[] {
+export function frontToNeck(
+  size: SizeRecord,
+  style: EaseStyleId,
+  gauge: Gauge,
+  neck: NeckStyle = 'round',
+): Row[] {
   const rows = panelThroughArmhole('front', size, style, gauge);
-  const { neckLineRow } = frontNeckPlan(size, style, gauge);
+  const { neckLineRow } = frontNeckPlan(size, style, gauge, neck);
   let index = rows.length;
   const stitches = rows[rows.length - 1].stitches;
   while (index < neckLineRow) {
@@ -71,39 +96,41 @@ export function frontNeckShaping(perSide: number): { castOffs: number[]; decs: n
 }
 
 /**
- * The complete front piece. Shared to the neck line, then a crew neck: cast off
- * the centre, and work each half (left then right) separately up to its shoulder.
- * Each half curves the neck edge (cast off ~1.5" worth, graduated) down to the
- * shoulder count, then short-row shoulders to match the back. Representation A:
- * one `front` piece, rows after the split carry `side`, and `stitches` counts the
- * half being worked (the machine's row counter resets at the split and per side).
+ * The complete front piece, for the chosen neck style. Shared to the neck line, then
+ * split into a left and right half worked separately up to their shoulders (which
+ * short-row to match the back). Rows after the split carry `side`, and `stitches`
+ * counts the half being worked (the row counter resets at the split and per side).
  */
-export function frontRows(size: SizeRecord, style: EaseStyleId, gauge: Gauge): Row[] {
-  const rows = frontToNeck(size, style, gauge);
-  const fp = frontNeckPlan(size, style, gauge);
-  const perSide = stitchesFor(1.5, gauge); // ~1.5" curve each neck edge
-  const centreCastOff = fp.frontNeckSts - 2 * perSide;
-  const shaping = frontNeckShaping(perSide);
+export function frontRows(
+  size: SizeRecord,
+  style: EaseStyleId,
+  gauge: Gauge,
+  neck: NeckStyle = 'round',
+): Row[] {
+  const rows = frontToNeck(size, style, gauge, neck);
+  const fp = frontNeckPlan(size, style, gauge, neck);
   const shoulderSteps = splitIntoSteps(fp.shoulderSts, SHOULDER_STEP_STS);
-  const heightRows = frontNeckDepthRows(size, gauge);
+  const perSide = stitchesFor(1.5, gauge); // crew: ~1.5" curve each neck edge
+  // Crew removes a centre chunk; a V divides at a single point (no centre cast-off).
+  const centreCastOff = neck === 'v' ? 0 : fp.frontNeckSts - 2 * perSide;
 
   let index = rows.length;
 
-  // Split row: cast off the centre; the two halves are then worked separately.
+  // Split row: crew casts off the centre; V just divides.
   index += 1;
   rows.push({
     index,
     piece: 'front',
     stitches: fp.bodySts - centreCastOff, // both halves still live
     carriage: carriageForRow(index),
-    ops: [{ kind: 'bind_off', count: centreCastOff, side: 'center' }],
+    ops: neck === 'v' ? [] : [{ kind: 'bind_off', count: centreCastOff, side: 'center' }],
     section: 'neck_split',
   });
 
   const workHalf = (side: 'left' | 'right'): void => {
     const neckEdge: 'L' | 'R' = side === 'left' ? 'R' : 'L'; // centre-facing edge
     const armEdge: 'L' | 'R' = side === 'left' ? 'L' : 'R';
-    let sts = fp.shoulderSts + perSide;
+    let sts = neck === 'v' ? Math.floor((fp.bodySts - centreCastOff) / 2) : fp.shoulderSts + perSide;
     let used = 0;
     const push = (ops: Row['ops'], section: string): void => {
       index += 1;
@@ -116,22 +143,32 @@ export function frontRows(size: SizeRecord, style: EaseStyleId, gauge: Gauge): R
       rows.push({ index, piece: 'front', stitches: sts, carriage: carriageForRow(index), ops, section, side });
     };
 
-    // Neck-edge curve: cast-offs, then decreases every other row.
-    for (const co of shaping.castOffs) {
-      push([{ kind: 'bind_off', count: co, side: neckEdge }], 'neck');
-      push([], 'neck'); // return row
+    if (neck === 'v') {
+      // Steady neck-edge decreases from the half width down to the shoulder, spread
+      // over the deep V (leaving room for the shoulder short-rows at the top).
+      const decsNeeded = sts - fp.shoulderSts;
+      const shaperRows = Math.max(decsNeeded, fp.neckDepthRows - 2 * shoulderSteps.length);
+      const decAt = new Set(evenlySpread(decsNeeded, shaperRows));
+      for (let r = 1; r <= shaperRows; r++) {
+        push(decAt.has(r) ? [{ kind: 'decrease', count: 1, side: neckEdge }] : [], 'neck');
+      }
+    } else {
+      // Crew: cast-offs, then decreases every other row, then straight to the shoulder.
+      const shaping = frontNeckShaping(perSide);
+      for (const co of shaping.castOffs) {
+        push([{ kind: 'bind_off', count: co, side: neckEdge }], 'neck');
+        push([], 'neck'); // return row
+      }
+      for (let d = 0; d < shaping.decs; d++) {
+        push([{ kind: 'decrease', count: 1, side: neckEdge }], 'neck');
+        if (d < shaping.decs - 1) push([], 'neck');
+      }
+      const straight = Math.max(0, fp.neckDepthRows - used - 2 * shoulderSteps.length);
+      for (let i = 0; i < straight; i++) push([], 'upper_front');
     }
-    for (let d = 0; d < shaping.decs; d++) {
-      push([{ kind: 'decrease', count: 1, side: neckEdge }], 'neck');
-      if (d < shaping.decs - 1) push([], 'neck');
-    }
-    // Straight to the shoulder line, then short-row the shoulder. Hold each group
-    // only on a row whose carriage ends at this half's armhole edge — that is the
-    // side away from the carriage when the hold is set, so it does not make a hole
-    // (see machine-holding-hole-rule). This can leave the two halves off by a row;
-    // that is the accepted small discrepancy. Slope rate matches the back.
-    const straight = Math.max(0, heightRows - used - 2 * shoulderSteps.length);
-    for (let i = 0; i < straight; i++) push([], 'upper_front');
+
+    // Short-row the shoulder — held only on a row whose carriage ends at this half's
+    // armhole edge, so it does not hole (machine-holding-hole rule). Matches the back.
     for (const s of shoulderSteps) {
       if (carriageForRow(index + 1) !== armEdge) push([], 'shoulder'); // wait for the safe row
       push([{ kind: 'hold', count: s, side: armEdge }], 'shoulder');

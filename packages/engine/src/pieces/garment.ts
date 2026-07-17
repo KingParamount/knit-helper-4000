@@ -6,7 +6,7 @@
  * renderer (prose, schematic, device feed), which walks each piece in turn.
  */
 
-import type { SizeRecord, EaseStyleId } from '../data/types';
+import type { SizeRecord, EaseStyleId, NeckStyle } from '../data/types';
 import type { Gauge } from '../gauge';
 import type { Row } from '../row';
 import { backRows } from './back';
@@ -22,18 +22,19 @@ export interface Garment {
   neckband: Row[];
 }
 
-/** Every piece of the set-in crew pullover for one size / ease style / gauge. */
+/** Every piece of the set-in pullover for one size / ease style / gauge / neck style. */
 export function assembleGarment(
   size: SizeRecord,
   style: EaseStyleId,
   gauge: Gauge,
+  neck: NeckStyle = 'round',
 ): Garment {
   const s = sleeves(size, style, gauge);
   return {
     back: backRows(size, style, gauge),
-    front: frontRows(size, style, gauge),
+    front: frontRows(size, style, gauge, neck),
     sleeveLeft: s.left,
     sleeveRight: s.right,
-    neckband: neckbandRows(size, style, gauge),
+    neckband: neckbandRows(size, style, gauge, neck),
   };
 }

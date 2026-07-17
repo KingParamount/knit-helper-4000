@@ -1,19 +1,20 @@
 /**
- * The crew neckband: pick up stitches around the finished neck opening, work a
- * short 1×1 rib (which pulls in for a snug crew fit), and cast off loosely.
+ * The neckband: pick up stitches around the finished neck opening, work a short rib
+ * band, and cast off loosely. Serves both neck styles — a crew has a front centre
+ * cast-off to pick up along; a V has none (frontCentre = 0) and picks up along the
+ * two long V edges instead, meeting at the point (finish — mitred or crossed — is a
+ * prose choice presented in the pattern, not a construction fork).
  *
- * Pick-up count is the usual convention: one stitch per stitch along the cast-off
- * edges (back neck, front centre), and ~3 stitches per 4 rows along the shaped
- * front-neck side edges. Band depth from the size table's neck rib.
- *
+ * Pick-up: one stitch per stitch along the cast-off edges (back neck, front centre),
+ * ~3 stitches per 4 rows along the shaped side edges. Band depth from the neck rib.
  * Worked flat here (seam one shoulder last); the count is the same as in the round.
  */
 
-import type { SizeRecord, EaseStyleId } from '../data/types';
+import type { SizeRecord, EaseStyleId, NeckStyle } from '../data/types';
 import { type Gauge, stitchesFor, ribRowsFor } from '../gauge';
 import { type Row, carriageForRow } from '../row';
 import { backPlan } from './back';
-import { frontNeckPlan, frontNeckDepthRows } from './front';
+import { frontNeckPlan } from './front';
 
 /** Stitches picked up per row along a shaped/vertical neck edge (3 per 4 rows). */
 export const PICKUP_PER_ROW = 3 / 4;
@@ -27,14 +28,21 @@ export interface NeckbandPlan {
   bandRows: number;
 }
 
-export function neckbandPlan(size: SizeRecord, style: EaseStyleId, gauge: Gauge): NeckbandPlan {
+export function neckbandPlan(
+  size: SizeRecord,
+  style: EaseStyleId,
+  gauge: Gauge,
+  neck: NeckStyle = 'round',
+): NeckbandPlan {
   const bp = backPlan(size, style, gauge);
   const backCentreSts = bp.backNeckCentreSts; // centre cast-off of the back scoop
   const backSidePickup = Math.round(bp.backNeckRows * PICKUP_PER_ROW);
-  const fp = frontNeckPlan(size, style, gauge);
-  const frontCentreSts = fp.frontNeckSts - 2 * stitchesFor(1.5, gauge); // the centre cast-off
-  const frontSidePickup = Math.round(frontNeckDepthRows(size, gauge) * PICKUP_PER_ROW);
-  // A worked-flat 1x1 rib band picks up an odd number (extra on the right) so both
+  const fp = frontNeckPlan(size, style, gauge, neck);
+  // A crew picks up along its front centre cast-off; a V has no centre — the two long
+  // V edges meet at the point (frontCentre = 0), so its side pick-up runs the deep V.
+  const frontCentreSts = neck === 'v' ? 0 : fp.frontNeckSts - 2 * stitchesFor(1.5, gauge);
+  const frontSidePickup = Math.round(fp.neckDepthRows * PICKUP_PER_ROW);
+  // A worked-flat rib band picks up an odd number (extra on the right) so both
   // selvedges are knit stitches; it is cast off in rib, with no drop to even.
   const rawPickup = backCentreSts + 2 * backSidePickup + frontCentreSts + 2 * frontSidePickup;
   const pickupTotal = rawPickup % 2 === 0 ? rawPickup + 1 : rawPickup;
@@ -48,8 +56,13 @@ export function neckbandPlan(size: SizeRecord, style: EaseStyleId, gauge: Gauge)
   };
 }
 
-export function neckbandRows(size: SizeRecord, style: EaseStyleId, gauge: Gauge): Row[] {
-  const p = neckbandPlan(size, style, gauge);
+export function neckbandRows(
+  size: SizeRecord,
+  style: EaseStyleId,
+  gauge: Gauge,
+  neck: NeckStyle = 'round',
+): Row[] {
+  const p = neckbandPlan(size, style, gauge, neck);
   const rows: Row[] = [];
   let index = 0;
   let stitches = 0;

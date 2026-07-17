@@ -14,7 +14,7 @@
  * Prose is ours; the geometric fact is not authored, so we check it.
  */
 
-import type { SizeRecord, EaseStyleId } from '../data/types';
+import type { SizeRecord, EaseStyleId, NeckStyle } from '../data/types';
 import type { Gauge } from '../gauge';
 import { backPlan, armholeShaping, lowerPanelRows, armholeOpening } from './back';
 import { frontNeckPlan } from './front';
@@ -55,12 +55,17 @@ export interface AssemblyReport {
  * ease must be a small non-negative fraction — negative means the cap is too short
  * to reach round the armhole, and much over ~10% means it will pucker at the head.
  */
-export function assemblyReport(size: SizeRecord, style: EaseStyleId, gauge: Gauge): AssemblyReport {
+export function assemblyReport(
+  size: SizeRecord,
+  style: EaseStyleId,
+  gauge: Gauge,
+  neck: NeckStyle = 'round',
+): AssemblyReport {
   const bp = backPlan(size, style, gauge);
   const shaping = armholeShaping(bp.bodySts, bp.upperBackSts, gauge);
   const achieved = shaping.achievedSts;
   const backShoulder = Math.round((achieved - bp.backNeckSts) / 2);
-  const front = frontNeckPlan(size, style, gauge);
+  const front = frontNeckPlan(size, style, gauge, neck);
   const sleeve = sleevePlan(size, style, gauge);
 
   const backSide = lowerPanelRows('back', size, style, gauge).length;

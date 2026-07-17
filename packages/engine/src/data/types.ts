@@ -65,3 +65,9 @@ export type EaseStyleId =
   | 'moderate'
   | 'comfortable'
   | 'oversized';
+
+/**
+ * Front neck style. Uses the `neckline_front` option vocabulary ('round' = crew),
+ * so the constraint validator and option list line up. Distinct from EaseStyleId.
+ */
+export type NeckStyle = 'round' | 'v';

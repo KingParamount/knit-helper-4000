@@ -22,6 +22,7 @@ import type {
   Category,
   Units,
   Gauge,
+  NeckStyle,
   ProseStyle,
   Pattern,
   PieceSchematic,
@@ -60,6 +61,8 @@ export interface BuildInput {
   chest: number;
   units: Units;
   ease: EaseId;
+  /** Front neck style; defaults to a crew ('round') when omitted. */
+  neck?: NeckStyle;
   swatch: Swatch;
 }
 
@@ -71,7 +74,8 @@ export function buildPatternText(input: BuildInput, style: ProseStyle): string |
   const size = resolveSize(input.category, input.chest);
   if (!size) return null;
   const g = gaugeFromSwatch(input.swatch);
-  const pattern: Pattern = renderPattern(assembleGarment(size, input.ease, g), style);
+  const neck = input.neck ?? 'round';
+  const pattern: Pattern = renderPattern(assembleGarment(size, input.ease, g, neck), style);
   return pattern.pieces.map((p) => `${p.title}\n${p.lines.join('\n')}`).join('\n\n\n');
 }
 
@@ -79,15 +83,16 @@ export function buildSchematics(input: BuildInput): Record<PieceId, PieceSchemat
   const size = resolveSize(input.category, input.chest);
   if (!size) return null;
   const g = gaugeFromSwatch(input.swatch);
+  const neck = input.neck ?? 'round';
   const bp = backPlan(size, input.ease, g);
-  const fnp = frontNeckPlan(size, input.ease, g);
+  const fnp = frontNeckPlan(size, input.ease, g, neck);
   const sp = sleevePlan(size, input.ease, g);
-  const np = neckbandPlan(size, input.ease, g);
+  const np = neckbandPlan(size, input.ease, g, neck);
   return {
     back: backSchematic(backRows(size, input.ease, g), bp, g),
-    front: frontSchematic(frontRows(size, input.ease, g), bp, fnp, g),
+    front: frontSchematic(frontRows(size, input.ease, g, neck), bp, fnp, g),
     sleeve: sleeveSchematic(sleeveRows('sleeve_l', size, input.ease, g), sp, g),
-    neckband: neckbandSchematic(neckbandRows(size, input.ease, g), np, g),
+    neckband: neckbandSchematic(neckbandRows(size, input.ease, g, neck), np, g),
   };
 }
 

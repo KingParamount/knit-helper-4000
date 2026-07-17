@@ -99,7 +99,7 @@ function splitNeckSchematic(
   const bodyHalf = opts.bodySts / 2;
   const split = rows.find((r) => r.section === 'neck_split');
   const splitY = split ? split.index : opts.totalRows;
-  const centreCastOff = split ? ((split.ops[0] as { count: number }).count ?? 0) : opts.neckWidthSts;
+  const centreCastOff = split ? (((split.ops[0] as { count?: number })?.count) ?? 0) : opts.neckWidthSts;
   const topY = opts.totalRows;
   const { rightPts, leftPts, underarmY, marks } = trackBodyEdges(rows, bodyHalf, splitY);
   const achievedHalf = rightPts[rightPts.length - 1].x;
@@ -188,7 +188,7 @@ export function frontSchematic(
   const split = rows.find((r) => r.section === 'neck_split');
   const splitY = split ? split.index : fnp.neckLineRow;
   const centreCastOff = split
-    ? ((split.ops[0] as { count: number }).count ?? 0)
+    ? (((split.ops[0] as { count?: number })?.count) ?? 0)
     : fnp.frontNeckSts;
   // The two neck halves continue the row index past the garment top, so take the
   // top from the plan rather than the last row index.
