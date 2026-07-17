@@ -9,15 +9,17 @@ export type Piece = 'back' | 'front' | 'sleeve_l' | 'sleeve_r' | 'collar';
 
 /**
  * A shaping event on a row. `both` = the same at each end of the row; `center`
- * (bind-off only) = a block in the middle, e.g. a flat back neck. `hold` puts
- * needles into holding position (short-row shaping) — they stay live on the
- * needles for grafting, so they do not reduce the stitch count.
+ * on a bind-off = a block in the middle, e.g. a flat back neck; `center` on a
+ * decrease = a centred double decrease at a marked point (the V-neckband mitre —
+ * `count` stitches removed either side of the point). `hold` puts needles into
+ * holding position (short-row shaping) — they stay live on the needles for
+ * grafting, so they do not reduce the stitch count.
  */
 export type Op =
   | { kind: 'cast_on'; count: number }
   | { kind: 'pick_up'; count: number } // pick up and knit along an edge (e.g. a neckband)
   | { kind: 'bind_off'; count: number; side: 'L' | 'R' | 'both' | 'center' }
-  | { kind: 'decrease'; count: number; side: 'L' | 'R' | 'both' }
+  | { kind: 'decrease'; count: number; side: 'L' | 'R' | 'both' | 'center' }
   | { kind: 'increase'; count: number; side: 'L' | 'R' | 'both' }
   | { kind: 'hold'; count: number; side: 'L' | 'R' };
 

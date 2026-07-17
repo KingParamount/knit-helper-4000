@@ -89,6 +89,35 @@ describe('abbreviated mode', () => {
   });
 });
 
+describe('v-neck band mitre + crossed-over alternative', () => {
+  const vGarment = assembleGarment(W36, 'moderate', G, 'v');
+  const vBand = renderPiece(vGarment.neckband, 'Neckband');
+  const vBandT = renderPiece(vGarment.neckband, 'Neckband', 'abbreviated');
+  const crew = renderPiece(assembleGarment(W36, 'moderate', G, 'round').neckband, 'Neckband');
+
+  it('mitres the point: mark the centre, decrease every row, then cast off', () => {
+    expect(has(vBand, 'Mitre the front point.')).toBe(true);
+    expect(has(vBand, 'Mark the centre stitch — it sits at the base of the V, where the two front edges meet.')).toBe(true);
+    expect(vBand.lines.some((l) => l.includes('centred double decrease at the marked stitch') && l.includes('until the row counter reads'))).toBe(true);
+  });
+
+  it('presents the crossed-over point as an alternative finish', () => {
+    expect(has(vBand, 'Alternative front point — crossed over.')).toBe(true);
+    expect(vBand.lines.some((l) => l.includes('lap the left band end over the right'))).toBe(true);
+  });
+
+  it('a crew band does neither (no mitre, no alternative)', () => {
+    expect(has(crew, 'Mitre the front point.')).toBe(false);
+    expect(has(crew, 'crossed over')).toBe(false);
+  });
+
+  it('abbreviates the mitre and the alternative', () => {
+    expect(has(vBandT, 'Mitre front point.')).toBe(true);
+    expect(vBandT.lines.some((l) => l.includes('centred double dec at marked st'))).toBe(true);
+    expect(has(vBandT, 'Alt point — crossed over.')).toBe(true);
+  });
+});
+
 it('CHECKPOINT: prints both registers of the full Woman 36" pattern', () => {
   console.log('\n===== VERBOSE =====\n' + patternText(renderPattern(garment)));
   console.log('\n===== ABBREVIATED =====\n' + patternText(renderPattern(garment, 'abbreviated')));

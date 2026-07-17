@@ -111,6 +111,11 @@ interface Vocab {
   setHold(): string;
   holdGroup(count: number, side: Carriage, rc: number): string;
   holdRepeatBack(count: number, rc: number, carriage: Carriage): string;
+  mitreHeading(): string;
+  markPoint(): string;
+  mitreWork(rc: number, count: number): string;
+  crossoverTitle(): string;
+  crossoverBody(): string;
 }
 
 function splitV(n: number): string {
@@ -184,6 +189,16 @@ const VERBOSE: Vocab = {
     `Repeat the last two instructions, holding ${count} needles each time, until the row counter reads ${pad(
       rc,
     )}.${VERBOSE.carr(carriage)}`,
+  mitreHeading: () => 'Mitre the front point.',
+  markPoint: () =>
+    'Mark the centre stitch — it sits at the base of the V, where the two front edges meet.',
+  mitreWork: (rc, count) =>
+    `On every row, work a centred double decrease at the marked stitch — decrease 1 stitch on each side of it, so the point column stays unbroken — until the row counter reads ${pad(
+      rc,
+    )} (${count} decrease rows in all). Keep the marker on the centre stitch as the point travels in.`,
+  crossoverTitle: () => 'Alternative front point — crossed over.',
+  crossoverBody: () =>
+    'For a crossed-over point instead of the mitre, skip the centre decreases above: work all the picked-up stitches straight in rib for the same number of rows and cast off. Then lap the left band end over the right at the base of the V and stitch both ends down neatly on the inside. It is the more casual finish and the easier one to work flat.',
 };
 
 const TERSE: Vocab = {
@@ -228,6 +243,13 @@ const TERSE: Vocab = {
   holdGroup: (count, side, rc) => `${count} N at ${side} into hold, then Kn to RC ${pad(rc)}.`,
   holdRepeatBack: (count, rc, carriage) =>
     `Rpt last 2 instructions, holding ${count} N each time, to RC ${pad(rc)}.${TERSE.carr(carriage)}`,
+  mitreHeading: () => 'Mitre front point.',
+  markPoint: () => 'Mark centre st (base of V, where the front edges meet).',
+  mitreWork: (rc, count) =>
+    `Every row, centred double dec at marked st (dec 1 st each side) to RC ${pad(rc)} (${count}×), marker on centre st.`,
+  crossoverTitle: () => 'Alt point — crossed over.',
+  crossoverBody: () =>
+    'For a crossed-over point: skip the centre dec, work all PU st straight in rib for the same rows, BO. Lap L band end over R at base of V, stitch down inside.',
 };
 
 function vocabFor(style: ProseStyle): Vocab {
@@ -329,6 +351,7 @@ type Kind =
   | 'co_edge'
   | 'dec_both'
   | 'dec_edge'
+  | 'mitre'
   | 'inc_both'
   | 'hold';
 
@@ -349,7 +372,11 @@ function classify(row: Row): Ev {
     case 'bind_off':
       return { row, kind: op.side === 'center' ? 'co_center' : 'co_edge', op };
     case 'decrease':
-      return { row, kind: op.side === 'both' ? 'dec_both' : 'dec_edge', op };
+      return {
+        row,
+        kind: op.side === 'both' ? 'dec_both' : op.side === 'center' ? 'mitre' : 'dec_edge',
+        op,
+      };
     case 'increase':
       return { row, kind: 'inc_both', op };
     case 'hold':
@@ -501,6 +528,25 @@ export function renderPiece(rows: Row[], title: string, style: ProseStyle = 'ver
       continue;
     }
 
+    if (ev.kind === 'mitre') {
+      // The V-neckband mitre: a centred double decrease at the point every row.
+      // Gather the run, mark the point, describe the first row, then repeat.
+      const mitreRows: Row[] = [];
+      let j = i;
+      while (j < evs.length && evs[j].kind === 'mitre') {
+        mitreRows.push(evs[j].row);
+        j += 1;
+      }
+      heading(v.mitreHeading());
+      lines.push(v.markPoint());
+      const last = counter(mitreRows[mitreRows.length - 1].index);
+      lines.push(v.mitreWork(last, mitreRows.length));
+      lines.push(v.stitchCount(mitreRows[mitreRows.length - 1].stitches, false));
+      prevCounter = last;
+      i = j;
+      continue;
+    }
+
     if (ev.kind === 'co_center') {
       const c = counter(row.index);
       const n = (ev.op as { count: number }).count;
@@ -577,6 +623,14 @@ export function renderPiece(rows: Row[], title: string, style: ProseStyle = 'ver
     // it is not split left/right.
     lines.push(v.stitchCount(shapeRows[shapeRows.length - 1].stitches, kind !== 'dec_edge'));
     i = j;
+  }
+
+  // A mitred V-band offers the crossed-over point as an alternative finish (extra
+  // info in the prose, not a construction fork — see vneck-band-both-finishes).
+  if (rows.some((r) => r.section === 'mitre')) {
+    lines.push('');
+    lines.push(v.crossoverTitle());
+    lines.push(v.crossoverBody());
   }
 
   return { title, lines };

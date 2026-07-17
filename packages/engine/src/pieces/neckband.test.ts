@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { findSize } from '../data/sizes';
+import { findSize, sizes } from '../data/sizes';
 import { DEFAULT_GAUGE } from '../gauge';
 import { neckbandPlan, neckbandRows } from './neckband';
 
 const W36 = findSize('Woman', 36, 'in')!;
 const G = DEFAULT_GAUGE;
+const sizesForV = () => sizes.filter((s) => s.units === 'in');
 
 describe('neckband plan (Woman 36", moderate)', () => {
   const p = neckbandPlan(W36, 'moderate', G);
@@ -22,7 +23,7 @@ describe('neckband plan (Woman 36", moderate)', () => {
   });
 });
 
-describe('neckband rows', () => {
+describe('neckband rows (crew)', () => {
   const rows = neckbandRows(W36, 'moderate', G);
 
   it('picks up, ribs, then casts off', () => {
@@ -31,5 +32,40 @@ describe('neckband rows', () => {
     expect(rows[rows.length - 1].ops).toEqual([{ kind: 'bind_off', count: 143, side: 'center' }]);
     expect(rows[rows.length - 1].stitches).toBe(0);
     expect(rows).toHaveLength(12); // pick-up + 10 rib + cast-off
+  });
+
+  it('has no shaping between pick-up and cast-off (straight rib)', () => {
+    for (const r of rows.slice(1, -1)) {
+      expect(r.section).toBe('rib');
+      expect(r.ops).toEqual([]);
+    }
+  });
+});
+
+describe('neckband rows (v-neck mitre)', () => {
+  const p = neckbandPlan(W36, 'moderate', G, 'v');
+  const rows = neckbandRows(W36, 'moderate', G, 'v');
+
+  it('mitres the front point: a centred double decrease every band row', () => {
+    const mitre = rows.filter((r) => r.section === 'mitre');
+    expect(mitre).toHaveLength(p.bandRows);
+    for (const r of mitre) {
+      expect(r.ops).toEqual([{ kind: 'decrease', count: 2, side: 'center' }]);
+    }
+  });
+
+  it('casts off the stitches the mitre leaves (pickup − 2 per band row)', () => {
+    const remaining = p.pickupTotal - 2 * p.bandRows;
+    const last = rows[rows.length - 1];
+    expect(last.ops).toEqual([{ kind: 'bind_off', count: remaining, side: 'center' }]);
+    expect(last.stitches).toBe(0);
+    expect(rows[rows.length - 2].stitches).toBe(remaining); // live count before cast-off
+  });
+
+  it('keeps the stitch count positive through the mitre for every size', () => {
+    for (const s of sizesForV()) {
+      const pv = neckbandPlan(s, 'moderate', G, 'v');
+      expect(pv.pickupTotal - 2 * pv.bandRows, `${s.category} ${s.chest}"`).toBeGreaterThan(0);
+    }
   });
 });

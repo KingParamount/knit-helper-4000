@@ -2,8 +2,10 @@
  * The neckband: pick up stitches around the finished neck opening, work a short rib
  * band, and cast off loosely. Serves both neck styles — a crew has a front centre
  * cast-off to pick up along; a V has none (frontCentre = 0) and picks up along the
- * two long V edges instead, meeting at the point (finish — mitred or crossed — is a
- * prose choice presented in the pattern, not a construction fork).
+ * two long V edges instead, meeting at the point. The canonical V band is MITRED (a
+ * centred double decrease at the point every row — real row-level shaping, so it
+ * lives in the row array); the crossed-over finish is offered as a prose alternative
+ * (same band worked straight, ends lapped), per vneck-band-both-finishes.
  *
  * Pick-up: one stitch per stitch along the cast-off edges (back neck, front centre),
  * ~3 stitches per 4 rows along the shaped side edges. Band depth from the neck rib.
@@ -73,11 +75,21 @@ export function neckbandRows(
     for (const op of ops) {
       if (op.kind === 'pick_up') stitches = op.count;
       if (op.kind === 'bind_off') stitches -= op.count;
+      if (op.kind === 'decrease') stitches -= op.count;
     }
     rows.push({ index, piece: 'collar', stitches, carriage: carriageForRow(index), ops, section });
   };
   push([{ kind: 'pick_up', count: p.pickupTotal }], 'pickup');
-  for (let i = 0; i < p.bandRows; i++) push([], 'rib');
-  push([{ kind: 'bind_off', count: p.pickupTotal, side: 'center' }], 'castoff'); // loosely
+  if (neck === 'v') {
+    // Mitre the front point: a centred double decrease (1 st either side of the
+    // marked point) on every band row draws the two long V edges into a clean
+    // corner. The crossed-over alternative is offered in the prose, not built here
+    // — it works the same band straight, so it needs no shaping (see
+    // vneck-band-both-finishes). pickupTotal is odd, so the point is a true stitch.
+    for (let i = 0; i < p.bandRows; i++) push([{ kind: 'decrease', count: 2, side: 'center' }], 'mitre');
+  } else {
+    for (let i = 0; i < p.bandRows; i++) push([], 'rib');
+  }
+  push([{ kind: 'bind_off', count: stitches, side: 'center' }], 'castoff'); // remaining, loosely
   return rows;
 }
