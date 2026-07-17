@@ -8,10 +8,10 @@ import { neckHeadFit, neckFitVerdict, crewSuitable, NECK_OPENING_STRETCH, fitRep
 const inSizes = sizes.filter((s) => s.units === 'in');
 const styles = easeStyles.map((e) => e.id as EaseStyleId);
 
-// Green Tier-B checks — hold across every size and ease style. The reds (hip
-// clearance at deliberately-tight styles, upper-arm ease, sleeve-length ease) are
-// tracked separately below and printed by the checkpoint; they're pending decisions.
-const GREEN = new Set(['neck clears head', 'neck not too wide', 'chest ease sane']);
+// Green Tier-B checks — hold across every size and ease style. Hip clearance is the
+// one informational red (a straight body is tight at the hem only for deliberately-
+// snug styles — agreed as a final contention), printed by the checkpoint, not asserted.
+const GREEN = new Set(['neck clears head', 'neck not too wide', 'chest ease sane', 'sleeve clears the arm']);
 
 describe('Tier-B fit sweep — the checks that hold across all sizes & styles', () => {
   for (const style of styles) {

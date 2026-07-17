@@ -18,16 +18,33 @@ import type { SizeRecord, EaseStyleId } from './data/types';
 import { easeBase } from './data/options';
 
 /**
- * Fixed ease allowances for a set-in sleeve, in inches. These do not scale with
- * the chest ease style — a set-in armhole/sleeve is fitted regardless of body
- * looseness. (A truly oversized garment loosens the sleeve slightly; treated as a
- * later refinement.) Sources in `dimensions_model.md`.
+ * Fixed ease allowances for a set-in sleeve, in inches. The back-width seam sits on
+ * the shoulder tip (zero ease) and the armhole depth is a fixed drop; both are
+ * independent of the fit style. The *bicep* ease is NOT fixed — it tracks the fit
+ * style (see `upperArmEase`): a snug fit is snug over the arm, a standard fit isn't.
+ * Sources in `dimensions_model.md`.
  */
 export const SETIN_ALLOWANCE_IN = {
   backWidth: 0.0, // set-in shoulder seam sits on the shoulder tip — zero ease
   armholeDepth: 1.0, // body arm depth + 1" → ~8.5" finished, central vs (bust/6)+5cm
-  upperArm: 1.0, // body upper arm + 1"
 } as const;
+
+/** Bicep ease as a fraction of the chest ease — so it tracks the fit style. */
+export const ARM_EASE_FRACTION = 0.75;
+/** The sleeve must clear the arm even at the snuggest fit... */
+export const MIN_UPPER_ARM_EASE_IN = 0.5;
+/** ...and a set-in armhole can only ease in so much cap, so the bicep ease is capped. */
+export const MAX_UPPER_ARM_EASE_IN = 2.5;
+
+/**
+ * Ease around the upper arm, scaled to the fit style. A snug (skintight/tight) fit is
+ * snug over the bicep; a standard fit is comfortable; a loose fit is roomy — clamped
+ * so the sleeve always clears the arm and never asks more cap than the armhole can take.
+ */
+export function upperArmEase(size: SizeRecord, style: EaseStyleId): number {
+  const scaled = chestEase(size, style) * ARM_EASE_FRACTION;
+  return Math.min(MAX_UPPER_ARM_EASE_IN, Math.max(MIN_UPPER_ARM_EASE_IN, scaled));
+}
 
 export interface GarmentWidths {
   unit: 'in';
@@ -61,6 +78,6 @@ export function garmentWidths(size: SizeRecord, style: EaseStyleId): GarmentWidt
     backWidth: size.back_width + SETIN_ALLOWANCE_IN.backWidth,
     armholeDepth,
     armhole: 2 * armholeDepth, // manual.txt:257,506 — around = twice the depth
-    sleeveTop: size.upper_arm + SETIN_ALLOWANCE_IN.upperArm,
+    sleeveTop: size.upper_arm + upperArmEase(size, style),
   };
 }

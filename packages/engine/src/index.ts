@@ -81,7 +81,6 @@ export {
   neckFitVerdict,
   fitReport,
   HIP_STRETCH,
-  UPPER_ARM_COMFORT_EASE_IN,
   MIN_SHOULDER_IN,
 } from './fit';
 export type { NeckHeadFit, NeckFitVerdict, FitCheck, FitReport } from './fit';

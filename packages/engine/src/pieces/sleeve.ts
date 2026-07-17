@@ -58,7 +58,8 @@ export function sleevePlan(size: SizeRecord, style: EaseStyleId, gauge: Gauge): 
   const bodyCuffSts = evenStitchesFor(size.wrist + CUFF_EASE_IN, gauge); // even
   const ribCastOnSts = bodyCuffSts + 1; // rib cast on odd, extra on the right
   const ribRows = ribRowsFor(size.rib_body, gauge);
-  const taperRows = rowsFor(size.arm_length, gauge) - ribRows;
+  // Sleeve length = arm length + the sourced length ease (ease_arml), less the rib.
+  const taperRows = rowsFor(size.arm_length + size.ease_arml, gauge) - ribRows;
   const incPerSide = Math.round((stitchesFor(w.sleeveTop, gauge) - bodyCuffSts) / 2);
   const sleeveTopSts = bodyCuffSts + 2 * incPerSide; // even
 

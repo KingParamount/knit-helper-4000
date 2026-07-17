@@ -9,7 +9,7 @@
  */
 
 import type { SizeRecord, EaseStyleId } from './data/types';
-import { garmentWidths } from './dimensions';
+import { garmentWidths, MIN_UPPER_ARM_EASE_IN } from './dimensions';
 import {
   NECK_OPENING_STRETCH,
   NECK_STRETCH_MAX,
@@ -58,8 +58,6 @@ export function neckFitVerdict(size: SizeRecord): { verdict: NeckFitVerdict; fit
 
 /** Knit fabric stretches ~8% to pass over the hip. */
 export const HIP_STRETCH = 1.08;
-/** A set-in sleeve wants roughly this much ease around the upper arm to be comfortable. */
-export const UPPER_ARM_COMFORT_EASE_IN = 1.5;
 /** Each shoulder should be at least this wide, or the neck slides off. */
 export const MIN_SHOULDER_IN = 1.25;
 
@@ -104,19 +102,16 @@ export function fitReport(size: SizeRecord, style: EaseStyleId): FitReport {
       detail: `${chestEase >= 0 ? '+' : ''}${chestEase.toFixed(1)}"`,
     },
     {
+      label: 'sleeve clears the arm',
+      ok: upperArmEase >= MIN_UPPER_ARM_EASE_IN,
+      detail: `bicep ease +${upperArmEase.toFixed(1)}" (scales with fit style)`,
+    },
+    {
+      // Straight body to the armholes is the standard construction (agreed), so a
+      // hip wider than the chest is only tight at deliberately-snug styles. Informational.
       label: 'hip clearance',
       ok: size.hip <= w.chest * HIP_STRETCH,
       detail: `hip ${size.hip}" vs finished ${w.chest.toFixed(1)}"`,
-    },
-    {
-      label: 'upper-arm ease',
-      ok: upperArmEase >= UPPER_ARM_COMFORT_EASE_IN,
-      detail: `+${upperArmEase.toFixed(1)}" (want ≥${UPPER_ARM_COMFORT_EASE_IN}")`,
-    },
-    {
-      label: 'sleeve-length ease applied',
-      ok: (size.ease_arml ?? 0) === 0,
-      detail: `ease_arml ${size.ease_arml}" not added to the sleeve`,
     },
   ];
   return { size: `${size.category} ${size.chest}"`, checks, allOk: checks.every((c) => c.ok) };

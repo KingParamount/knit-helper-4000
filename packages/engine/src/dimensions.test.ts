@@ -25,15 +25,23 @@ describe('garment widths (Woman 36", set-in, straight body)', () => {
     expect(chests).toEqual([...chests].sort((a, b) => a - b));
   });
 
-  it('uses fixed set-in allowances that do NOT scale with ease style', () => {
-    // back width +0, armhole depth +1.5 (=>armhole 18.0), sleeve top +1 — same for every style
+  it('keeps the back-width and armhole allowances fixed across ease styles', () => {
+    // back width +0, armhole depth +1.0 — the shoulder seam and armhole don't loosen
     for (const s of STYLES) {
       const w = garmentWidths(W36, s);
       expect(w.backWidth).toBeCloseTo(13.25, 4); // 13.25 + 0
       expect(w.armholeDepth).toBeCloseTo(8.5, 4); // 7.5 + 1.0
       expect(w.armhole).toBeCloseTo(17.0, 4); // 2 × 8.5
-      expect(w.sleeveTop).toBeCloseTo(11.75, 4); // 10.75 + 1.0
     }
+  });
+
+  it('scales the bicep ease with the fit style — snug when snug, roomy when loose', () => {
+    const top = (s: (typeof STYLES)[number]): number => garmentWidths(W36, s).sleeveTop;
+    expect(top('skintight')).toBeCloseTo(11.25, 4); // 10.75 + 0.50 (min, clears the arm)
+    expect(top('moderate')).toBeCloseTo(12.51, 2); // 10.75 + 1.76 (comfortable)
+    expect(top('oversized')).toBeCloseTo(13.25, 4); // 10.75 + 2.50 (max, capped for the cap)
+    expect(top('skintight')).toBeLessThan(top('moderate'));
+    expect(top('moderate')).toBeLessThan(top('oversized'));
   });
 });
 

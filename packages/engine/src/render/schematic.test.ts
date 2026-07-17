@@ -64,9 +64,9 @@ describe('front / sleeve / neckband schematics', () => {
   it('sleeve: widens from cuff to the upper arm, then a cap', () => {
     const sp = sleevePlan(W36, 'moderate', DEFAULT_GAUGE);
     const s = sleeveSchematic(sleeveRows('sleeve_l', W36, 'moderate', DEFAULT_GAUGE), sp, DEFAULT_GAUGE);
-    expect(s.widthSts).toBe(88); // widest at the underarm
+    expect(s.widthSts).toBe(94); // widest at the underarm
     expect(s.measures.find((m) => m.label === 'cuff')?.sts).toBe(50);
-    expect(s.measures.find((m) => m.label === 'upper arm')?.sts).toBe(88);
+    expect(s.measures.find((m) => m.label === 'upper arm')?.sts).toBe(94);
   });
 
   it('neckband: a plain rib strip', () => {

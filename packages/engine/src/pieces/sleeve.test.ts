@@ -20,17 +20,17 @@ describe('sleeve plan (Woman 36", moderate, default gauge)', () => {
   it('casts on the cuff and tapers to the sleeve top', () => {
     expect(p.bodyCuffSts).toBe(50); // (wrist 5.75 + 1") × 30/4, rounded even
     expect(p.ribCastOnSts).toBe(51); // rib cast on odd (cuff + 1, extra on the right)
-    expect(p.incPerSide).toBe(19); // (88 − 50)/2
-    expect(p.sleeveTopSts).toBe(88); // 50 + 2×19  (≈ upper arm 11.75"), even
+    expect(p.incPerSide).toBe(22); // (94 − 50)/2
+    expect(p.sleeveTopSts).toBe(94); // 50 + 2×22 (upper arm + style-scaled bicep ease), even
   });
 
   it('lays out rib, taper and cap counts', () => {
     expect(p.ribRows).toBe(25); // 2.5"
-    expect(p.taperRows).toBe(143); // arm length 16.75" − rib
+    expect(p.taperRows).toBe(158); // (arm length 16.75" + ease_arml 1.5") − rib
     expect(p.underarmCastOff).toBe(8); // matches the body armhole underarm
-    expect(p.capHeightRows).toBe(57); // solved so the cap perimeter eases +5% over the armhole
-    expect(p.capTopSts).toBe(20); // crown = what remains after symmetric shaping (even)
-    expect(p.capDecPerSide).toBe(26); // (88 − 16 − 21 target) / 2
+    expect(p.capHeightRows).toBe(55); // solved so the cap perimeter eases +5% over the armhole
+    expect(p.capTopSts).toBe(22); // crown = what remains after symmetric shaping (even)
+    expect(p.capDecPerSide).toBe(28); // (94 − 16 − crown target) / 2
   });
 
   it('makes the cap a sensible fraction of the armhole depth', () => {
@@ -44,7 +44,7 @@ describe('sleeve rows', () => {
   const rows = sleeveRows('sleeve_l', W36, 'moderate', G);
 
   it('reaches the sleeve top then binds off the whole cap', () => {
-    expect(Math.max(...rows.map((r) => r.stitches))).toBe(88); // widest at the underarm, even
+    expect(Math.max(...rows.map((r) => r.stitches))).toBe(94); // widest at the underarm, even
     expect(rows[rows.length - 1].stitches).toBe(0); // cap fully cast off
   });
 
@@ -54,7 +54,7 @@ describe('sleeve rows', () => {
       { kind: 'decrease', count: 1, side: 'R' }, // drop to even at the change to stocking
     ]);
     const incRows = rows.filter((r) => r.ops.some((o) => o.kind === 'increase'));
-    expect(incRows).toHaveLength(19);
+    expect(incRows).toHaveLength(22);
   });
 
   it('casts off each underarm on its carriage-end side', () => {
