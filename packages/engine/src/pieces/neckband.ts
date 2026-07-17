@@ -19,7 +19,8 @@ import { frontNeckPlan, frontNeckDepthRows } from './front';
 export const PICKUP_PER_ROW = 3 / 4;
 
 export interface NeckbandPlan {
-  backNeckSts: number; // picked up 1:1 along the back cast-off
+  backCentreSts: number; // picked up 1:1 along the back centre cast-off
+  backSidePickup: number; // each shaped back-neck side edge (the back is now scooped)
   frontCentreSts: number; // picked up 1:1 along the front centre cast-off
   frontSidePickup: number; // each shaped front side edge
   pickupTotal: number;
@@ -27,16 +28,19 @@ export interface NeckbandPlan {
 }
 
 export function neckbandPlan(size: SizeRecord, style: EaseStyleId, gauge: Gauge): NeckbandPlan {
-  const backNeckSts = backPlan(size, style, gauge).backNeckSts;
+  const bp = backPlan(size, style, gauge);
+  const backCentreSts = bp.backNeckCentreSts; // centre cast-off of the back scoop
+  const backSidePickup = Math.round(bp.backNeckRows * PICKUP_PER_ROW);
   const fp = frontNeckPlan(size, style, gauge);
   const frontCentreSts = fp.frontNeckSts - 2 * stitchesFor(1.5, gauge); // the centre cast-off
   const frontSidePickup = Math.round(frontNeckDepthRows(size, gauge) * PICKUP_PER_ROW);
   // A worked-flat 1x1 rib band picks up an odd number (extra on the right) so both
   // selvedges are knit stitches; it is cast off in rib, with no drop to even.
-  const rawPickup = backNeckSts + frontCentreSts + 2 * frontSidePickup;
+  const rawPickup = backCentreSts + 2 * backSidePickup + frontCentreSts + 2 * frontSidePickup;
   const pickupTotal = rawPickup % 2 === 0 ? rawPickup + 1 : rawPickup;
   return {
-    backNeckSts,
+    backCentreSts,
+    backSidePickup,
     frontCentreSts,
     frontSidePickup,
     pickupTotal,

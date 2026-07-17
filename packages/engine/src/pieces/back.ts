@@ -19,6 +19,7 @@ import {
 } from '../gauge';
 import { type Row, type Piece, carriageForRow } from '../row';
 import { seamEdgeLength, ARMHOLE_SECTIONS } from './seams';
+import { backNeckDepthRows } from '../neckopening';
 
 export interface PlanSection {
   name: string;
@@ -38,6 +39,9 @@ export interface BackPlan {
   ribRows: number;
   bodyRows: number; // plain body, top of rib to underarm
   armholeRows: number; // underarm to shoulder
+  backNeckRows: number; // scoop depth: rows from the back neck line to the shoulder
+  backNeckPerSide: number; // stitches shaped away each side of the scoop
+  backNeckCentreSts: number; // stitches cast off flat at the centre of the scoop
   sections: PlanSection[];
   shaping: {
     armholeDecTotal: number; // castOn - upperBack, split across both sides
@@ -67,6 +71,23 @@ export function backPlan(
   const ribRows = ribRowsFor(size.rib_body, gauge);
   const armholeRows = rowsFor(w.armholeDepth, gauge);
   const bodyRows = totalRows - armholeRows - ribRows;
+  const backNeckRows = backNeckDepthRows(size, gauge);
+
+  // Back-neck scoop shaping (single source for backRows and the neckband). The curve
+  // is capped so its cast-offs + decreases fit in the scoop depth alongside the
+  // short-row shoulders, and so the flat centre stays positive.
+  const achieved = armholeShaping(bodySts, upperBackSts, gauge).achievedSts;
+  const backShoulderSts = Math.round((achieved - backNeckSts) / 2);
+  const backSteps = splitIntoSteps(backShoulderSts, SHOULDER_STEP_STS);
+  const backNeckPerSide = Math.max(
+    1,
+    Math.min(
+      stitchesFor(1.5, gauge),
+      Math.floor((backNeckRows - 2 * backSteps.length) / 2),
+      Math.floor((backNeckSts - 2) / 2),
+    ),
+  );
+  const backNeckCentreSts = backNeckSts - 2 * backNeckPerSide;
 
   const sections: PlanSection[] = [
     { name: 'rib', startRow: 1, endRow: ribRows, rows: ribRows, stitches: ribCastOnSts },
@@ -96,6 +117,9 @@ export function backPlan(
     ribRows,
     bodyRows,
     armholeRows,
+    backNeckRows,
+    backNeckPerSide,
+    backNeckCentreSts,
     sections,
     shaping: {
       armholeDecTotal: bodySts - upperBackSts,
@@ -241,15 +265,15 @@ export function splitIntoSteps(total: number, target: number): number[] {
 }
 
 /**
- * The complete back piece: cast-on → rib → body → curved armhole → straight to
- * the shoulder line → short-row shoulders → flat back-neck cast-off.
+ * The complete back piece: cast-on → rib → body → curved armhole → straight to the
+ * back neck line → a scooped back neck (split, each half's neck edge shaped down to
+ * the shoulder) → short-row shoulders held for grafting.
  *
- * Shoulders are shaped by holding needle groups (the user's choice): the outer
- * (armhole-edge) group is held first, working inward, so the shoulder slopes down
- * toward the armhole. Held stitches stay live for grafting, so the piece ends with
- * the two shoulders (≈half the non-neck stitches each) on hold; `stitches` counts
- * live stitches on the needles, so holds do not change it. The flat back neck is a
- * single centre cast-off.
+ * The back neck is scooped, not a flat cast-off: real crews drop the back neck, and
+ * the scoop is what opens the neck enough to pass the head (see neckopening.ts). The
+ * construction mirrors the front's crew neck at a shallower, solved depth; the curve
+ * (perSide) is capped so it fits inside that depth alongside the short-row shoulders.
+ * Held shoulder stitches stay live for grafting, so `stitches` counts live needles.
  */
 export function backRows(size: SizeRecord, style: EaseStyleId, gauge: Gauge): Row[] {
   const plan = backPlan(size, style, gauge);
@@ -258,33 +282,71 @@ export function backRows(size: SizeRecord, style: EaseStyleId, gauge: Gauge): Ro
   const backNeck = plan.backNeckSts;
   const shoulderSts = Math.round((achieved - backNeck) / 2);
   const steps = splitIntoSteps(shoulderSts, SHOULDER_STEP_STS);
+  const depth = plan.backNeckRows;
+  const perSide = plan.backNeckPerSide;
+  const centreCastOff = plan.backNeckCentreSts;
+  const co1 = Math.min(3, perSide);
+  const co2 = Math.min(2, Math.max(0, perSide - co1));
+  const castOffs = [co1, co2].filter((n) => n > 0);
+  const decs = perSide - co1 - co2;
 
   let index = rows.length;
-  let stitches = achieved;
-  const push = (ops: Row['ops'], section: string): void => {
+
+  // Straight to the back neck line (leaving `depth` rows for the scoop + shoulders).
+  const straightToSplit = Math.max(0, plan.totalRows - depth - rows.length);
+  for (let i = 0; i < straightToSplit; i++) {
     index += 1;
-    for (const op of ops) {
-      if (op.kind === 'bind_off') stitches -= op.count;
-      if (op.kind === 'decrease') stitches -= op.count * (op.side === 'both' ? 2 : 1);
-      // hold: needles held but still live — no change to the stitch count
-    }
-    rows.push({ index, piece: 'back', stitches, carriage: carriageForRow(index), ops, section });
-  };
-
-  // Straight to the shoulder line (reserve rows for the shoulders + neck cast-off).
-  const shoulderRows = 2 * steps.length;
-  const straightRows = Math.max(0, plan.totalRows - rows.length - shoulderRows - 1);
-  for (let i = 0; i < straightRows; i++) push([], 'upper_back');
-
-  // Short-row shoulders: hold each group on one side, then the mirror group on the
-  // other, working outer→inner. Held at whichever side the carriage is on.
-  for (const s of steps) {
-    push([{ kind: 'hold', count: s, side: carriageForRow(index + 1) as 'L' | 'R' }], 'shoulder');
-    push([{ kind: 'hold', count: s, side: carriageForRow(index + 1) as 'L' | 'R' }], 'shoulder');
+    rows.push({ index, piece: 'back', stitches: achieved, carriage: carriageForRow(index), ops: [], section: 'upper_back' });
   }
 
-  // Flat back neck: cast off the centre; the two shoulders stay held for grafting.
-  push([{ kind: 'bind_off', count: backNeck, side: 'center' }], 'neck');
+  // Split: cast off the centre back neck; the two halves are worked separately.
+  index += 1;
+  rows.push({
+    index,
+    piece: 'back',
+    stitches: achieved - centreCastOff, // both halves still live
+    carriage: carriageForRow(index),
+    ops: [{ kind: 'bind_off', count: centreCastOff, side: 'center' }],
+    section: 'neck_split',
+  });
+
+  const workHalf = (side: 'left' | 'right'): void => {
+    const neckEdge: 'L' | 'R' = side === 'left' ? 'R' : 'L'; // centre-facing edge
+    const armEdge: 'L' | 'R' = side === 'left' ? 'L' : 'R';
+    let sts = shoulderSts + perSide;
+    let used = 0;
+    const push = (ops: Row['ops'], section: string): void => {
+      index += 1;
+      used += 1;
+      for (const op of ops) {
+        if (op.kind === 'bind_off') sts -= op.count;
+        if (op.kind === 'decrease') sts -= op.count;
+        // hold: still live, no change
+      }
+      rows.push({ index, piece: 'back', stitches: sts, carriage: carriageForRow(index), ops, section, side });
+    };
+    // Neck-edge curve: cast-offs, then decreases every other row.
+    for (const co of castOffs) {
+      push([{ kind: 'bind_off', count: co, side: neckEdge }], 'neck');
+      push([], 'neck'); // return row
+    }
+    for (let d = 0; d < decs; d++) {
+      push([{ kind: 'decrease', count: 1, side: neckEdge }], 'neck');
+      if (d < decs - 1) push([], 'neck');
+    }
+    // Straight to the shoulder line, then short-row the shoulder — held only on a row
+    // whose carriage ends at this half's armhole edge, so it does not hole (see the
+    // machine-holding-hole rule). Slope rate matches the front.
+    const straight = Math.max(0, depth - used - 2 * steps.length);
+    for (let i = 0; i < straight; i++) push([], 'upper_back');
+    for (const s of steps) {
+      if (carriageForRow(index + 1) !== armEdge) push([], 'shoulder'); // wait for the safe row
+      push([{ kind: 'hold', count: s, side: armEdge }], 'shoulder');
+    }
+  };
+
+  workHalf('left');
+  workHalf('right');
   return rows;
 }
 

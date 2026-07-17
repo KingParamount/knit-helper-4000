@@ -72,7 +72,7 @@ describe('front / sleeve / neckband schematics', () => {
   it('neckband: a plain rib strip', () => {
     const np = neckbandPlan(W36, 'moderate', DEFAULT_GAUGE);
     const n = neckbandSchematic(neckbandRows(W36, 'moderate', DEFAULT_GAUGE), np, DEFAULT_GAUGE);
-    expect(n.widthSts).toBe(125);
+    expect(n.widthSts).toBe(143); // the whole scooped neck pick-up
     expect(n.outline).toHaveLength(4);
   });
 });

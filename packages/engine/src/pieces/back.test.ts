@@ -123,15 +123,18 @@ describe('splitIntoSteps', () => {
   });
 });
 
-describe('complete back piece (short-row shoulders + flat back neck)', () => {
+describe('complete back piece (scooped neck, short-row shoulders)', () => {
   const rows = backRows(W36, 'moderate', DEFAULT_GAUGE);
 
-  it('runs the full body length and ends with the shoulders held for grafting', () => {
-    expect(rows).toHaveLength(246); // = plan body length
+  it('splits the back neck and ends with the shoulders held for grafting', () => {
     const last = rows[rows.length - 1];
-    expect(last.stitches).toBe(52); // 98 − 46 neck cast-off = two 26-st shoulders, held
-    expect(last.section).toBe('neck');
-    expect(last.ops).toEqual([{ kind: 'bind_off', count: 46, side: 'center' }]);
+    expect(last.section).toBe('shoulder');
+    expect(last.ops.some((o) => o.kind === 'hold')).toBe(true);
+    const held = rows
+      .flatMap((r) => r.ops)
+      .filter((o) => o.kind === 'hold')
+      .reduce((n, o) => n + (o.kind === 'hold' ? o.count : 0), 0);
+    expect(held).toBe(52); // two 26-st shoulders, held for grafting
   });
 
   it('holds all shoulder stitches, balanced across the two sides', () => {
@@ -144,10 +147,11 @@ describe('complete back piece (short-row shoulders + flat back neck)', () => {
     expect(perSide('R')).toBe(26);
   });
 
-  it('holds do not change the live stitch count; only the neck cast-off does', () => {
-    const firstHoldIdx = rows.findIndex((r) => r.ops.some((o) => o.kind === 'hold'));
-    expect(rows[firstHoldIdx - 1].stitches).toBe(98);
-    expect(rows[rows.length - 2].stitches).toBe(98); // still 98 right before the neck cast-off
+  it('casts off the centre back neck at the split, at full width', () => {
+    const split = rows.find((r) => r.section === 'neck_split')!;
+    expect(split.ops).toEqual([{ kind: 'bind_off', count: 42, side: 'center' }]); // 46 − 2×2 curve
+    const splitIdx = rows.indexOf(split);
+    expect(rows[splitIdx - 1].stitches).toBe(98); // full width right up to the split
   });
 
   it('keeps the carriage alternating and never gains stitches', () => {

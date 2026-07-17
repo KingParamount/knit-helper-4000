@@ -28,6 +28,7 @@ export function seamEdgeLength(rows: Row[], sections: Set<string>, gauge: Gauge)
   let length = 0;
   for (const r of rows) {
     if (!sections.has(r.section ?? '')) continue;
+    if (r.side === 'right') continue; // measure one side only: skip the far half of a split piece
     let dx = 0;
     let skipRow = false;
     for (const op of r.ops) {

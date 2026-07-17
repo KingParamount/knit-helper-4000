@@ -76,57 +76,102 @@ export interface PieceSchematic {
  * underarm cast-offs actually land a row apart). The shoulder slope and neck notch
  * are reconstructed from the plan, since short-row holds keep the live count flat.
  */
-export function backSchematic(
+/**
+ * A body piece with a scooped, split neck (both the front and — now that it has a
+ * back-neck scoop — the back). Body and armhole come from the per-row live count up
+ * to the split; above it the two halves share one y-range, so the neck edge and
+ * shoulder staircase are read from the left half and mirrored, and the top comes
+ * from the plan (not the halves' running row index).
+ */
+function splitNeckSchematic(
   rows: Row[],
-  plan: {
-    ribCastOnSts: number;
+  gauge: Gauge,
+  opts: {
+    piece: 'front' | 'back';
+    title: string;
+    neckLabel: string;
     bodySts: number;
-    backNeckSts: number;
     ribRows: number;
     totalRows: number;
+    neckWidthSts: number;
   },
-  gauge: Gauge,
 ): PieceSchematic {
-  const firstHold = rows.findIndex((r) => r.ops.some((o) => o.kind === 'hold'));
-  const holdY = firstHold >= 0 ? rows[firstHold].index : rows.length + 1;
-  const shoulderStartY = firstHold >= 0 ? rows[firstHold].index - 1 : rows.length - 1;
-  const topY = rows[rows.length - 1].index; // neck cast-off row
-  const achievedHalf = (firstHold >= 0 ? rows[firstHold - 1].stitches : rows[rows.length - 1].stitches) / 2;
-  const neckHalf = plan.backNeckSts / 2;
-  const bodyHalf = plan.bodySts / 2;
+  const bodyHalf = opts.bodySts / 2;
+  const split = rows.find((r) => r.section === 'neck_split');
+  const splitY = split ? split.index : opts.totalRows;
+  const centreCastOff = split ? ((split.ops[0] as { count: number }).count ?? 0) : opts.neckWidthSts;
+  const topY = opts.totalRows;
+  const { rightPts, leftPts, underarmY, marks } = trackBodyEdges(rows, bodyHalf, splitY);
+  const achievedHalf = rightPts[rightPts.length - 1].x;
+  const neckTopHalf = opts.neckWidthSts / 2;
+  const neckBottomHalf = centreCastOff / 2;
 
-  // Body + armhole edges true-to-side from the ops; the shoulders as the real
-  // short-row staircase from the hold groups; the flat back neck cast off across
-  // the top between them.
-  const { rightPts, leftPts, underarmY, marks } = trackBodyEdges(rows, bodyHalf, holdY);
-  const holds = shoulderHolds(rows);
-  rightPts.push(...shoulderStaircase(holds.filter((h) => h.side === 'R'), achievedHalf, -1));
-  rightPts.push({ x: neckHalf, y: topY });
-  leftPts.push(...shoulderStaircase(holds.filter((h) => h.side === 'L'), -achievedHalf, 1));
-  leftPts.push({ x: -neckHalf, y: topY });
-  const outline = [...rightPts, ...leftPts.reverse()];
-  marks.push({ kind: 'castoff', x: 0, y: topY - 0.5, span: plan.backNeckSts, centre: true }); // back neck
-  marks.push(...holdMarks(holds, achievedHalf));
+  marks.push({ kind: 'castoff', x: 0, y: splitY - 0.5, span: centreCastOff, centre: true }); // divide
+  const leftRows = rows.filter((r) => r.side === 'left');
+  const leftNeck: Pt[] = [{ x: -neckBottomHalf, y: splitY }];
+  let nx = -neckBottomHalf;
+  for (const r of leftRows) {
+    const cy = r.index - 0.5;
+    for (const op of r.ops) {
+      if (op.kind !== 'bind_off' && op.kind !== 'decrease') continue;
+      if (op.side !== 'R') continue;
+      const before = nx;
+      nx -= op.count; // the neck opening widens away from the centre
+      if (leftNeck[leftNeck.length - 1].y < r.index - 1) leftNeck.push({ x: before, y: r.index - 1 });
+      leftNeck.push({ x: nx, y: r.index });
+      if (op.kind === 'bind_off') {
+        marks.push({ kind: 'castoff', x: nx + op.count / 2, y: cy, span: op.count });
+        marks.push({ kind: 'castoff', x: -(nx + op.count / 2), y: cy, span: op.count });
+      } else {
+        marks.push({ kind: 'dec', x: nx + 0.5, y: cy, lean: -1 });
+        marks.push({ kind: 'dec', x: -(nx + 0.5), y: cy, lean: 1 });
+      }
+    }
+  }
+  const leftStair = shoulderStaircase(shoulderHolds(leftRows).filter((h) => h.side === 'L'), -achievedHalf, 1);
+  const mirror = (p: Pt): Pt => ({ x: -p.x, y: p.y });
+  rightPts.push(...leftStair.map(mirror), ...leftNeck.map(mirror).reverse());
+  leftPts.push(...leftStair, ...[...leftNeck].reverse());
+  // A shallow scoop can push a shoulder row a row past the planned top; clamp so the
+  // outline stays within the piece height.
+  const outline = [...rightPts, ...leftPts.reverse()].map((p) => ({ x: p.x, y: Math.min(p.y, topY) }));
+  const lhm = holdMarks(shoulderHolds(leftRows), achievedHalf);
+  marks.push(...lhm, ...lhm.map((m) => ({ ...m, x: -m.x })));
 
   const measures: Measure[] = [
-    { kind: 'width', label: 'width', sts: plan.bodySts, at: 0, from: -bodyHalf, to: bodyHalf },
-    { kind: 'width', label: 'upper back', sts: achievedHalf * 2, at: shoulderStartY, from: -achievedHalf, to: achievedHalf },
-    { kind: 'width', label: 'back neck', sts: plan.backNeckSts, at: topY, from: -neckHalf, to: neckHalf },
+    { kind: 'width', label: 'width', sts: opts.bodySts, at: 0, from: -bodyHalf, to: bodyHalf },
+    { kind: 'width', label: opts.neckLabel, sts: opts.neckWidthSts, at: topY, from: -neckTopHalf, to: neckTopHalf },
     { kind: 'height', label: 'length', rows: topY, at: 0, from: 0, to: topY },
     { kind: 'height', label: 'armhole', rows: topY - underarmY, at: 0, from: underarmY, to: topY },
+    { kind: 'height', label: 'neck depth', rows: topY - splitY, at: 0, from: splitY, to: topY },
   ];
-
   return {
-    piece: 'back',
-    title: 'The Back',
+    piece: opts.piece,
+    title: opts.title,
     outline,
-    widthSts: plan.bodySts,
+    widthSts: opts.bodySts,
     heightRows: topY,
-    ribRows: plan.ribRows,
+    ribRows: opts.ribRows,
     gauge,
     measures,
     marks,
   };
+}
+
+export function backSchematic(
+  rows: Row[],
+  plan: { bodySts: number; backNeckSts: number; ribRows: number; totalRows: number },
+  gauge: Gauge,
+): PieceSchematic {
+  return splitNeckSchematic(rows, gauge, {
+    piece: 'back',
+    title: 'The Back',
+    neckLabel: 'back neck',
+    bodySts: plan.bodySts,
+    ribRows: plan.ribRows,
+    totalRows: plan.totalRows,
+    neckWidthSts: plan.backNeckSts,
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -79,7 +79,11 @@ describe('complete front piece (crew neck, two-sided)', () => {
 
   it('reconciles with the back: front shoulders graft to back shoulders', () => {
     const back = backRows(W36, 'moderate', DEFAULT_GAUGE);
-    const backShoulder = (back[back.length - 1].stitches) / 2; // 52 held / 2
+    const backHeld = back
+      .flatMap((r) => r.ops)
+      .filter((o) => o.kind === 'hold')
+      .reduce((n, o) => n + (o.kind === 'hold' ? o.count : 0), 0);
+    const backShoulder = backHeld / 2; // 52 held across two shoulders
     expect(backShoulder).toBe(26);
     const left = rows.filter((r) => r.side === 'left');
     expect(left[left.length - 1].stitches).toBe(backShoulder);

@@ -421,7 +421,7 @@ export function renderPiece(rows: Row[], title: string, style: ProseStyle = 'ver
       case 'neck':
         if (row.side === 'left' || row.side === 'right') {
           announced.add(key);
-          heading(`Shape the ${sideWord(row.side === 'left' ? 'L' : 'R')} front neck.`);
+          heading(`Shape the ${sideWord(row.side === 'left' ? 'L' : 'R')} ${row.piece === 'back' ? 'back' : 'front'} neck.`);
         }
         break;
       default:

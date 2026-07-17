@@ -52,15 +52,17 @@ describe('armhole shaping (verbose)', () => {
   });
 });
 
-describe('shoulders (verbose) — holds phrased as shaping', () => {
-  it('sets carriage to hold, uses "knit to row counter", and reaches 220', () => {
+describe('back neck scoop + shoulders (verbose) — holds phrased as shaping', () => {
+  it('divides for the back neck and short-rows each shoulder with a reset counter', () => {
+    expect(has(back, 'cast off the centre 42 stitches loosely to divide for the neck.')).toBe(true);
+    expect(has(back, 'Shape the left back neck.')).toBe(true);
     expect(has(back, 'Set the carriage to hold.')).toBe(true);
-    expect(has(back, 'Bring 6 needles at the right into hold, then knit to row counter 211.')).toBe(true);
-    expect(has(back, 'holding 5 needles each time, until the row counter reads 220')).toBe(true);
+    expect(has(back, 'Bring 6 needles at the left into hold, then knit to row counter 007.')).toBe(true);
+    expect(has(back, 'Bring 5 needles at the left into hold, then knit to row counter 009.')).toBe(true);
   });
-  it('casts off the back neck and takes shoulders off on waste yarn', () => {
-    expect(has(back, 'Cast off the centre 46 stitches loosely.')).toBe(true);
-    expect(has(back, 'Take each shoulder off separately onto 5-6 rows of waste yarn. There should be 26 stitches on each shoulder.')).toBe(true);
+  it('takes each shoulder off on waste yarn for grafting', () => {
+    expect(has(back, 'Take this shoulder off onto 5-6 rows of waste yarn. There should be 26 stitches on this shoulder.')).toBe(true);
+    expect(has(back, 'Break the yarn, leaving plenty of tail for grafting.')).toBe(true);
   });
 });
 
@@ -78,12 +80,10 @@ describe('abbreviated mode', () => {
     expect(has(backT, 'Kn to RC 139, then dec 1 st at either end.')).toBe(true);
     expect(has(backT, 'Rpt instruction for RC 140 to 143 (total 5 times). COR.')).toBe(true);
   });
-  it('uses BO (not CO) for casting off, and terse holds / finishing', () => {
-    expect(has(backT, '6 N at R into hold, then Kn to RC 211.')).toBe(true);
-    expect(has(backT, 'Rpt last 2 instructions, holding 5 N each time, to RC 220. COL.')).toBe(true);
-    expect(has(backT, 'BO centre 46 st loosely.')).toBe(true);
-    expect(has(backT, 'Break yarn, leaving tail.')).toBe(true);
-    expect(has(backT, 'Take shoulders off to waste yarn. 26 st per shoulder.')).toBe(true);
+  it('divides for the back neck and short-rows the shoulders; never CO for a cast-off', () => {
+    expect(has(backT, 'BO centre 42 st loosely to divide for neck.')).toBe(true);
+    expect(has(backT, '6 N at L into hold, then Kn to RC 007.')).toBe(true);
+    expect(has(backT, 'Take shoulder off to waste yarn. 26 st per shoulder.')).toBe(true);
     // never CO for a cast-off:
     for (const l of backT.lines) expect(l).not.toMatch(/CO \d+ st at/);
   });

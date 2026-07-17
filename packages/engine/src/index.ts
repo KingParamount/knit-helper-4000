@@ -72,6 +72,18 @@ export { assembleGarment } from './pieces/garment';
 export type { Garment } from './pieces/garment';
 
 export {
+  NECK_OPENING_STRETCH,
+  NECK_STRETCH_MAX,
+  crewSuitable,
+  neckOpeningPerimeter,
+  backNeckDepthIn,
+  neckHeadFit,
+  neckFitVerdict,
+} from './fit';
+export type { NeckHeadFit, NeckFitVerdict } from './fit';
+export { backNeckDepthRows } from './neckopening';
+
+export {
   seamEdgeLength,
   armholeOpening,
   capPerimeter,
