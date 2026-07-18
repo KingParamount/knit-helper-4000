@@ -76,3 +76,32 @@ describe('front / sleeve / neckband schematics', () => {
     expect(n.outline).toHaveLength(4);
   });
 });
+
+describe('drop-shoulder schematics label for what the piece actually is', () => {
+  const G = DEFAULT_GAUGE;
+
+  it('sleeve: a straight "sleeve top", no set-in crown or cap', () => {
+    const sp = sleevePlan(W36, 'moderate', G, 'drop');
+    const s = sleeveSchematic(sleeveRows('sleeve_l', W36, 'moderate', G, 'drop'), sp, G);
+    expect(s.measures.find((m) => m.label === 'sleeve top')?.sts).toBe(sp.sleeveTopSts);
+    expect(s.measures.find((m) => m.label === 'crown')).toBeUndefined();
+    expect(s.measures.find((m) => m.label === 'cap')).toBeUndefined();
+    expect(s.measures.find((m) => m.label === 'to underarm')).toBeUndefined();
+  });
+
+  it('back: armhole depth comes from the plan, not the whole straight side', () => {
+    const bp = backPlan(W36, 'moderate', G, 'drop');
+    const s = backSchematic(backRows(W36, 'moderate', G, 'drop'), bp, G);
+    const armhole = s.measures.find((m) => m.label === 'armhole');
+    expect(armhole?.rows).toBe(bp.armholeRows); // the sleeve-join depth, not the length
+    expect(armhole!.from).toBeGreaterThan(0); // sits at the top, not from the hem
+    expect(armhole!.rows).toBeLessThan(bp.totalRows);
+  });
+
+  it('set-in pieces keep the crown/cap vocabulary', () => {
+    const sp = sleevePlan(W36, 'moderate', G, 'set_in');
+    const s = sleeveSchematic(sleeveRows('sleeve_l', W36, 'moderate', G, 'set_in'), sp, G);
+    expect(s.measures.find((m) => m.label === 'crown')).toBeDefined();
+    expect(s.measures.find((m) => m.label === 'cap')).toBeDefined();
+  });
+});

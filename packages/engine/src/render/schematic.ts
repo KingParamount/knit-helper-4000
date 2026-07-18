@@ -94,6 +94,7 @@ function splitNeckSchematic(
     ribRows: number;
     totalRows: number;
     neckWidthSts: number;
+    armholeRows: number;
   },
 ): PieceSchematic {
   const bodyHalf = opts.bodySts / 2;
@@ -138,11 +139,16 @@ function splitNeckSchematic(
   const lhm = holdMarks(shoulderHolds(leftRows), achievedHalf);
   marks.push(...lhm, ...lhm.map((m) => ({ ...m, x: -m.x })));
 
+  // A set-in body shapes the armhole, so its depth reads off the underarm step
+  // (underarmY > 0). A drop body runs straight (no step, underarmY === 0): the
+  // armhole is the plain top stretch the sleeve sews onto, so take its depth from
+  // the plan instead of the (whole-piece) fallback.
+  const armholeStartY = underarmY > 0 ? underarmY : topY - opts.armholeRows;
   const measures: Measure[] = [
     { kind: 'width', label: 'width', sts: opts.bodySts, at: 0, from: -bodyHalf, to: bodyHalf },
     { kind: 'width', label: opts.neckLabel, sts: opts.neckWidthSts, at: topY, from: -neckTopHalf, to: neckTopHalf },
     { kind: 'height', label: 'length', rows: topY, at: 0, from: 0, to: topY },
-    { kind: 'height', label: 'armhole', rows: topY - underarmY, at: 0, from: underarmY, to: topY },
+    { kind: 'height', label: 'armhole', rows: topY - armholeStartY, at: 0, from: armholeStartY, to: topY },
     { kind: 'height', label: 'neck depth', rows: topY - splitY, at: 0, from: splitY, to: topY },
   ];
   return {
@@ -160,7 +166,7 @@ function splitNeckSchematic(
 
 export function backSchematic(
   rows: Row[],
-  plan: { bodySts: number; backNeckSts: number; ribRows: number; totalRows: number },
+  plan: { bodySts: number; backNeckSts: number; ribRows: number; totalRows: number; armholeRows: number },
   gauge: Gauge,
 ): PieceSchematic {
   return splitNeckSchematic(rows, gauge, {
@@ -171,6 +177,7 @@ export function backSchematic(
     ribRows: plan.ribRows,
     totalRows: plan.totalRows,
     neckWidthSts: plan.backNeckSts,
+    armholeRows: plan.armholeRows,
   });
 }
 
@@ -180,7 +187,7 @@ export function backSchematic(
 
 export function frontSchematic(
   rows: Row[],
-  plan: { bodySts: number; ribRows: number; totalRows: number },
+  plan: { bodySts: number; ribRows: number; totalRows: number; armholeRows: number },
   fnp: { neckLineRow: number; frontNeckSts: number; shoulderSts: number },
   gauge: Gauge,
 ): PieceSchematic {
@@ -238,11 +245,14 @@ export function frontSchematic(
   const outline = [...rightPts, ...leftPts.reverse()];
   const lhm = holdMarks(shoulderHolds(leftRows), achievedHalf); // left-half shoulder holds
   marks.push(...lhm, ...lhm.map((m) => ({ ...m, x: -m.x })));
+  // Set-in: armhole depth from the underarm step. Drop: straight body (no step),
+  // so read the armhole depth (the plain top the sleeve sews to) from the plan.
+  const armholeStartY = underarmY > 0 ? underarmY : topY - plan.armholeRows;
   const measures: Measure[] = [
     { kind: 'width', label: 'width', sts: plan.bodySts, at: 0, from: -bodyHalf, to: bodyHalf },
     { kind: 'width', label: 'front neck', sts: fnp.frontNeckSts, at: topY, from: -neckTopHalf, to: neckTopHalf },
     { kind: 'height', label: 'length', rows: topY, at: 0, from: 0, to: topY },
-    { kind: 'height', label: 'armhole', rows: topY - underarmY, at: 0, from: underarmY, to: topY },
+    { kind: 'height', label: 'armhole', rows: topY - armholeStartY, at: 0, from: armholeStartY, to: topY },
     { kind: 'height', label: 'neck depth', rows: topY - splitY, at: 0, from: splitY, to: topY },
   ];
   return {
@@ -462,13 +472,24 @@ export function sleeveSchematic(
   const outline = [...rightPts, ...leftPts.reverse()];
   marks.push({ kind: 'castoff', x: 0, y: topY - 0.5, span: plan.capTopSts, centre: true }); // crown
 
-  const measures: Measure[] = [
-    { kind: 'width', label: 'cuff', sts: plan.bodyCuffSts, at: 0, from: -cuffHalf, to: cuffHalf },
-    { kind: 'width', label: 'upper arm', sts: plan.sleeveTopSts, at: capStartY, from: -maxHalf, to: maxHalf },
-    { kind: 'width', label: 'crown', sts: plan.capTopSts, at: topY, from: -plan.capTopSts / 2, to: plan.capTopSts / 2 },
-    { kind: 'height', label: 'to underarm', rows: capStartY, at: 0, from: 0, to: capStartY },
-    { kind: 'height', label: 'cap', rows: topY - capStartY, at: 0, from: capStartY, to: topY },
-  ];
+  // A set-in sleeve tapers to the underarm (capStartY) then shapes a cap up to the
+  // crown. A drop sleeve has no cap — it tapers straight to a wide flat top that is
+  // bound off and sewn to the armhole edge — so capStartY never gets set (0). Label
+  // for what the piece actually is.
+  const isDrop = capStartY === 0;
+  const measures: Measure[] = isDrop
+    ? [
+        { kind: 'width', label: 'cuff', sts: plan.bodyCuffSts, at: 0, from: -cuffHalf, to: cuffHalf },
+        { kind: 'width', label: 'sleeve top', sts: plan.sleeveTopSts, at: topY, from: -plan.sleeveTopSts / 2, to: plan.sleeveTopSts / 2 },
+        { kind: 'height', label: 'length', rows: topY, at: 0, from: 0, to: topY },
+      ]
+    : [
+        { kind: 'width', label: 'cuff', sts: plan.bodyCuffSts, at: 0, from: -cuffHalf, to: cuffHalf },
+        { kind: 'width', label: 'upper arm', sts: plan.sleeveTopSts, at: capStartY, from: -maxHalf, to: maxHalf },
+        { kind: 'width', label: 'crown', sts: plan.capTopSts, at: topY, from: -plan.capTopSts / 2, to: plan.capTopSts / 2 },
+        { kind: 'height', label: 'to underarm', rows: capStartY, at: 0, from: 0, to: capStartY },
+        { kind: 'height', label: 'cap', rows: topY - capStartY, at: 0, from: capStartY, to: topY },
+      ];
   return {
     piece: 'sleeve',
     title: 'The Sleeves (make 2)',
@@ -775,6 +796,28 @@ export function schematicSvg(s: PieceSchematic, opts: SvgOpts = {}): string {
   // sit just ABOVE their line (the bottom / left margins are the ruler's); heights
   // run down the RIGHT margin (the full length outermost). The chart uses the
   // per-row annotations instead, so it skips these. A white halo keeps them legible.
+  // Lay the vertical (height) labels out in lanes down the right margin so that
+  // labels whose spans overlap — a V's armhole and neck depth both reach the top,
+  // say — sit side by side instead of on top of one another. Longest span sits
+  // outermost; each shorter one that would clash steps one lane inward.
+  const heightText = (m: Measure): string =>
+    `${m.label} · ${measured ? fmtLen((m.rows as number) * inPerRow, units) : `${m.rows} rows`}`;
+  const heightLane = new Map<Measure, number>();
+  {
+    const hs = s.measures.filter((m) => m.kind === 'height' && m.rows != null);
+    const occupied: { lo: number; hi: number }[][] = [];
+    for (const m of [...hs].sort((a, b) => b.to - b.from - (a.to - a.from))) {
+      const cy = Y((m.from + m.to) / 2);
+      const half = (heightText(m).length * 6.2) / 2; // rotated text runs vertically
+      let lane = 0;
+      while (lane < occupied.length && occupied[lane].some((iv) => cy - half < iv.hi && cy + half > iv.lo)) lane += 1;
+      (occupied[lane] ??= []).push({ lo: cy - half, hi: cy + half });
+      heightLane.set(m, lane);
+    }
+    const maxLane = occupied.length - 1;
+    for (const [m, l] of heightLane) heightLane.set(m, maxLane - l); // longest → outermost
+  }
+
   const labels: string[] = [
     `<g fill="#1b2733" font-size="13" paint-order="stroke" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round">`,
   ];
@@ -785,11 +828,10 @@ export function schematicSvg(s: PieceSchematic, opts: SvgOpts = {}): string {
       const cy = Y(m.at) - 9;
       labels.push(`<text x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" text-anchor="middle">${m.label} · ${text}</text>`);
     } else if (m.kind === 'height' && m.rows != null) {
-      const text = measured ? fmtLen(m.rows * inPerRow, units) : `${m.rows} rows`;
-      const cx = X(halfW) + (m.from === 0 ? 36 : 17); // full length outermost
+      const cx = X(halfW) + 17 + (heightLane.get(m) ?? 0) * 19;
       const cy = Y((m.from + m.to) / 2);
       labels.push(
-        `<text x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" text-anchor="middle" transform="rotate(-90 ${cx.toFixed(1)} ${cy.toFixed(1)})">${m.label} · ${text}</text>`,
+        `<text x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" text-anchor="middle" transform="rotate(-90 ${cx.toFixed(1)} ${cy.toFixed(1)})">${heightText(m)}</text>`,
       );
     }
   }
