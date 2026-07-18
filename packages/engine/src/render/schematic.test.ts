@@ -74,6 +74,31 @@ describe('front / sleeve / neckband schematics', () => {
     const n = neckbandSchematic(neckbandRows(W36, 'moderate', DEFAULT_GAUGE), np, DEFAULT_GAUGE);
     expect(n.widthSts).toBe(143); // the whole scooped neck pick-up
     expect(n.outline).toHaveLength(4);
+    expect(n.marks).toHaveLength(0); // no shaping on a crew band
+  });
+
+  it('neckband: a V band draws its two mitred ends, not a flat rectangle', () => {
+    const np = neckbandPlan(W36, 'moderate', DEFAULT_GAUGE, 'v');
+    const n = neckbandSchematic(
+      neckbandRows(W36, 'moderate', DEFAULT_GAUGE, 'v'),
+      np,
+      DEFAULT_GAUGE,
+    );
+    expect(np.mitreRows).toBeGreaterThan(0); // the fixture must actually mitre
+    expect(n.widthSts).toBe(np.pickupTotal);
+    // The cast-on edge is the full width; the live edge is narrower by the mitres.
+    const atCastOn = Math.max(...n.outline.filter((p) => p.y === 0).map((p) => p.x));
+    const atTop = Math.max(...n.outline.filter((p) => p.y === n.heightRows).map((p) => p.x));
+    expect(atCastOn).toBe(np.pickupTotal / 2);
+    expect(atTop).toBe(np.finalSts / 2);
+    expect(atTop).toBeLessThan(atCastOn);
+    // The taper is done by the top of the mitre and runs straight above it.
+    const atMitreTop = Math.max(...n.outline.filter((p) => p.y === np.mitreRows).map((p) => p.x));
+    expect(atMitreTop).toBe(np.finalSts / 2);
+    // One decrease glyph at each end on every mitre row.
+    expect(n.marks.filter((m) => m.kind === 'dec')).toHaveLength(2 * np.mitreRows);
+    expect(n.measures.find((m) => m.label === 'take off')?.sts).toBe(np.finalSts);
+    expect(n.measures.find((m) => m.label === 'mitre')?.rows).toBe(np.mitreRows);
   });
 });
 

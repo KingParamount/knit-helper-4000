@@ -504,26 +504,55 @@ export function sleeveSchematic(
 }
 
 // ---------------------------------------------------------------------------
-// The Neckband — a picked-up rib strip (worked flat, seamed at one shoulder).
+// The Neckband — a rib strip knit on its own and sewn to the neckline in making up.
+// A crew is a plain rectangle; a V mitres both ends so they seam into a centre point.
 // ---------------------------------------------------------------------------
 
 export function neckbandSchematic(
   rows: Row[],
-  plan: { pickupTotal: number; bandRows: number },
+  plan: { pickupTotal: number; bandRows: number; mitreRows?: number; finalSts?: number },
   gauge: Gauge,
 ): PieceSchematic {
   const half = plan.pickupTotal / 2;
   const h = plan.bandRows;
-  const outline: Pt[] = [
-    { x: half, y: 0 },
-    { x: half, y: h },
-    { x: -half, y: h },
-    { x: -half, y: 0 },
-  ];
+  // Row 1 is the cast-on and the last row is the take-off, so row index i sits at
+  // y = i − 1: the cast-on edge is y = 0 and the live edge lands on y = bandRows.
+  // A crew's live count never moves, so this yields the same plain rectangle as
+  // before; a V's mitre decreases at BOTH ends taper the two lower corners in.
+  const mitreRows = plan.mitreRows ?? 0;
+  const finalSts = plan.finalSts ?? plan.pickupTotal;
+  const finalHalf = finalSts / 2;
+  const rightPts: Pt[] = [{ x: half, y: 0 }];
+  const marks: ShapeMark[] = [];
+  let lastHalf = half;
+  for (const r of rows) {
+    const y = r.index - 1;
+    const rh = r.stitches / 2;
+    if (r.ops.some((op) => op.kind === 'decrease')) {
+      // On the new edge stitch, as the body/sleeve charts place theirs.
+      marks.push({ kind: 'dec', x: rh - 0.5, y: y - 0.5, lean: 1 });
+      marks.push({ kind: 'dec', x: -rh + 0.5, y: y - 0.5, lean: -1 });
+    }
+    if (rh !== lastHalf) {
+      rightPts.push({ x: rh, y });
+      lastHalf = rh;
+    }
+  }
+  // Above the mitre the band runs straight to the live edge.
+  rightPts.push({ x: lastHalf, y: h });
+  const outline: Pt[] = [...rightPts, ...rightPts.map((p) => ({ x: -p.x, y: p.y })).reverse()];
   const measures: Measure[] = [
     { kind: 'width', label: 'cast on', sts: plan.pickupTotal, at: 0, from: -half, to: half },
     { kind: 'height', label: 'band', rows: h, at: 0, from: 0, to: h },
   ];
+  if (mitreRows > 0) {
+    // The mitred ends are the whole point of a V band — say what the live edge
+    // measures and how deep the taper runs.
+    measures.push(
+      { kind: 'width', label: 'take off', sts: finalSts, at: h, from: -finalHalf, to: finalHalf },
+      { kind: 'height', label: 'mitre', rows: mitreRows, at: finalHalf, from: 0, to: mitreRows },
+    );
+  }
   return {
     piece: 'neckband',
     title: 'Neckband',
@@ -533,7 +562,7 @@ export function neckbandSchematic(
     ribRows: h, // all rib
     gauge,
     measures,
-    marks: [],
+    marks,
   };
 }
 
@@ -587,16 +616,32 @@ function fmtLen(inches: number, units: 'in' | 'cm' | 'both'): string {
   return `${inTxt} / ${cmTxt}`;
 }
 
+/** The geometry of a rendered schematic, in output px. */
+export interface SchematicMetrics {
+  W: number; // overall width
+  H: number; // overall height
+  cellW: number;
+  cellH: number;
+  inPerSt: number; // inches of blocked fabric per stitch
+  inPerRow: number;
+  pad: number;
+  padX: number;
+  topExtra: number;
+  measured: boolean;
+  chart: boolean;
+  factor: number;
+  px: number;
+}
+
 /**
- * Render a piece schematic to a self-contained SVG string. Stitch mode uses square
- * cells; measured mode stretches x by 4/stGauge and y by 4/rowGauge (inches), then
- * by `scaleFactor`, and labels physical dimensions.
+ * The size and cell geometry a given render will have, WITHOUT building the SVG.
+ * Callers that must lay a drawing out on paper — tiling an oversized roller template
+ * across sheets, say — need its dimensions before they have the markup, and deriving
+ * them by parsing the emitted `width`/`height` back out would be a second, silently
+ * divergent copy of this arithmetic. schematicSvg uses this too, so there is one.
  */
-export function schematicSvg(s: PieceSchematic, opts: SvgOpts = {}): string {
-  const scale = opts.scale ?? 'stitch';
-  const grid = opts.grid ?? true;
-  const units = opts.units ?? 'both';
-  const measured = scale === 'measured';
+export function schematicMetrics(s: PieceSchematic, opts: SvgOpts = {}): SchematicMetrics {
+  const measured = (opts.scale ?? 'stitch') === 'measured';
   const factor = measured ? (opts.scaleFactor ?? 1) : 1;
   const px = opts.pxPerUnit ?? (measured ? 46 : 4);
 
@@ -610,9 +655,24 @@ export function schematicSvg(s: PieceSchematic, opts: SvgOpts = {}): string {
   const pad = 82;
   const padX = chart ? 128 : 82; // wider side margins so the chart annotations fit
   const topExtra = chart ? 30 : 0; // a strip above the grid for the key
+  return {
+    W: s.widthSts * cellW + padX * 2,
+    H: s.heightRows * cellH + pad * 2 + topExtra,
+    cellW, cellH, inPerSt, inPerRow, pad, padX, topExtra, measured, chart, factor, px,
+  };
+}
+
+/**
+ * Render a piece schematic to a self-contained SVG string. Stitch mode uses square
+ * cells; measured mode stretches x by 4/stGauge and y by 4/rowGauge (inches), then
+ * by `scaleFactor`, and labels physical dimensions.
+ */
+export function schematicSvg(s: PieceSchematic, opts: SvgOpts = {}): string {
+  const grid = opts.grid ?? true;
+  const units = opts.units ?? 'both';
+  const { W, H, cellW, cellH, inPerSt, inPerRow, pad, padX, topExtra, measured, chart, factor, px } =
+    schematicMetrics(s, opts);
   const halfW = s.widthSts / 2;
-  const W = s.widthSts * cellW + padX * 2;
-  const H = s.heightRows * cellH + pad * 2 + topExtra;
 
   // stitch/row point → svg px (x centred, y flipped so cast-on is at the bottom).
   const X = (xSt: number): number => padX + (xSt + halfW) * cellW;

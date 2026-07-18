@@ -106,5 +106,6 @@ export {
   sleeveSchematic,
   neckbandSchematic,
   schematicSvg,
+  schematicMetrics,
 } from './render/schematic';
 export type { PieceSchematic, Pt, Measure, SvgOpts } from './render/schematic';
