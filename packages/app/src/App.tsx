@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
 import { availableChests, schematicMetrics } from '@knit-helper-4000/engine';
 import type { Category, Units, NeckStyle, ShoulderStyle } from '@knit-helper-4000/engine';
@@ -22,7 +22,10 @@ import {
   IconDocFull, IconDocShort, IconChart, IconRoller, IconPrint,
 } from './icons';
 import { PrintDoc } from './PrintDoc';
-import { PAPERS, planTiles, describePlan, type PaperId } from './tiling';
+import {
+  PAPERS, planTiles, planBands, describePlan, fitScaleFactor, mmToPx, pxToMm,
+  PATTERN_MARGIN_MM, DIAGRAM_HEAD_MM, type PaperId,
+} from './tiling';
 import './theme.css';
 
 type OutputId = 'full' | 'concise' | 'chart' | 'knitleader' | 'knitradar';
@@ -60,6 +63,39 @@ function Btn({
       {state === 'soon' && <span className="badge">soon</span>}
     </button>
   );
+}
+
+/**
+ * A diagram sized to its container instead of drawn large and shrunk by CSS.
+ *
+ * Same reasoning as the printed page: `scaleFactor` scales the drawing but not the
+ * label text, so re-rendering at a smaller scale keeps the labels full size, whereas
+ * letting CSS shrink the SVG shrinks the labels with it — which is why they were only
+ * just legible here and unreadable on paper. It also makes the calibration line honest:
+ * the drawing used to be emitted at 1:1, labelled "10 cm at full scale", and then
+ * squeezed to about half by max-width, so the line never measured what it claimed.
+ */
+function FittedDiagram({
+  metrics, svgAt, className = 'diagram',
+}: {
+  metrics: { W: number; H: number; pad: number; padX: number; topExtra: number } | null;
+  svgAt: (factor: number) => string;
+  className?: string;
+}): JSX.Element {
+  const ref = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => {
+      setBox({ w: e.contentRect.width, h: window.innerHeight * 0.7 });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // First paint has no measurement yet; draw nothing rather than flash a huge diagram.
+  const html = metrics && box.w > 0 ? svgAt(fitScaleFactor(metrics, box.w, box.h)) : '';
+  return <div ref={ref} className={className} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 // ---- swatch measurement field ----------------------------------------------
@@ -130,6 +166,7 @@ export function App(): JSX.Element {
   const [help, setHelp] = useState(false);
   const [paper, setPaper] = useState<PaperId>('a4');
   const [landscape, setLandscape] = useState(false);
+  const paperRec = PAPERS.find((p) => p.id === paper) ?? PAPERS[0];
 
   const chests = useMemo(() => availableChests(category, 'in'), [category]);
   const chooseCategory = (c: Category): void => {
@@ -164,13 +201,31 @@ export function App(): JSX.Element {
     schematics ? svgFor(schematics[pid], { scale: 'measured', units, grid: !factor, scaleFactor: factor }) : '';
 
   /**
-   * On paper a CSS pixel IS 1/96 inch, so a measured drawing only comes out at true
-   * physical size at 96 px per inch. The screen's default (46) is a sensible viewing
-   * density but would print every drawing at just under half size — including the
-   * roller templates, where exact size is the whole point, and their own "10 cm"
-   * calibration line, which is drawn in the same scaled space and so shrinks with it.
+   * One density for both screen and paper. A drawing is emitted at the scale it will
+   * actually be shown at, so nothing downstream has to squeeze it — see FittedDiagram
+   * for why squeezing is what made the labels illegible.
    */
-  const PRINT_PX_PER_IN = 96;
+  const PX_PER_IN = 96;
+  /** Metrics at 1:1, the input FittedDiagram fits against. */
+  const screenMetrics = (pid: PieceId) =>
+    schematics
+      ? schematicMetrics(schematics[pid], { scale: 'measured', scaleFactor: 1, pxPerUnit: PX_PER_IN })
+      : null;
+  /** Keeps the grid, unlike diagramSvg — a factor here means "fitted", not "template". */
+  const screenDiagramSvg = (pid: PieceId, factor: number): string =>
+    schematics
+      ? svgFor(schematics[pid], {
+          scale: 'measured', units, grid: true, scaleFactor: factor, pxPerUnit: PX_PER_IN,
+        })
+      : '';
+
+  /*
+   * On paper a CSS pixel IS 1/96 inch, so a measured drawing only comes out at true
+   * physical size at PX_PER_IN. The renderer's own default (46) would print every
+   * drawing at just under half size — including the roller templates, where exact
+   * size is the whole point, and their own "10 cm" calibration line, which is drawn
+   * in the same scaled space and so shrinks with it, hiding the error.
+   */
   const printDiagramSvg = (pid: PieceId, factor?: number): string =>
     schematics
       ? svgFor(schematics[pid], {
@@ -178,9 +233,39 @@ export function App(): JSX.Element {
           units,
           grid: !factor,
           scaleFactor: factor,
-          pxPerUnit: PRINT_PX_PER_IN,
+          pxPerUnit: PX_PER_IN,
         })
       : '';
+
+  /**
+   * A full-page blocking diagram, rendered AT the scale it will print rather than
+   * rendered full size and shrunk by CSS. The distinction is the labels: scaleFactor
+   * scales the drawing but not the label text, so re-rendering keeps the text at full
+   * size, where CSS scaling took it down to about 2.8pt — legible on screen, not on
+   * paper.
+   */
+  const printBlockingSvg = (pid: PieceId): string => {
+    if (!schematics) return '';
+    const full = schematicMetrics(schematics[pid], {
+      scale: 'measured',
+      scaleFactor: 1,
+      pxPerUnit: PX_PER_IN,
+    });
+    const pageW = landscape ? paperRec.heightMm : paperRec.widthMm;
+    const pageH = landscape ? paperRec.widthMm : paperRec.heightMm;
+    const f = fitScaleFactor(
+      full,
+      mmToPx(pageW - 2 * PATTERN_MARGIN_MM),
+      mmToPx(pageH - 2 * PATTERN_MARGIN_MM - DIAGRAM_HEAD_MM),
+    );
+    return svgFor(schematics[pid], {
+      scale: 'measured',
+      units,
+      grid: true,
+      scaleFactor: f,
+      pxPerUnit: PX_PER_IN,
+    });
+  };
   const chartSvg = (pid: PieceId): string =>
     schematics ? svgFor(schematics[pid], { scale: 'stitch', chart: true, grid: true }) : '';
 
@@ -195,19 +280,42 @@ export function App(): JSX.Element {
   );
   // How each template gets cut across sheets. Measured from the drawing's true size,
   // which the engine computes without building the SVG (schematicMetrics).
-  const paperRec = PAPERS.find((p) => p.id === paper) ?? PAPERS[0];
   const tilePlanFor = (pid: PieceId) => {
     const m = schematics
       ? schematicMetrics(schematics[pid], {
           scale: 'measured',
           scaleFactor,
-          pxPerUnit: PRINT_PX_PER_IN,
+          pxPerUnit: PX_PER_IN,
         })
       : { W: 0, H: 0 };
     return planTiles(m.W, m.H, paperRec, landscape);
   };
   // The Back is the widest piece, so its plan is the one worth previewing.
   const backPlanTiles = schematics ? tilePlanFor('back') : null;
+
+  // Room left on a sheet once the heading has had its share — the charts are scaled
+  // into this, which is what keeps each one on the same page as its title.
+  const sheetRoomMm =
+    (landscape ? paperRec.widthMm : paperRec.heightMm) - 2 * PATTERN_MARGIN_MM - DIAGRAM_HEAD_MM;
+  /** The whole printable height — chart sheets are set to this and flex internally. */
+  const pageHeightMm =
+    (landscape ? paperRec.widthMm : paperRec.heightMm) - 2 * PATTERN_MARGIN_MM;
+
+  /**
+   * Landscape charts fit the page WIDTH and band down it; portrait squeezes the whole
+   * chart onto one sheet. Landscape therefore trades sheets for bigger cells, which is
+   * the choice worth having — a men's chart on one portrait page is legible but tight.
+   */
+  const chartBandsFor = (pid: PieceId) => {
+    const m = schematics
+      ? schematicMetrics(schematics[pid], { scale: 'stitch', chart: true, grid: true })
+      : { W: 0, H: 0 };
+    const pageW = (landscape ? paperRec.heightMm : paperRec.widthMm) - 2 * PATTERN_MARGIN_MM;
+    // Band sheets carry their own two-line heading (piece, sheet number, size) and
+    // NOT the document header, so sheetRoomMm — which already reserves a heading's
+    // height — is the right budget here.
+    return planBands(pxToMm(m.W), pxToMm(m.H), pageW, landscape ? sheetRoomMm : Infinity);
+  };
 
   const printLabels = {
     sizeLabel: `${category} ${sizeVal} ${sizeUnit}`,
@@ -374,7 +482,10 @@ export function App(): JSX.Element {
                   {output === 'chart'
                     ? <div className="diagram" dangerouslySetInnerHTML={{ __html: chartSvg(piece) }} />
                     : <div className="pattern">{patternText}</div>}
-                  <div className="diagram" dangerouslySetInnerHTML={{ __html: diagramSvg(piece) }} />
+                  <FittedDiagram
+                    metrics={screenMetrics(piece)}
+                    svgAt={(f) => screenDiagramSvg(piece, f)}
+                  />
                 </div>
               )}
             </div>
@@ -392,25 +503,25 @@ export function App(): JSX.Element {
                 onClick={() => window.print()}
               />
             </div>
-            {templateOnly && (
-              <div style={{ marginTop: 12 }}>
-                <div className="btn-row">
-                  {PAPERS.map((p) => (
-                    <Btn
-                      key={p.id}
-                      label={p.label}
-                      state={paper === p.id ? 'selected' : 'normal'}
-                      onClick={() => setPaper(p.id)}
-                    />
-                  ))}
+            {/* Paper governs the whole document, not just the templates: the full-page
+                blocking diagrams are rendered to fit the sheet they will print on. */}
+            <div style={{ marginTop: 12 }}>
+              <div className="btn-row">
+                {PAPERS.map((p) => (
                   <Btn
-                    label="Landscape"
-                    state={landscape ? 'selected' : 'normal'}
-                    onClick={() => setLandscape(!landscape)}
+                    key={p.id}
+                    label={p.label}
+                    state={paper === p.id ? 'selected' : 'normal'}
+                    onClick={() => setPaper(p.id)}
                   />
-                </div>
+                ))}
+                <Btn
+                  label="Landscape"
+                  state={landscape ? 'selected' : 'normal'}
+                  onClick={() => setLandscape(!landscape)}
+                />
               </div>
-            )}
+            </div>
             <p style={{ fontSize: '.85rem', color: 'var(--ink-soft)', marginTop: 10 }}>
               {templateOnly ? (
                 <>
@@ -423,7 +534,19 @@ export function App(): JSX.Element {
                   you knit to it.
                 </>
               ) : (
-                `Prints every piece${output === 'chart' ? ' with its chart' : ''}, and the making up — not just the piece shown above. Choose “Save as PDF” in the print dialogue to keep a copy.`
+                output === 'chart' ? (
+                  <>
+                    Every piece&rsquo;s chart on its own sheet, then the making up and a
+                    full-page blocking diagram for each. Choose &ldquo;Save as PDF&rdquo;
+                    in the print dialogue to keep a copy.
+                  </>
+                ) : (
+                  <>
+                    Prints every piece, the making up, and a full-page blocking diagram
+                    for each — not just the piece shown above. Choose &ldquo;Save as
+                    PDF&rdquo; in the print dialogue to keep a copy.
+                  </>
+                )
               )}
             </p>
           </Tile>
@@ -440,6 +563,12 @@ export function App(): JSX.Element {
           twoColumn={output === 'concise'}
           chartFor={chartSvg}
           tilePlanFor={tilePlanFor}
+          sheetRoomMm={sheetRoomMm}
+          pageHeightMm={pageHeightMm}
+          chartBandsFor={chartBandsFor}
+          blockingSvgFor={printBlockingSvg}
+          paperLabel={paperRec.label}
+          landscape={landscape}
           svgFor={(pid) => printDiagramSvg(pid, scaleFactor)}
           sizeLabel={printLabels.sizeLabel}
           styleLabel={printLabels.styleLabel}

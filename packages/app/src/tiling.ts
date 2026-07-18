@@ -48,6 +48,10 @@ export const PAPERS: Paper[] = [
 /** Printer margin we ask for, and the overlap left on tiles for taping. */
 export const MARGIN_MM = 10;
 export const OVERLAP_MM = 10;
+/** The pattern document is read, not measured, so it gets a roomier text margin. */
+export const PATTERN_MARGIN_MM = 14;
+/** Room a full-page diagram or chart must leave for its piece heading. */
+export const DIAGRAM_HEAD_MM = 16;
 /**
  * Held back from the printable area so a tile is always strictly smaller than the
  * page. A tile exactly equal to the printable area can still tip a "shrink to fit"
@@ -134,6 +138,80 @@ export function planTiles(
     tiles, rows, cols,
     tileWidthPx, tileHeightPx, tileWidthMm, tileHeightMm,
     paper, landscape, single: false,
+  };
+}
+
+/**
+ * Scales a drawing can be rendered at. Neat fractions only: the calibration line is
+ * labelled "10 cm at 1/N scale", so an arbitrary 0.287 would print an honest line
+ * under a dishonest label. A little white space beats a wrong number.
+ */
+export const NICE_FACTORS = [1, 1 / 2, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 8, 1 / 10];
+
+/**
+ * The largest neat scale at which a drawing fits `maxWPx` × `maxHPx`.
+ *
+ * Why fit by re-rendering instead of letting CSS shrink the SVG: `scaleFactor` scales
+ * the DRAWING (the cells), while the labels and the padding around them are fixed px.
+ * So rendering smaller makes the text relatively BIGGER, whereas CSS scaling shrinks
+ * everything together — which is how a full-size back ended up on the page at 0.34
+ * with its labels at 2.8pt, unreadable. Render at the size it will print.
+ *
+ * Takes the metrics at factor 1 and solves per axis: only the cell area scales, the
+ * padding is constant, so W(f) = (W₁ − 2·padX)·f + 2·padX.
+ */
+export function fitScaleFactor(
+  m: { W: number; H: number; pad: number; padX: number; topExtra: number },
+  maxWPx: number,
+  maxHPx: number,
+): number {
+  const drawW = m.W - 2 * m.padX;
+  const drawH = m.H - 2 * m.pad - m.topExtra;
+  const roomW = maxWPx - 2 * m.padX;
+  const roomH = maxHPx - 2 * m.pad - m.topExtra;
+  // No room even for the margins — take the smallest scale and let CSS cope.
+  if (roomW <= 0 || roomH <= 0) return NICE_FACTORS[NICE_FACTORS.length - 1];
+  const limit = Math.min(drawW > 0 ? roomW / drawW : Infinity, drawH > 0 ? roomH / drawH : Infinity);
+  return NICE_FACTORS.find((f) => f <= limit) ?? NICE_FACTORS[NICE_FACTORS.length - 1];
+}
+
+export interface BandPlan {
+  bands: number;
+  /** The drawing scaled to the page width. */
+  widthMm: number;
+  heightMm: number;
+  /** Visible height of one band, and how far each band advances. */
+  bandHeightMm: number;
+  stepMm: number;
+}
+
+/**
+ * Split a drawing into full-width horizontal bands, one per sheet.
+ *
+ * The counterpart to planTiles, for drawings that MAY be scaled but are too tall once
+ * scaled to the page width — knit charts in landscape. Two reasons it is bands and not
+ * tiles: a chart is read row by row, so a horizontal strip is a natural unit; and
+ * cutting only one way means no sheet is ever a corner sliver with four dots of ink on
+ * it, which is what 2-D tiling a mostly-plain chart produced.
+ *
+ * Bands overlap by OVERLAP_MM so the join can be taped with a repeated row visible.
+ */
+export function planBands(
+  naturalWMm: number,
+  naturalHMm: number,
+  pageWMm: number,
+  pageHMm: number,
+): BandPlan {
+  const scale = naturalWMm > pageWMm ? pageWMm / naturalWMm : 1;
+  const widthMm = naturalWMm * scale;
+  const heightMm = naturalHMm * scale;
+  if (heightMm <= pageHMm) {
+    return { bands: 1, widthMm, heightMm, bandHeightMm: heightMm, stepMm: heightMm };
+  }
+  const stepMm = pageHMm - OVERLAP_MM;
+  return {
+    bands: Math.max(1, Math.ceil((heightMm - OVERLAP_MM) / stepMm)),
+    widthMm, heightMm, bandHeightMm: pageHMm, stepMm,
   };
 }
 

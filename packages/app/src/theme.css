@@ -209,9 +209,11 @@ footer.foot { text-align: center; color: var(--ink-soft); font-size: .8rem; padd
   }
   .print-sheet:last-child { break-after: auto; page-break-after: auto; }
 
-  .print-head { margin-bottom: 10mm; border-bottom: 1.5pt solid #000; padding-bottom: 3mm; }
-  .print-head h1 { font-family: var(--serif); font-size: 20pt; margin: 0; }
-  .print-meta { font-size: 10pt; margin: 2mm 0 0; }
+  /* A compact running header — it shares the first sheet with a piece heading and
+     its content, so it earns its height in millimetres, not in presence. */
+  .print-head { margin-bottom: 5mm; border-bottom: 1pt solid #000; padding-bottom: 2mm; }
+  .print-head h1 { font-family: var(--serif); font-size: 13pt; margin: 0; display: inline; }
+  .print-meta { font-size: 9pt; margin: 1mm 0 0; }
 
   .print-piece-title {
     font-family: var(--serif); font-size: 15pt; margin: 0 0 4mm;
@@ -228,7 +230,11 @@ footer.foot { text-align: center; color: var(--ink-soft); font-size: .8rem; padd
     break-inside: avoid; page-break-inside: avoid;
   }
   .print-diagram svg { max-width: 100%; height: auto; }
-  .print-diagram.big svg { max-height: 240mm; width: auto; }
+  /* Full-page diagrams are already rendered at the size they print (fitScaleFactor),
+     so there is nothing here to scale them down — scaling would shrink the labels
+     with the drawing, which is the problem the fitting exists to solve. max-width
+     stays only as a guard against overflow. */
+  .print-diagram.big svg { width: auto; height: auto; }
 
   /* Instructions run the full width beneath the diagram — no narrow column, since
      nothing sits alongside them any more. */
@@ -238,9 +244,41 @@ footer.foot { text-align: center; color: var(--ink-soft); font-size: .8rem; padd
   /* Concise in two columns — the shorter document that choosing concise implies. */
   .print-prose.two-col { columns: 2; column-gap: 10mm; column-fill: auto; }
 
-  /* The knit chart takes the place of the prose, so it gets the full width. */
+  /* The knit chart takes the place of the prose, so it gets the full width — and a
+     height cap, which is what keeps it on the same page as its own title. Without
+     one it kept its natural height (a men's back chart is ~357mm), pushed past the
+     heading and ran onto further sheets. --sheet-room is the height left under the
+     heading and comes from PrintDoc, since it depends on the paper chosen.
+     Scaling the chart shrinks its symbols too, which is fine here: unlike the
+     dimension LABELS on a blocking diagram, chart glyphs stay legible small. */
   .print-chart { display: flex; justify-content: center; break-inside: avoid; page-break-inside: avoid; }
-  .print-chart svg { max-width: 100%; height: auto; }
+  /* A chart sheet is exactly one page tall and lays out as a column: heading first at
+     whatever height it needs, chart second taking all the room that is left. Nothing
+     here estimates how tall a heading is — which matters because the FIRST sheet also
+     carries the document header, so any fixed millimetre allowance is wrong for either
+     the first sheet or all the others. object-fit keeps the chart's aspect ratio while
+     it shrinks into the space it is given. */
+  .print-sheet.chart-sheet {
+    /* A hair under a full page, deliberately. At exactly --page-h the box ends on the
+       page boundary and the forced break-after then lands on a page that is already
+       empty — a blank sheet between every piece. Sub-pixel rounding in the heading
+       does the same. Two millimetres of slack costs nothing and removes both. */
+    height: calc(var(--page-h, 269mm) - 2mm);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .print-sheet.chart-sheet .print-chart {
+    flex: 1 1 0;
+    min-height: 0; /* without this a flex item refuses to shrink below its content */
+  }
+  .print-sheet.chart-sheet .print-chart svg {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    max-height: none;
+  }
+  .print-chart svg { max-width: 100%; width: auto; height: auto; }
 
   /* --- Roller templates, tiled ------------------------------------------------
      A template is measured with a ruler, so it must print at intrinsic size. We cut
@@ -259,6 +297,18 @@ footer.foot { text-align: center; color: var(--ink-soft); font-size: .8rem; padd
   }
   .printdoc.templates .tile-head strong { font-family: var(--serif); font-size: 11pt; }
   .printdoc.templates .tile-meta { font-size: 8pt; color: #444; }
+
+  /* Band sheets reuse the tile heading; give it the same fixed height it has on a
+     template tile, so the band below it gets the room the plan assumed. */
+  .printdoc .tile-head { height: 12mm; overflow: hidden; font-size: 9pt; line-height: 1.25; margin: 0 0 2mm; }
+  .printdoc .tile-head strong { font-family: var(--serif); font-size: 11pt; }
+  .printdoc .tile-meta { font-size: 8pt; color: #444; }
+
+  /* A landscape chart scaled to the page width and shown one horizontal band per
+     sheet. Same window/shift trick as a tile, but cut in one direction only. */
+  .band-window { position: relative; overflow: hidden; outline: 0.3pt solid #999; }
+  .band-shift { position: absolute; left: 0; }
+  .band-shift svg { display: block; width: 100%; height: auto; }
 
   .cover-list { font-size: 10pt; line-height: 1.5; margin: 0 0 6mm; padding-left: 5mm; }
   .cover-list li { margin-bottom: 1.5mm; }
