@@ -205,13 +205,16 @@ export function App(): JSX.Element {
       : chest;
   const sizeUnit = young ? (category === 'Baby' ? 'months' : 'years') : units === 'cm' ? 'cm chest' : 'in chest';
 
-  const input = { category, chest, units, ease, neck, shoulder, swatch };
+  // Crochet is not built, so it can never be the selected method; the cast keeps the
+  // engine's narrower Technique honest rather than widening it to a value it cannot serve.
+  const technique = method === 'hand' ? ('hand' as const) : ('machine' as const);
+  const input = { category, chest, units, ease, neck, shoulder, swatch, technique };
   const gauge = gaugeReadout(gaugeFromSwatch(swatch), units);
 
   // Live outputs — the engine is pure and fast, so this runs every render.
   const patternText = useMemo(
     () => buildPatternText(input, output === 'concise' ? 'abbreviated' : 'verbose'),
-    [category, chest, ease, neck, shoulder, swatch, output],
+    [category, chest, ease, neck, shoulder, swatch, output, technique],
   );
   const schematics = useMemo(() => buildSchematics(input), [category, chest, ease, neck, shoulder, swatch]);
 
@@ -338,6 +341,7 @@ export function App(): JSX.Element {
   const printLabels = {
     sizeLabel: `${category} ${sizeVal} ${sizeUnit}`,
     styleLabel: [
+      method === 'hand' ? 'hand knitted' : 'machine knitted',
       neck === 'v' ? 'V-neck' : 'Crew neck',
       shoulder === 'drop' ? 'drop shoulder' : 'set-in sleeve',
       // "moderate ease", not a bare "moderate" — on paper the word has to carry
@@ -451,7 +455,11 @@ export function App(): JSX.Element {
           <Tile title="Method">
             <div className="btn-row">
               <Btn label="Machine" state={method === 'machine' ? 'selected' : 'normal'} onClick={() => setMethod('machine')} />
-              <Btn label="Hand knit" state="soon" />
+              <Btn label="Hand knit" state={method === 'hand' ? 'selected' : 'normal'} onClick={() => {
+                setMethod('hand');
+                // The roller templates vanish for hand; don't leave one selected.
+                if (output === 'knitleader' || output === 'knitradar') setOutput('full');
+              }} />
               <Btn label="Crochet" state="soon" />
             </div>
           </Tile>
@@ -477,8 +485,14 @@ export function App(): JSX.Element {
               <Btn icon={<IconDocFull />} label="Full written" state={output === 'full' ? 'selected' : 'normal'} onClick={() => setOutput('full')} />
               <Btn icon={<IconDocShort />} label="Concise" state={output === 'concise' ? 'selected' : 'normal'} onClick={() => setOutput('concise')} />
               <Btn icon={<IconChart />} label="Knit chart" state={output === 'chart' ? 'selected' : 'normal'} onClick={() => setOutput('chart')} />
-              <Btn icon={<IconRoller />} label="KnitLeader ½" state={output === 'knitleader' ? 'selected' : 'normal'} onClick={() => setOutput('knitleader')} />
-              <Btn icon={<IconRoller />} label="KnitRadar ¼" state={output === 'knitradar' ? 'selected' : 'normal'} onClick={() => setOutput('knitradar')} />
+              {/* The roller templates drive a KnitLeader or KnitRadar — machine
+                  accessories. There is nothing to feed them by hand. */}
+              {method === 'machine' && (
+                <>
+                  <Btn icon={<IconRoller />} label="KnitLeader ½" state={output === 'knitleader' ? 'selected' : 'normal'} onClick={() => setOutput('knitleader')} />
+                  <Btn icon={<IconRoller />} label="KnitRadar ¼" state={output === 'knitradar' ? 'selected' : 'normal'} onClick={() => setOutput('knitradar')} />
+                </>
+              )}
             </div>
           </Tile>
         </Section>

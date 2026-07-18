@@ -24,6 +24,7 @@ import type {
   Gauge,
   NeckStyle,
   ShoulderStyle,
+  Technique,
   ProseStyle,
   Pattern,
   PieceSchematic,
@@ -82,6 +83,8 @@ export interface BuildInput {
   neck?: NeckStyle;
   /** Shoulder / sleeve-join style; defaults to 'set_in' when omitted. */
   shoulder?: ShoulderStyle;
+  /** How it is made. Machine unless said otherwise. */
+  technique?: Technique;
   swatch: Swatch;
 }
 
@@ -101,7 +104,14 @@ export function buildPattern(input: BuildInput, style: ProseStyle): Pattern | nu
   const g = gaugeFromSwatch(input.swatch);
   const neck = input.neck ?? 'round';
   const shoulder = input.shoulder ?? 'set_in';
-  return renderPattern(assembleGarment(size, input.ease, g, neck, shoulder), style);
+  // Hand prose measures rather than counts, so it needs the row gauge and the
+  // knitter's units; machine prose reads neither.
+  return renderPattern(assembleGarment(size, input.ease, g, neck, shoulder), {
+    style,
+    technique: input.technique ?? 'machine',
+    gauge: g,
+    units: input.units,
+  });
 }
 
 export function buildPatternText(input: BuildInput, style: ProseStyle): string | null {
