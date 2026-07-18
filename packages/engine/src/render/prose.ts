@@ -25,6 +25,7 @@
  */
 
 import type { Row, Op, Carriage } from '../row';
+import type { NeckStyle, ShoulderStyle } from '../data/types';
 
 export interface PieceProse {
   title: string;
@@ -44,6 +45,11 @@ function pad(n: number): string {
 
 function sideWord(side: Carriage): string {
   return side === 'L' ? 'left' : 'right';
+}
+
+/** Capitalise the first letter (for reusing a mid-sentence phrase as a sentence). */
+function cap(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function otherSide(side: Carriage): Carriage {
@@ -112,10 +118,14 @@ interface Vocab {
   holdGroup(count: number, side: Carriage, rc: number): string;
   holdRepeatBack(count: number, rc: number, carriage: Carriage): string;
   mitreHeading(): string;
-  markPoint(): string;
   mitreWork(rc: number, count: number): string;
+  mitreMeetNote(): string;
   crossoverTitle(): string;
   crossoverBody(): string;
+  takeOff(n: number): string;
+  markWaypoints(positions: number[]): string;
+  foldedTitle(): string;
+  foldedBody(): string;
 }
 
 function splitV(n: number): string {
@@ -134,10 +144,13 @@ function corT(side: Carriage): string {
 const VERBOSE: Vocab = {
   carr: (side) => ` The carriage should be on the ${sideWord(side)}.`,
   castOn: (n, ce) =>
-    `Cast on ${n} stitches in rib ${splitV(n)}, ending with the carriage on the ${sideWord(ce)}. (Any rib pattern is fine — the count suits 1×1; adjust for 2×2 etc. to taste.)`,
+    `Cast on ${n} stitches ${splitV(n)}, ending with the carriage on the ${sideWord(ce)}.`,
   ribTension: () => 'Set the tension to main tension, minus 2 whole numbers.',
   setCounter: () => 'Set the row counter to 000.',
-  ribUntil: (rc) => `Knit rib until the row counter reads ${pad(rc)}.`,
+  ribUntil: (rc) =>
+    `Work in the rib pattern of your choice until the row counter reads ${pad(
+      rc,
+    )}. If you are knitting mock rib, follow your machine manual for how to work it.`,
   resetToStocking: (drop, carriage) =>
     'Reset the row counter to 000, change to stocking stitch, set the tension back to main tension' +
     (drop ? `, and decrease 1 stitch at the ${sideWord(drop)} hand edge.` : '.') +
@@ -189,24 +202,33 @@ const VERBOSE: Vocab = {
     `Repeat the last two instructions, holding ${count} needles each time, until the row counter reads ${pad(
       rc,
     )}.${VERBOSE.carr(carriage)}`,
-  mitreHeading: () => 'Mitre the front point.',
-  markPoint: () =>
-    'Mark the centre stitch — it sits at the base of the V, where the two front edges meet.',
+  mitreHeading: () => 'Mitre the two ends.',
   mitreWork: (rc, count) =>
-    `On every row, work a centred double decrease at the marked stitch — decrease 1 stitch on each side of it, so the point column stays unbroken — until the row counter reads ${pad(
+    `Working in the rib pattern of your choice, decrease 1 stitch at each end of every row until the row counter reads ${pad(
       rc,
-    )} (${count} decrease rows in all). Keep the marker on the centre stitch as the point travels in.`,
+    )} (${count} rows), tapering both ends to a diagonal.`,
+  mitreMeetNote: () =>
+    'These two mitred ends meet at the centre front; you seam them there when you make up, forming the point of the V.',
   crossoverTitle: () => 'Alternative front point — crossed over.',
   crossoverBody: () =>
-    'For a crossed-over point instead of the mitre, skip the centre decreases above: work all the picked-up stitches straight in rib for the same number of rows and cast off. Then lap the left band end over the right at the base of the V and stitch both ends down neatly on the inside. It is the more casual finish and the easier one to work flat.',
+    'For a crossed-over point instead of the mitre, work the band straight (no end shaping), then lap one end over the other at the centre front and stitch both down neatly on the inside. It is the more casual finish.',
+  takeOff: (n) =>
+    `Take all ${n} stitches off onto 5–6 rows of waste yarn — they stay live, ready to block and seam.`,
+  markWaypoints: (positions) =>
+    `Hang a contrast-yarn marker at ${andList(positions.map((p) => `stitch ${p}`))} — this is where the band will meet the shoulder ${
+      positions.length > 1 ? 'seams' : 'seam'
+    }. Matching the markers to the seams keeps the band eased in evenly.`,
+  foldedTitle: () => 'Alternative band — mock rib or a folded band.',
+  foldedBody: () =>
+    'To work the band in mock rib, or as a doubled band, knit twice as many rows in plain knitting (or mock rib). Then pick the first (cast-on) row up — onto spare needles, or, for a plain band, onto the needles holding the last row — so the band folds in half, and take both layers off together on the waste yarn. Sew on as before; the fold gives a neat, doubled edge.',
 };
 
 const TERSE: Vocab = {
   carr: (side) => ` ${corT(side)}.`,
-  castOn: (n, ce) => `CO ${n} st in rib ${splitT(n)}, ${corT(ce)}.`,
+  castOn: (n, ce) => `CO ${n} st ${splitT(n)}, ${corT(ce)}.`,
   ribTension: () => 'Set to MT-2.',
   setCounter: () => 'RC to 000.',
-  ribUntil: (rc) => `Rib to RC ${pad(rc)}.`,
+  ribUntil: (rc) => `Work your rib to RC ${pad(rc)}. Mock rib: see machine manual.`,
   resetToStocking: (drop, carriage) =>
     'RC to 000, change to st st, set to MT' +
     (drop ? `, dec 1 st at ${edgeT(drop)}.` : '.') +
@@ -243,13 +265,21 @@ const TERSE: Vocab = {
   holdGroup: (count, side, rc) => `${count} N at ${side} into hold, then Kn to RC ${pad(rc)}.`,
   holdRepeatBack: (count, rc, carriage) =>
     `Rpt last 2 instructions, holding ${count} N each time, to RC ${pad(rc)}.${TERSE.carr(carriage)}`,
-  mitreHeading: () => 'Mitre front point.',
-  markPoint: () => 'Mark centre st (base of V, where the front edges meet).',
+  mitreHeading: () => 'Mitre the two ends.',
   mitreWork: (rc, count) =>
-    `Every row, centred double dec at marked st (dec 1 st each side) to RC ${pad(rc)} (${count}×), marker on centre st.`,
+    `In your chosen rib, dec 1 st at each end every row to RC ${pad(rc)} (${count} rows), tapering both ends.`,
+  mitreMeetNote: () => 'The two mitred ends seam at centre front in making up (the V point).',
   crossoverTitle: () => 'Alt point — crossed over.',
   crossoverBody: () =>
-    'For a crossed-over point: skip the centre dec, work all PU st straight in rib for the same rows, BO. Lap L band end over R at base of V, stitch down inside.',
+    'Crossed-over: work the band straight (no end shaping), lap one end over the other at centre front, stitch down inside.',
+  takeOff: (n) => `Take all ${n} st off on 5–6 rows waste yarn (live, to block & seam).`,
+  markWaypoints: (positions) =>
+    `Hang a contrast marker at ${andList(positions.map((p) => `st ${p}`))} (band meets the shoulder ${
+      positions.length > 1 ? 'seams' : 'seam'
+    }; match markers to seams to ease in).`,
+  foldedTitle: () => 'Alt band — mock rib / folded.',
+  foldedBody: () =>
+    'Mock rib or doubled band: knit twice the rows plain (or mock rib), pick the first row up (spare needles, or the last row for a plain band) to fold in half, take both off together on waste yarn. Sew on as before.',
 };
 
 function vocabFor(style: ProseStyle): Vocab {
@@ -353,7 +383,9 @@ type Kind =
   | 'dec_edge'
   | 'mitre'
   | 'inc_both'
-  | 'hold';
+  | 'hold'
+  | 'take_off'
+  | 'mark';
 
 interface Ev {
   row: Row;
@@ -372,22 +404,33 @@ function classify(row: Row): Ev {
     case 'bind_off':
       return { row, kind: op.side === 'center' ? 'co_center' : 'co_edge', op };
     case 'decrease':
-      return {
-        row,
-        kind: op.side === 'both' ? 'dec_both' : op.side === 'center' ? 'mitre' : 'dec_edge',
-        op,
-      };
+      // The V-neckband mitres both ends with edge decreases (section 'mitre'); every
+      // other decrease is ordinary edge/both shaping.
+      if (row.section === 'mitre') return { row, kind: 'mitre', op };
+      return { row, kind: op.side === 'both' ? 'dec_both' : 'dec_edge', op };
     case 'increase':
       return { row, kind: 'inc_both', op };
     case 'hold':
       return { row, kind: 'hold', op };
+    case 'take_off':
+      return { row, kind: 'take_off', op };
+    case 'mark':
+      return { row, kind: 'mark', op };
   }
 }
 
 function isResetBoundary(cur: Row, prev: Row | undefined): boolean {
   if (!prev) return false;
-  // rib -> body change (but not rib straight into a final cast-off, e.g. a neckband).
-  if (prev.section === 'rib' && cur.section !== 'rib' && cur.section !== 'castoff') return true;
+  // rib -> body change. Not the band's own terminal rows (its rib runs straight into
+  // the marker row then off on waste yarn — no change to stocking stitch).
+  if (
+    prev.section === 'rib' &&
+    cur.section !== 'rib' &&
+    cur.section !== 'castoff' &&
+    cur.section !== 'mark' &&
+    cur.section !== 'take_off'
+  )
+    return true;
   if (cur.side && cur.side !== prev.side) return true;
   return false;
 }
@@ -520,6 +563,20 @@ export function renderPiece(rows: Row[], title: string, style: ProseStyle = 'ver
       continue;
     }
 
+    if (ev.kind === 'mark') {
+      lines.push(v.markWaypoints((ev.op as { positions: number[] }).positions));
+      prevCounter = counter(row.index);
+      i += 1;
+      continue;
+    }
+
+    if (ev.kind === 'take_off') {
+      lines.push('');
+      lines.push(v.takeOff((ev.op as { count: number }).count));
+      i += 1;
+      continue;
+    }
+
     maybeHeading(row);
 
     if (ev.kind === 'hold') {
@@ -529,8 +586,8 @@ export function renderPiece(rows: Row[], title: string, style: ProseStyle = 'ver
     }
 
     if (ev.kind === 'mitre') {
-      // The V-neckband mitre: a centred double decrease at the point every row.
-      // Gather the run, mark the point, describe the first row, then repeat.
+      // The V-neckband mitre: an EDGE decrease at each end every row (knittable — no
+      // mid-row transfers), tapering both ends so they seam into a point at the front.
       const mitreRows: Row[] = [];
       let j = i;
       while (j < evs.length && evs[j].kind === 'mitre') {
@@ -538,10 +595,10 @@ export function renderPiece(rows: Row[], title: string, style: ProseStyle = 'ver
         j += 1;
       }
       heading(v.mitreHeading());
-      lines.push(v.markPoint());
       const last = counter(mitreRows[mitreRows.length - 1].index);
       lines.push(v.mitreWork(last, mitreRows.length));
       lines.push(v.stitchCount(mitreRows[mitreRows.length - 1].stitches, false));
+      lines.push(v.mitreMeetNote());
       prevCounter = last;
       i = j;
       continue;
@@ -625,12 +682,18 @@ export function renderPiece(rows: Row[], title: string, style: ProseStyle = 'ver
     i = j;
   }
 
-  // A mitred V-band offers the crossed-over point as an alternative finish (extra
-  // info in the prose, not a construction fork — see vneck-band-both-finishes).
-  if (rows.some((r) => r.section === 'mitre')) {
+  // The neckband (it ends by coming off on waste yarn) carries its alternatives as
+  // extra info: a mock-rib / folded band for any band, and — for a V — the crossed-over
+  // point instead of the mitre. Neither is a construction fork (see the memory notes).
+  if (rows.some((r) => r.section === 'take_off')) {
     lines.push('');
-    lines.push(v.crossoverTitle());
-    lines.push(v.crossoverBody());
+    lines.push(v.foldedTitle());
+    lines.push(v.foldedBody());
+    if (rows.some((r) => r.section === 'mitre')) {
+      lines.push('');
+      lines.push(v.crossoverTitle());
+      lines.push(v.crossoverBody());
+    }
   }
 
   return { title, lines };
@@ -706,8 +769,114 @@ export interface Pattern {
   pieces: PieceProse[];
 }
 
+/**
+ * The Making Up section. Every piece comes off on waste yarn, so nothing is joined on
+ * the machine — assembly happens here, and the order is specific to the neck and
+ * shoulder style. The through-line: join all the shoulder seams but ONE (the right
+ * front, left open), sew the neckband on from that open seam round to it, close the
+ * last seam, then the sleeves, then the sides, then the ends.
+ *
+ * The shoulder step here joins only the two body shoulder seams — a set-in or drop
+ * sleeve does not reach the neckband, so its arms go in later, at the armhole step.
+ * (Raglan and saddle sleeves DO meet the neckband, so when they arrive their arm seams
+ * join in this same going-round step, before the band — that's why it is built as its
+ * own block.) A stretchy join is called out only where it matters — the neckband and
+ * the armholes — with an example; other seams take any method.
+ */
+export function makingUpProse(
+  neck: NeckStyle,
+  shoulder: ShoulderStyle,
+  style: ProseStyle = 'verbose',
+): PieceProse {
+  const verbose = style !== 'abbreviated';
+  const lines: string[] = [];
+  const stretchy = verbose ? 'a stretchy join (e.g. mattress stitch)' : 'stretchy join (e.g. mattress stitch)';
+
+  // Block first — everything goes together flatter and truer to size off the machine.
+  lines.push(
+    verbose
+      ? 'Block each piece to the measurements on its schematic and let it dry before you start; take the pieces off their waste yarn only as you come to seam them.'
+      : 'Block all pieces to the schematic measurements; let dry. Unpick the waste yarn as you seam each.',
+  );
+  if (verbose) {
+    lines.push(
+      'Several seaming methods will serve — mattress stitch, backstitch, an edge-to-edge join — and your machine manual shows how to work them and where each suits. Work with right sides together unless a step says otherwise.',
+    );
+  } else {
+    lines.push('Right sides together unless noted.');
+  }
+
+  // 1 — join all shoulder seams but the right front (left open for the band).
+  lines.push('');
+  lines.push(
+    verbose
+      ? 'Join the left shoulder: seam the front-left shoulder to the back-left shoulder. Leave the right shoulder open for now.'
+      : 'Join left shoulder (front-left to back-left). Leave the right shoulder open.',
+  );
+
+  // 2 — the neckband, in from the open shoulder and back to it.
+  lines.push('');
+  if (neck === 'v') {
+    lines.push(
+      verbose
+        ? 'Seam the neckband’s two mitred ends together at the centre front, forming the point of the V.'
+        : 'Seam the band’s mitred ends at centre front (the V point).',
+    );
+  }
+  lines.push(
+    verbose
+      ? `Sew the neckband on. Starting at the open right shoulder, ease the band’s live edge onto the neckline all the way round and back to the start, matching each marker to its seam. Use ${stretchy} so the neck still stretches over the head.`
+      : `Sew the band on from the open right shoulder, round and back to it, markers to seams. ${cap(stretchy)}.`,
+  );
+
+  // 3 — close the last (right) shoulder, shutting the band’s ends.
+  lines.push('');
+  lines.push(
+    verbose
+      ? 'Join the right shoulder: seam the front-right shoulder to the back-right shoulder, closing the ends of the neckband.'
+      : 'Join right shoulder (front-right to back-right); closes the band ends.',
+  );
+
+  // 4 — the sleeves into the armholes (the set-in vs drop difference lives here).
+  lines.push('');
+  if (shoulder === 'drop') {
+    lines.push(
+      verbose
+        ? `Sew in the sleeves. Centre each sleeve’s straight top edge on the shoulder seam and sew it to the straight armhole edge down each side. Use ${stretchy}.`
+        : `Sew in the sleeves: straight top to the armhole edge, centred on the shoulder seam. ${cap(stretchy)}.`,
+    );
+  } else {
+    lines.push(
+      verbose
+        ? `Set in the sleeves. Ease each sleeve cap into its armhole, lining the top of the cap up with the shoulder seam and the underarm cast-offs together. Use ${stretchy}.`
+        : `Set in the sleeves: ease each cap into its armhole, cap top to shoulder seam. ${cap(stretchy)}.`,
+    );
+  }
+
+  // 5 — sides + underarms in one line.
+  lines.push('');
+  lines.push(
+    verbose
+      ? 'Join the sides: seam each side and its sleeve underarm in one line, from the cuff to the hem.'
+      : 'Join the sides: cuff to hem in one line each side.',
+  );
+
+  // 6 — finish.
+  lines.push('');
+  lines.push(verbose ? 'Sew in all the loose ends along the wrong side, then give the seams a light press.' : 'Sew in all ends.');
+
+  return { title: 'Making Up', lines };
+}
+
 export function renderPattern(
-  garment: { back: Row[]; front: Row[]; sleeveLeft: Row[]; neckband: Row[] },
+  garment: {
+    back: Row[];
+    front: Row[];
+    sleeveLeft: Row[];
+    neckband: Row[];
+    neck: NeckStyle;
+    shoulder: ShoulderStyle;
+  },
   style: ProseStyle = 'verbose',
 ): Pattern {
   return {
@@ -716,6 +885,7 @@ export function renderPattern(
       renderPiece(garment.front, 'The Front', style),
       renderPiece(garment.sleeveLeft, 'The Sleeves (make 2)', style),
       renderPiece(garment.neckband, 'Neckband', style),
+      makingUpProse(garment.neck, garment.shoulder, style),
     ],
   };
 }

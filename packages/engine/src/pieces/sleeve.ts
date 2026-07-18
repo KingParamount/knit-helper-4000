@@ -142,6 +142,7 @@ export function sleeveRows(
       if (op.kind === 'bind_off') stitches -= op.count;
       if (op.kind === 'increase') stitches += op.count * (op.side === 'both' ? 2 : 1);
       if (op.kind === 'decrease') stitches -= op.count * (op.side === 'both' ? 2 : 1);
+      // take_off leaves the stitches live on waste yarn — no count change.
     }
     rows.push({ index, piece, stitches, carriage: carriageForRow(index), ops, section });
   };
@@ -158,9 +159,10 @@ export function sleeveRows(
     else push(incAt.has(t) ? [{ kind: 'increase', count: 1, side: 'both' }] : [], 'taper');
   }
 
-  // Drop shoulder: no cap — bind off the whole top straight (it sews to the armhole edge).
+  // Drop shoulder: no cap — the whole straight top comes off on waste yarn (it sews
+  // to the armhole edge in making up, so it stays live, not cast off).
   if (shoulder === 'drop') {
-    push([{ kind: 'bind_off', count: p.sleeveTopSts, side: 'center' }], 'cap');
+    push([{ kind: 'take_off', count: p.sleeveTopSts }], 'cap');
     return rows;
   }
 
@@ -180,7 +182,7 @@ export function sleeveRows(
     push(decAt.has(r) ? [{ kind: 'decrease', count: 1, side: 'both' }] : [], 'cap'); // gentle middle
   }
   for (let i = 0; i < fast; i++) push([{ kind: 'decrease', count: 1, side: 'both' }], 'cap'); // fast top
-  push([{ kind: 'bind_off', count: p.capTopSts, side: 'center' }], 'cap'); // crown
+  push([{ kind: 'take_off', count: p.capTopSts }], 'cap'); // crown off on waste yarn
   return rows;
 }
 

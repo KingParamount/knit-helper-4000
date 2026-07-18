@@ -20,6 +20,8 @@ export interface Garment {
   sleeveLeft: Row[];
   sleeveRight: Row[];
   neckband: Row[];
+  neck: NeckStyle;
+  shoulder: ShoulderStyle;
 }
 
 /** Every piece of the set-in pullover for one size / ease style / gauge / neck style. */
@@ -37,5 +39,7 @@ export function assembleGarment(
     sleeveLeft: s.left,
     sleeveRight: s.right,
     neckband: neckbandRows(size, style, gauge, neck, shoulder),
+    neck,
+    shoulder,
   };
 }

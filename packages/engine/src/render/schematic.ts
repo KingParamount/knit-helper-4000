@@ -470,7 +470,7 @@ export function sleeveSchematic(
   rightPts.push({ x: plan.capTopSts / 2, y: topY });
   leftPts.push({ x: -plan.capTopSts / 2, y: topY });
   const outline = [...rightPts, ...leftPts.reverse()];
-  marks.push({ kind: 'castoff', x: 0, y: topY - 0.5, span: plan.capTopSts, centre: true }); // crown
+  // The crown/top comes off on waste yarn (live), not cast off — no shaping glyph.
 
   // A set-in sleeve tapers to the underarm (capStartY) then shapes a cap up to the
   // crown. A drop sleeve has no cap — it tapers straight to a wide flat top that is
@@ -521,7 +521,7 @@ export function neckbandSchematic(
     { x: -half, y: 0 },
   ];
   const measures: Measure[] = [
-    { kind: 'width', label: 'pick-up', sts: plan.pickupTotal, at: 0, from: -half, to: half },
+    { kind: 'width', label: 'cast on', sts: plan.pickupTotal, at: 0, from: -half, to: half },
     { kind: 'height', label: 'band', rows: h, at: 0, from: 0, to: h },
   ];
   return {

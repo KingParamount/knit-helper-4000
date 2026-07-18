@@ -1,15 +1,18 @@
 /**
- * The neckband: pick up stitches around the finished neck opening, work a short rib
- * band, and cast off loosely. Serves both neck styles — a crew has a front centre
- * cast-off to pick up along; a V has none (frontCentre = 0) and picks up along the
- * two long V edges instead, meeting at the point. The canonical V band is MITRED (a
- * centred double decrease at the point every row — real row-level shaping, so it
- * lives in the row array); the crossed-over finish is offered as a prose alternative
- * (same band worked straight, ends lapped), per vneck-band-both-finishes.
+ * The neckband — knit as its OWN strip and sewn onto the neckline in making up (the
+ * machine-knitting reality: picking a curved neck up onto the needles is awkward, so
+ * we knit a band the length of the neck opening and ease it on). Cast on the count the
+ * neck opening needs; that cast-on edge is the neat outer edge. Work the band, hang
+ * contrast markers on the penultimate row wherever the band meets a seam (waypoints to
+ * ease it on), and take it off on waste yarn — that live edge is sewn to the neckline.
  *
- * Pick-up: one stitch per stitch along the cast-off edges (back neck, front centre),
- * ~3 stitches per 4 rows along the shaped side edges. Band depth from the neck rib.
- * Worked flat here (seam one shoulder last); the count is the same as in the round.
+ * Neck styles differ at the front: a crew is a plain strip whose ends meet at the open
+ * shoulder; a V mitres both ends (a fully-fashioned decrease at EACH end every row — an
+ * EDGE decrease, which is knittable, unlike a centred one) so the two ends meet at the
+ * centre front and seam into a clean point (see vneck-band-both-finishes).
+ *
+ * The count follows the neck opening: 1 st per st along cast-off edges (back neck,
+ * front centre), ~3 sts per 4 rows along the shaped side edges. Depth from the neck rib.
  */
 
 import type { SizeRecord, EaseStyleId, NeckStyle, ShoulderStyle } from '../data/types';
@@ -18,16 +21,19 @@ import { type Row, carriageForRow } from '../row';
 import { backPlan } from './back';
 import { frontNeckPlan } from './front';
 
-/** Stitches picked up per row along a shaped/vertical neck edge (3 per 4 rows). */
+/** Stitches per row along a shaped/vertical neck edge (3 per 4 rows). */
 export const PICKUP_PER_ROW = 3 / 4;
 
 export interface NeckbandPlan {
-  backCentreSts: number; // picked up 1:1 along the back centre cast-off
-  backSidePickup: number; // each shaped back-neck side edge (the back is now scooped)
-  frontCentreSts: number; // picked up 1:1 along the front centre cast-off
+  backCentreSts: number; // 1:1 along the back centre cast-off
+  backSidePickup: number; // each shaped back-neck side edge (the back is scooped)
+  frontCentreSts: number; // 1:1 along the front centre cast-off (0 for a V)
   frontSidePickup: number; // each shaped front side edge
-  pickupTotal: number;
-  bandRows: number;
+  pickupTotal: number; // stitches the neck opening needs = the band cast-on
+  bandRows: number; // band depth in rows
+  mitreRows: number; // V only: rows of end-mitre shaping (0 for a crew)
+  finalSts: number; // live stitches taken off on waste yarn (cast-on − the mitres)
+  waypoints: number[]; // stitch positions (in the final row) where the band meets a seam
 }
 
 export function neckbandPlan(
@@ -41,21 +47,41 @@ export function neckbandPlan(
   const backCentreSts = bp.backNeckCentreSts; // centre cast-off of the back scoop
   const backSidePickup = Math.round(bp.backNeckRows * PICKUP_PER_ROW);
   const fp = frontNeckPlan(size, style, gauge, neck, shoulder);
-  // A crew picks up along its front centre cast-off; a V has no centre — the two long
-  // V edges meet at the point (frontCentre = 0), so its side pick-up runs the deep V.
+  // A crew has a front centre cast-off to follow; a V has none (frontCentre = 0) — the
+  // two long V edges run down to the point, which is the band's two ends.
   const frontCentreSts = neck === 'v' ? 0 : fp.frontNeckSts - 2 * stitchesFor(1.5, gauge);
   const frontSidePickup = Math.round(fp.neckDepthRows * PICKUP_PER_ROW);
-  // A worked-flat rib band picks up an odd number (extra on the right) so both
-  // selvedges are knit stitches; it is cast off in rib, with no drop to even.
-  const rawPickup = backCentreSts + 2 * backSidePickup + frontCentreSts + 2 * frontSidePickup;
-  const pickupTotal = rawPickup % 2 === 0 ? rawPickup + 1 : rawPickup;
+  // Cast on odd (extra on the right) so both selvedges are knit stitches.
+  const raw = backCentreSts + 2 * backSidePickup + frontCentreSts + 2 * frontSidePickup;
+  const pickupTotal = raw % 2 === 0 ? raw + 1 : raw;
+
+  const bandRows = ribRowsFor(size.rib_neck, gauge);
+  // The V mitre eats a triangle at each end over the band depth (a ~45° corner for
+  // square gauge); a crew has no mitre. Clamp so it never runs past the front-side edge.
+  const mitreRows =
+    neck === 'v' ? Math.max(0, Math.min(bandRows - 2, frontSidePickup - 1)) : 0;
+  const finalSts = pickupTotal - 2 * mitreRows;
+
+  // Waypoints: the stitch positions in the final (taken-off) row that meet a seam, so
+  // the knitter can ease the band on. A crew's two ends sit at the open shoulder, so its
+  // one interior waypoint is the OTHER shoulder. A V's two ends sit at the centre front,
+  // so both shoulders are interior. Positions are symmetric in from each end.
+  const clamp = (n: number): number => Math.max(1, Math.min(finalSts - 1, n));
+  const waypoints =
+    neck === 'v'
+      ? [clamp(frontSidePickup - mitreRows), clamp(finalSts - (frontSidePickup - mitreRows))]
+      : [clamp(2 * backSidePickup + backCentreSts)];
+
   return {
     backCentreSts,
     backSidePickup,
     frontCentreSts,
     frontSidePickup,
     pickupTotal,
-    bandRows: ribRowsFor(size.rib_neck, gauge),
+    bandRows,
+    mitreRows,
+    finalSts,
+    waypoints,
   };
 }
 
@@ -73,23 +99,24 @@ export function neckbandRows(
   const push = (ops: Row['ops'], section: string): void => {
     index += 1;
     for (const op of ops) {
-      if (op.kind === 'pick_up') stitches = op.count;
-      if (op.kind === 'bind_off') stitches -= op.count;
-      if (op.kind === 'decrease') stitches -= op.count;
+      if (op.kind === 'cast_on') stitches = op.count;
+      if (op.kind === 'decrease') stitches -= op.count * (op.side === 'both' ? 2 : 1);
+      // take_off / mark leave the live count unchanged.
     }
     rows.push({ index, piece: 'collar', stitches, carriage: carriageForRow(index), ops, section });
   };
-  push([{ kind: 'pick_up', count: p.pickupTotal }], 'pickup');
-  if (neck === 'v') {
-    // Mitre the front point: a centred double decrease (1 st either side of the
-    // marked point) on every band row draws the two long V edges into a clean
-    // corner. The crossed-over alternative is offered in the prose, not built here
-    // — it works the same band straight, so it needs no shaping (see
-    // vneck-band-both-finishes). pickupTotal is odd, so the point is a true stitch.
-    for (let i = 0; i < p.bandRows; i++) push([{ kind: 'decrease', count: 2, side: 'center' }], 'mitre');
-  } else {
-    for (let i = 0; i < p.bandRows; i++) push([], 'rib');
+
+  push([{ kind: 'cast_on', count: p.pickupTotal }], 'cast_on');
+  // Band body: a V mitres BOTH ends (edge decrease each end, every row); a crew is plain.
+  // Leaves two rows spare — one for the marker row (penultimate), one for the take-off.
+  const bodyRows = Math.max(0, p.bandRows - 2);
+  for (let i = 1; i <= bodyRows; i++) {
+    if (neck === 'v' && i <= p.mitreRows) push([{ kind: 'decrease', count: 1, side: 'both' }], 'mitre');
+    else push([], neck === 'v' ? 'mitre' : 'rib');
   }
-  push([{ kind: 'bind_off', count: stitches, side: 'center' }], 'castoff'); // remaining, loosely
+  // Penultimate row: hang the waypoint markers.
+  push([{ kind: 'mark', positions: p.waypoints }], 'mark');
+  // Off on waste yarn — the live edge that sews to the neckline.
+  push([{ kind: 'take_off', count: stitches }], 'take_off');
   return rows;
 }

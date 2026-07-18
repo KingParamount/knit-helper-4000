@@ -36,14 +36,15 @@ describe('drop shoulder: straight body, straight sleeve top, matched join', () =
     }
   });
 
-  it('binds the sleeve top off straight — no cap', () => {
+  it('takes the straight sleeve top off on waste yarn — no cap', () => {
     for (const size of inSizes) {
       const p = sleevePlan(size, 'moderate', G, 'drop');
       expect(p.capHeightRows, `${size.category} ${size.chest}"`).toBe(0);
       expect(p.underarmCastOff).toBe(0);
-      expect(p.capTopSts).toBe(p.sleeveTopSts); // whole top bound off in one step
+      expect(p.capTopSts).toBe(p.sleeveTopSts); // whole top comes off in one step
       const rows = sleeveRows('sleeve_l', size, 'moderate', G, 'drop');
-      expect(rows[rows.length - 1].stitches).toBe(0); // fully cast off
+      const last = rows[rows.length - 1];
+      expect(last.ops).toEqual([{ kind: 'take_off', count: p.sleeveTopSts }]); // live, not cast off
     }
   });
 

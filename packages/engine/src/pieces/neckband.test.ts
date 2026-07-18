@@ -23,49 +23,60 @@ describe('neckband plan (Woman 36", moderate)', () => {
   });
 });
 
-describe('neckband rows (crew)', () => {
+describe('neckband rows (crew) — a separate strip cast on and taken off on waste yarn', () => {
   const rows = neckbandRows(W36, 'moderate', G);
 
-  it('picks up, ribs, then casts off', () => {
-    expect(rows[0].ops).toEqual([{ kind: 'pick_up', count: 143 }]);
+  it('casts on, works straight rib, marks waypoints, then comes off on waste yarn', () => {
+    expect(rows[0].ops).toEqual([{ kind: 'cast_on', count: 143 }]);
     expect(rows[0].piece).toBe('collar');
-    expect(rows[rows.length - 1].ops).toEqual([{ kind: 'bind_off', count: 143, side: 'center' }]);
-    expect(rows[rows.length - 1].stitches).toBe(0);
-    expect(rows).toHaveLength(12); // pick-up + 10 rib + cast-off
+    const last = rows[rows.length - 1];
+    expect(last.ops).toEqual([{ kind: 'take_off', count: 143 }]); // live, not cast off
+    expect(last.section).toBe('take_off');
+    expect(rows[rows.length - 2].section).toBe('mark'); // penultimate = the waypoints
   });
 
-  it('has no shaping between pick-up and cast-off (straight rib)', () => {
-    for (const r of rows.slice(1, -1)) {
+  it('has no shaping between cast-on and the marker row (straight rib)', () => {
+    for (const r of rows.slice(1, -2)) {
       expect(r.section).toBe('rib');
       expect(r.ops).toEqual([]);
     }
   });
+
+  it('marks one interior waypoint — the far shoulder (its ends sit at the open shoulder)', () => {
+    const mark = rows[rows.length - 2];
+    expect(mark.ops[0]).toEqual({ kind: 'mark', positions: neckbandPlan(W36, 'moderate', G).waypoints });
+    expect(neckbandPlan(W36, 'moderate', G).waypoints).toHaveLength(1);
+  });
 });
 
-describe('neckband rows (v-neck mitre)', () => {
+describe('neckband rows (v-neck) — mitre both ends with edge decreases, seam at front', () => {
   const p = neckbandPlan(W36, 'moderate', G, 'v');
   const rows = neckbandRows(W36, 'moderate', G, 'v');
 
-  it('mitres the front point: a centred double decrease every band row', () => {
+  it('mitres both ends: an EDGE decrease at each end every mitre row (knittable)', () => {
     const mitre = rows.filter((r) => r.section === 'mitre');
-    expect(mitre).toHaveLength(p.bandRows);
+    expect(mitre).toHaveLength(p.mitreRows);
     for (const r of mitre) {
-      expect(r.ops).toEqual([{ kind: 'decrease', count: 2, side: 'center' }]);
+      expect(r.ops).toEqual([{ kind: 'decrease', count: 1, side: 'both' }]); // not 'center'
     }
   });
 
-  it('casts off the stitches the mitre leaves (pickup − 2 per band row)', () => {
-    const remaining = p.pickupTotal - 2 * p.bandRows;
+  it('takes off the stitches the mitre leaves (cast-on − 2 per mitre row), live', () => {
     const last = rows[rows.length - 1];
-    expect(last.ops).toEqual([{ kind: 'bind_off', count: remaining, side: 'center' }]);
-    expect(last.stitches).toBe(0);
-    expect(rows[rows.length - 2].stitches).toBe(remaining); // live count before cast-off
+    expect(p.finalSts).toBe(p.pickupTotal - 2 * p.mitreRows);
+    expect(last.ops).toEqual([{ kind: 'take_off', count: p.finalSts }]);
+    expect(last.stitches).toBe(p.finalSts); // still live on waste yarn
+  });
+
+  it('marks both shoulder waypoints (its ends sit at the centre front)', () => {
+    expect(p.waypoints).toHaveLength(2);
+    expect(rows[rows.length - 2].ops[0]).toEqual({ kind: 'mark', positions: p.waypoints });
   });
 
   it('keeps the stitch count positive through the mitre for every size', () => {
     for (const s of sizesForV()) {
       const pv = neckbandPlan(s, 'moderate', G, 'v');
-      expect(pv.pickupTotal - 2 * pv.bandRows, `${s.category} ${s.chest}"`).toBeGreaterThan(0);
+      expect(pv.finalSts, `${s.category} ${s.chest}"`).toBeGreaterThan(0);
     }
   });
 });

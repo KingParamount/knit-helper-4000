@@ -43,9 +43,11 @@ describe('sleeve plan (Woman 36", moderate, default gauge)', () => {
 describe('sleeve rows', () => {
   const rows = sleeveRows('sleeve_l', W36, 'moderate', G);
 
-  it('reaches the sleeve top then binds off the whole cap', () => {
+  it('reaches the sleeve top then comes off the crown on waste yarn', () => {
     expect(Math.max(...rows.map((r) => r.stitches))).toBe(94); // widest at the underarm, even
-    expect(rows[rows.length - 1].stitches).toBe(0); // cap fully cast off
+    const last = rows[rows.length - 1];
+    expect(last.ops[0].kind).toBe('take_off'); // crown live on waste yarn, not cast off
+    expect(last.stitches).toBeGreaterThan(0); // stitches stay live
   });
 
   it('casts on the odd cuff, drops to even, and increases by 2 per increase row', () => {

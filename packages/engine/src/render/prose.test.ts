@@ -3,7 +3,7 @@ declare const console: { log: (...args: unknown[]) => void };
 import { findSize } from '../data/sizes';
 import { DEFAULT_GAUGE } from '../gauge';
 import { assembleGarment } from '../pieces/garment';
-import { renderPiece, renderPattern, patternText } from './prose';
+import { renderPiece, renderPattern, patternText, makingUpProse } from './prose';
 
 const W36 = findSize('Woman', 36, 'in')!;
 const G = DEFAULT_GAUGE;
@@ -16,11 +16,11 @@ const has = (piece: { lines: string[] }, text: string): boolean =>
 describe('cast-on, tension and counter (verbose)', () => {
   it('casts on odd rib, sets rib tension, then the counter', () => {
     expect(back.lines[0]).toBe(
-      'Cast on 145 stitches in rib (72 left, 73 right), ending with the carriage on the right. (Any rib pattern is fine — the count suits 1×1; adjust for 2×2 etc. to taste.)',
+      'Cast on 145 stitches (72 left, 73 right), ending with the carriage on the right.',
     );
     expect(back.lines[1]).toBe('Set the tension to main tension, minus 2 whole numbers.');
     expect(back.lines[2]).toBe('Set the row counter to 000.');
-    expect(has(back, 'Knit rib until the row counter reads 025.')).toBe(true);
+    expect(has(back, 'Work in the rib pattern of your choice until the row counter reads 025. If you are knitting mock rib, follow your machine manual for how to work it.')).toBe(true);
   });
 
   it('drops the odd stitch and resets tension at the change to stocking', () => {
@@ -68,10 +68,10 @@ describe('back neck scoop + shoulders (verbose) — holds phrased as shaping', (
 
 describe('abbreviated mode', () => {
   it('abbreviates cast-on, tension, counter and rib', () => {
-    expect(backT.lines[0]).toBe('CO 145 st in rib (72L, 73R), COR.');
+    expect(backT.lines[0]).toBe('CO 145 st (72L, 73R), COR.');
     expect(backT.lines[1]).toBe('Set to MT-2.');
     expect(backT.lines[2]).toBe('RC to 000.');
-    expect(has(backT, 'Rib to RC 025.')).toBe(true);
+    expect(has(backT, 'Work your rib to RC 025. Mock rib: see machine manual.')).toBe(true);
   });
   it('abbreviates the transition, shaping and carriage', () => {
     expect(has(backT, 'RC to 000, change to st st, set to MT, dec 1 st at RH. COL.')).toBe(true);
@@ -89,32 +89,91 @@ describe('abbreviated mode', () => {
   });
 });
 
-describe('v-neck band mitre + crossed-over alternative', () => {
+describe('v-neck band mitre (edge decreases) + crossed-over alternative', () => {
   const vGarment = assembleGarment(W36, 'moderate', G, 'v');
   const vBand = renderPiece(vGarment.neckband, 'Neckband');
   const vBandT = renderPiece(vGarment.neckband, 'Neckband', 'abbreviated');
   const crew = renderPiece(assembleGarment(W36, 'moderate', G, 'round').neckband, 'Neckband');
 
-  it('mitres the point: mark the centre, decrease every row, then cast off', () => {
-    expect(has(vBand, 'Mitre the front point.')).toBe(true);
-    expect(has(vBand, 'Mark the centre stitch — it sits at the base of the V, where the two front edges meet.')).toBe(true);
-    expect(vBand.lines.some((l) => l.includes('centred double decrease at the marked stitch') && l.includes('until the row counter reads'))).toBe(true);
+  it('mitres both ends with edge decreases, seamed at the front (knittable)', () => {
+    expect(has(vBand, 'Mitre the two ends.')).toBe(true);
+    expect(vBand.lines.some((l) => l.includes('decrease 1 stitch at each end of every row') && l.includes('tapering both ends'))).toBe(true);
+    expect(vBand.lines.some((l) => l.includes('meet at the centre front'))).toBe(true);
+    // No unknittable mid-row centre decrease.
+    expect(vBand.lines.some((l) => l.includes('centred double decrease'))).toBe(false);
   });
 
-  it('presents the crossed-over point as an alternative finish', () => {
+  it('comes off on waste yarn (not cast off) with waypoint markers', () => {
+    expect(vBand.lines.some((l) => l.includes('off onto 5–6 rows of waste yarn'))).toBe(true);
+    expect(vBand.lines.some((l) => l.includes('contrast-yarn marker at stitch'))).toBe(true);
+  });
+
+  it('presents the crossed-over point and mock-rib/folded band as alternatives', () => {
     expect(has(vBand, 'Alternative front point — crossed over.')).toBe(true);
-    expect(vBand.lines.some((l) => l.includes('lap the left band end over the right'))).toBe(true);
+    expect(vBand.lines.some((l) => l.includes('lap one end over the other at the centre front'))).toBe(true);
+    expect(has(vBand, 'Alternative band — mock rib or a folded band.')).toBe(true);
   });
 
-  it('a crew band does neither (no mitre, no alternative)', () => {
-    expect(has(crew, 'Mitre the front point.')).toBe(false);
+  it('a crew band mitres nothing but still offers the folded alternative', () => {
+    expect(has(crew, 'Mitre the two ends.')).toBe(false);
     expect(has(crew, 'crossed over')).toBe(false);
+    expect(has(crew, 'Alternative band — mock rib or a folded band.')).toBe(true);
   });
 
-  it('abbreviates the mitre and the alternative', () => {
-    expect(has(vBandT, 'Mitre front point.')).toBe(true);
-    expect(vBandT.lines.some((l) => l.includes('centred double dec at marked st'))).toBe(true);
+  it('abbreviates the mitre and the alternatives', () => {
+    expect(has(vBandT, 'Mitre the two ends.')).toBe(true);
+    expect(vBandT.lines.some((l) => l.includes('dec 1 st at each end every row'))).toBe(true);
     expect(has(vBandT, 'Alt point — crossed over.')).toBe(true);
+    expect(has(vBandT, 'Alt band — mock rib / folded.')).toBe(true);
+  });
+});
+
+describe('Making Up — order, style-specific seams, stretchy only where it matters', () => {
+  const idx = (lines: string[], needle: string): number => lines.findIndex((l) => l.includes(needle));
+
+  it('runs shoulders → band → last shoulder → sleeves → sides → ends', () => {
+    const { lines } = makingUpProse('round', 'set_in');
+    const left = idx(lines, 'Join the left shoulder');
+    const band = idx(lines, 'Sew the neckband on');
+    const right = idx(lines, 'Join the right shoulder');
+    const sleeves = idx(lines, 'Set in the sleeves');
+    const sides = idx(lines, 'Join the sides');
+    const ends = idx(lines, 'Sew in all the loose ends');
+    expect(left).toBeGreaterThanOrEqual(0);
+    expect(left).toBeLessThan(band);
+    expect(band).toBeLessThan(right);
+    expect(right).toBeLessThan(sleeves);
+    expect(sleeves).toBeLessThan(sides);
+    expect(sides).toBeLessThan(ends);
+  });
+
+  it('flags a stretchy join on the neckband and armholes only — not shoulders or sides', () => {
+    const { lines } = makingUpProse('round', 'drop');
+    const stretchyLines = lines.filter((l) => l.includes('stretchy join'));
+    expect(stretchyLines).toHaveLength(2); // band + armholes
+    expect(stretchyLines.every((l) => l.includes('e.g. mattress stitch'))).toBe(true);
+    expect(lines.find((l) => l.includes('Join the left shoulder'))!).not.toContain('stretchy');
+    expect(lines.find((l) => l.includes('Join the sides'))!).not.toContain('stretchy');
+  });
+
+  it('set-in eases a cap in; drop sews a straight top on', () => {
+    expect(makingUpProse('round', 'set_in').lines.some((l) => l.includes('Ease each sleeve cap into its armhole'))).toBe(true);
+    expect(makingUpProse('round', 'drop').lines.some((l) => l.includes('straight top edge'))).toBe(true);
+  });
+
+  it('a V seams the mitred ends at the centre front; a crew does not', () => {
+    expect(makingUpProse('v', 'set_in').lines.some((l) => l.includes('mitred ends together at the centre front'))).toBe(true);
+    expect(makingUpProse('round', 'set_in').lines.some((l) => l.includes('mitred ends'))).toBe(false);
+  });
+
+  it('the seam-technique note is verbose-only', () => {
+    expect(makingUpProse('round', 'set_in', 'verbose').lines.some((l) => l.includes('Several seaming methods will serve'))).toBe(true);
+    expect(makingUpProse('round', 'set_in', 'abbreviated').lines.some((l) => l.includes('Several seaming methods'))).toBe(false);
+  });
+
+  it('is the last section of the whole pattern', () => {
+    const pattern = renderPattern(assembleGarment(W36, 'moderate', G, 'v', 'drop'));
+    expect(pattern.pieces[pattern.pieces.length - 1].title).toBe('Making Up');
   });
 });
 

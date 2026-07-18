@@ -9,19 +9,22 @@ export type Piece = 'back' | 'front' | 'sleeve_l' | 'sleeve_r' | 'collar';
 
 /**
  * A shaping event on a row. `both` = the same at each end of the row; `center`
- * on a bind-off = a block in the middle, e.g. a flat back neck; `center` on a
- * decrease = a centred double decrease at a marked point (the V-neckband mitre —
- * `count` stitches removed either side of the point). `hold` puts needles into
- * holding position (short-row shaping) — they stay live on the needles for
- * grafting, so they do not reduce the stitch count.
+ * on a bind-off = a block in the middle, e.g. a flat back neck. `hold` puts needles
+ * into holding position (short-row shaping) — they stay live on the needles for
+ * grafting, so they do not reduce the stitch count. `take_off` runs the piece off
+ * the machine on several rows of waste yarn: the stitches stay live (not cast off),
+ * ready to be blocked then seamed. `mark` hangs contrast markers at the given stitch
+ * positions (neckband waypoints, to ease the band onto the neckline).
  */
 export type Op =
   | { kind: 'cast_on'; count: number }
   | { kind: 'pick_up'; count: number } // pick up and knit along an edge (e.g. a neckband)
   | { kind: 'bind_off'; count: number; side: 'L' | 'R' | 'both' | 'center' }
-  | { kind: 'decrease'; count: number; side: 'L' | 'R' | 'both' | 'center' }
+  | { kind: 'decrease'; count: number; side: 'L' | 'R' | 'both' }
   | { kind: 'increase'; count: number; side: 'L' | 'R' | 'both' }
-  | { kind: 'hold'; count: number; side: 'L' | 'R' };
+  | { kind: 'hold'; count: number; side: 'L' | 'R' }
+  | { kind: 'take_off'; count: number } // off the machine on waste yarn; stitches stay live
+  | { kind: 'mark'; positions: number[] }; // hang contrast markers at these stitches
 
 export interface Row {
   /** 1-based, per piece (continues across a divided piece's two halves). */
