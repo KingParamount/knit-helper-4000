@@ -17,6 +17,7 @@ export type {
   EaseStyleId,
   NeckStyle,
   ShoulderStyle,
+  Technique,
 } from './data/types';
 
 export { sizes, findSize, availableChests } from './data/sizes';

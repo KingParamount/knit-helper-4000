@@ -3,6 +3,8 @@ declare const console: { log: (...args: unknown[]) => void };
 import { findSize } from '../data/sizes';
 import { DEFAULT_GAUGE } from '../gauge';
 import { assembleGarment } from '../pieces/garment';
+import { backRows } from '../pieces/back';
+import { frontRows } from '../pieces/front';
 import { renderPiece, renderPattern, patternText, makingUpProse } from './prose';
 
 const W36 = findSize('Woman', 36, 'in')!;
@@ -181,4 +183,31 @@ it('CHECKPOINT: prints both registers of the full Woman 36" pattern', () => {
   console.log('\n===== VERBOSE =====\n' + patternText(renderPattern(garment)));
   console.log('\n===== ABBREVIATED =====\n' + patternText(renderPattern(garment, 'abbreviated')));
   expect(true).toBe(true);
+});
+
+describe('every style combination renders (regression: empty shaping group)', () => {
+  // A shaping row that was ITSELF a counter-reset boundary ended its own group before
+  // collecting anything, then crashed reading the last row of an empty list. It was
+  // reachable straight from the app — all four neck/shoulder combinations are
+  // selectable — for the sizes where the neck divides on the row the rib ends.
+  const CASES = [
+    ['Baby', 20], ['Child', 24], ['Woman', 36], ['Man', 44],
+  ] as const;
+  for (const [category, chest] of CASES) {
+    for (const neck of ['round', 'v'] as const) {
+      for (const shoulder of ['set_in', 'drop'] as const) {
+        it(`${category} ${chest}" ${neck}/${shoulder} renders without throwing`, () => {
+          const size = findSize(category, chest, 'in')!;
+          for (const style of ['verbose', 'abbreviated'] as const) {
+            expect(() =>
+              renderPiece(frontRows(size, 'moderate', DEFAULT_GAUGE, neck, shoulder), 'The Front', style),
+            ).not.toThrow();
+            expect(() =>
+              renderPiece(backRows(size, 'moderate', DEFAULT_GAUGE, shoulder), 'The Back', style),
+            ).not.toThrow();
+          }
+        });
+      }
+    }
+  }
 });

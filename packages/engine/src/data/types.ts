@@ -78,3 +78,21 @@ export type NeckStyle = 'round' | 'v';
  * wide top (no cap) that sews to the armhole edge. Distinct from EaseStyleId.
  */
 export type ShoulderStyle = 'set_in' | 'drop';
+
+/**
+ * How the garment is made. Matches the `method` option vocabulary in options.json,
+ * which has carried hand/machine/crochet since the data was recovered — this is the
+ * code finally using that axis.
+ *
+ * This is NOT a prose register (see ProseStyle, which is verbose vs abbreviated and
+ * is orthogonal to it). Technique changes the CONSTRUCTION as well as the wording:
+ * a machine takes pieces off on waste yarn and sews a separate neckband on, because
+ * picking a curved neck up onto the needles is awkward on a machine; a hand knitter
+ * holds stitches on a holder and picks the band up directly. Several machine idioms
+ * — the row counter, carriage side, tension MT−2, holding position — have no hand
+ * equivalent at all.
+ *
+ * 'crochet' is deliberately absent: it is a different craft, and whether it fits this
+ * row array at all is an open question, not a foregone one.
+ */
+export type Technique = 'machine' | 'hand';

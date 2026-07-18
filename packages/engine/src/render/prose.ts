@@ -25,7 +25,8 @@
  */
 
 import type { Row, Op, Carriage } from '../row';
-import type { NeckStyle, ShoulderStyle } from '../data/types';
+import type { NeckStyle, ShoulderStyle, Technique, Units } from '../data/types';
+import type { Gauge } from '../gauge';
 
 export interface PieceProse {
   title: string;
@@ -87,12 +88,12 @@ interface Vocab {
   castOn(n: number, carriageEnd: Carriage): string;
   ribTension(): string;
   setCounter(): string;
-  ribUntil(rc: number): string;
+  ribUntil(rc: number, lengthIn: number): string;
   resetToStocking(drop: Carriage | undefined, carriage: Carriage): string;
   resetPlain(carriage: Carriage): string;
   rejoinRight(): string;
   stitchCount(n: number, split: boolean): string;
-  knitUntil(rc: number, carriage?: Carriage): string;
+  knitUntil(rc: number, lengthIn: number, carriage?: Carriage): string;
   marker(): string;
   shapeLead(gap: number, rc: number, action: string): string;
   actDecBoth(): string;
@@ -147,7 +148,7 @@ const VERBOSE: Vocab = {
     `Cast on ${n} stitches ${splitV(n)}, ending with the carriage on the ${sideWord(ce)}.`,
   ribTension: () => 'Set the tension to main tension, minus 2 whole numbers.',
   setCounter: () => 'Set the row counter to 000.',
-  ribUntil: (rc) =>
+  ribUntil: (rc, _lengthIn) =>
     `Work in the rib pattern of your choice until the row counter reads ${pad(
       rc,
     )}. If you are knitting mock rib, follow your machine manual for how to work it.`,
@@ -159,7 +160,7 @@ const VERBOSE: Vocab = {
   rejoinRight: () => 'Return the right side of the work to the needles and rejoin the yarn.',
   stitchCount: (n, split) =>
     split ? `There should be ${n} stitches ${splitV(n)}.` : `There should be ${n} stitches.`,
-  knitUntil: (rc, carriage) =>
+  knitUntil: (rc, _lengthIn, carriage) =>
     `Knit until the row counter reads ${pad(rc)}.` + (carriage ? VERBOSE.carr(carriage) : ''),
   marker: () =>
     'Hang a marker of contrast yarn on the right and left edge stitches; the markers line up when you set the sleeve into the armhole.',
@@ -228,7 +229,7 @@ const TERSE: Vocab = {
   castOn: (n, ce) => `CO ${n} st ${splitT(n)}, ${corT(ce)}.`,
   ribTension: () => 'Set to MT-2.',
   setCounter: () => 'RC to 000.',
-  ribUntil: (rc) => `Work your rib to RC ${pad(rc)}. Mock rib: see machine manual.`,
+  ribUntil: (rc, _lengthIn) => `Work your rib to RC ${pad(rc)}. Mock rib: see machine manual.`,
   resetToStocking: (drop, carriage) =>
     'RC to 000, change to st st, set to MT' +
     (drop ? `, dec 1 st at ${edgeT(drop)}.` : '.') +
@@ -236,7 +237,7 @@ const TERSE: Vocab = {
   resetPlain: (carriage) => `RC to 000.${TERSE.carr(carriage)}`,
   rejoinRight: () => 'Return R side to needles, rejoin yarn.',
   stitchCount: (n, split) => (split ? `${n} st ${splitT(n)}.` : `${n} st.`),
-  knitUntil: (rc, carriage) => `Kn to RC ${pad(rc)}.` + (carriage ? TERSE.carr(carriage) : ''),
+  knitUntil: (rc, _lengthIn, carriage) => `Kn to RC ${pad(rc)}.` + (carriage ? TERSE.carr(carriage) : ''),
   marker: () => 'Hang marker on R and L edge sts (line up when setting in the sleeve).',
   shapeLead: (_gap, rc, action) => `Kn to RC ${pad(rc)}, then ${action}.`,
   actDecBoth: () => 'dec 1 st at either end',
@@ -282,7 +283,190 @@ const TERSE: Vocab = {
     'Mock rib or doubled band: knit twice the rows plain (or mock rib), pick the first row up (spare needles, or the last row for a plain band) to fold in half, take both off together on waste yarn. Sew on as before.',
 };
 
-function vocabFor(style: ProseStyle): Vocab {
+
+/**
+ * A length, for prose that measures rather than counts.
+ *
+ * Rounded to something a knitter can actually find on a tape: half a centimetre, or a
+ * quarter inch. Finer than that is false precision — the fabric moves more than that
+ * under its own weight, and the tension it came from was measured by hand.
+ */
+export function fmtLength(inches: number, units: Units): string {
+  if (units === 'cm') {
+    const cm = Math.round(inches * 2.54 * 2) / 2;
+    return `${cm % 1 === 0 ? cm.toFixed(0) : cm.toFixed(1)} cm`;
+  }
+  const q = Math.round(inches * 4);
+  const whole = Math.floor(q / 4);
+  const frac = ['', '¼', '½', '¾'][q % 4];
+  if (whole === 0) return `${frac || '0'} in`;
+  return `${whole}${frac} in`;
+}
+
+// ---------------------------------------------------------------------------
+// The hand-knitting register.
+// ---------------------------------------------------------------------------
+
+/**
+ * Hand knitting over the SAME row array. What changes and why:
+ *
+ *  - **Measure plain stretches, count shaped ones.** Hand patterns say "until the
+ *    piece measures 35 cm"; row tension varies between knitters far more than stitch
+ *    tension does, so a length is the more reliable instruction. But you cannot
+ *    measure your way to "decrease on this row", so shaping stays counted. That split
+ *    is per-context, not a blanket swap for the machine's row counter.
+ *  - **Never left/right.** The work turns over every row, so the same physical edge is
+ *    at the start of a right-side row and the end of a wrong-side one. Edges are named
+ *    for what they are — "each end of the row", "the neck edge" — which is true
+ *    whichever way the work is facing. (The machine register can say left and right
+ *    because the bed does not move.)
+ *  - **No machine idioms at all**: no row counter, no carriage, no tension dial, no
+ *    holding position, no waste yarn. Stitches that stay live go on a holder.
+ *  - **The knitter's own fabric.** We never name a stitch pattern: the tension came
+ *    from their swatch, so the garment is whatever they swatched in. Likewise we never
+ *    name a needle size or yarn — tension is many-to-one over yarn, needle and knitter,
+ *    so inferring backwards would be inventing an input we were never given.
+ *
+ * Decrease pairing follows the majority convention: ssk at the start of a right-side
+ * row, k2tog at the end, so each slant follows its edge. Sources describe the opposite
+ * pairing as a legitimate deliberate choice, so this is a default and not a law.
+ */
+function handVocab(style: ProseStyle, units: Units): Vocab {
+  const terse = style === 'abbreviated';
+  const len = (inches: number): string => fmtLength(inches, units);
+  // "the piece measures X" — the fabric is measured from the cast-on edge, not from a
+  // section boundary, because that is where a tape measure actually starts.
+  const measure = (inches: number): string =>
+    terse ? `work to ${len(inches)} from cast-on` : `until the piece measures ${len(inches)} from the cast-on edge`;
+
+  return {
+    // A hand knitter has no carriage; the facing is carried in the row instructions.
+    carr: () => '',
+    castOn: (n) =>
+      terse ? `CO ${n} st.` : `Cast on ${n} stitches.`,
+    // Rib is worked on smaller needles, but there is no way to measure how much
+    // smaller: it depends on the yarn and the knitter, and they have not swatched it.
+    // So this is advice, and the rib's DEPTH is given as a measurement instead of a
+    // row count, which needs no rib tension at all.
+    ribTension: () =>
+      terse
+        ? 'Use needles a size or two smaller than your swatch needles.'
+        : 'Work the rib on needles a size or two smaller than the ones you used for your tension swatch.',
+    setCounter: () => '',
+    ribUntil: (_rc, lengthIn) =>
+      terse
+        ? `Rib to ${len(lengthIn)}.`
+        : `Work in the rib of your choice until it measures ${len(lengthIn)}.`,
+    resetToStocking: (drop) =>
+      (terse
+        ? 'Change to your swatch needles and the stitch you swatched in'
+        : 'Change to the needles you used for your tension swatch, and to the stitch your tension swatch was knitted in') +
+      (drop ? ', decreasing 1 stitch on the first row.' : '.'),
+    resetPlain: () => '',
+    rejoinRight: () =>
+      terse
+        ? 'Rejoin yarn to the held stitches.'
+        : 'Return the held stitches to a needle and rejoin the yarn, ready to work the second side.',
+    stitchCount: (n) => (terse ? `${n} st.` : `There should be ${n} stitches.`),
+    knitUntil: (_rc, lengthIn) =>
+      terse ? `Work ${measure(lengthIn)}.` : `Continue in pattern ${measure(lengthIn)}.`,
+    marker: () =>
+      terse
+        ? 'Mark each end of this row.'
+        : 'Mark each end of this row with a contrast thread; the marks line up when you set the sleeve into the armhole.',
+    // Shaping is counted, not measured — you cannot measure your way to a decrease row.
+    shapeLead: (gap, _rc, action) =>
+      terse
+        ? `Work ${gap === 1 ? '1 row' : `${gap} rows`}, then ${action}.`
+        : `Work ${gap === 1 ? '1 row' : `${gap} rows`}, then ${action}.`,
+    actDecBoth: () =>
+      terse ? 'dec 1 st at each end (ssk at the start, k2tog at the end)' : 'decrease 1 stitch at each end of the row — ssk at the start, k2tog at the end, so each decrease leans with its edge',
+    actIncBoth: () => (terse ? 'inc 1 st at each end' : 'increase 1 stitch at each end of the row'),
+    actDecNeck: () => (terse ? 'dec 1 st at the neck edge' : 'decrease 1 stitch at the neck edge'),
+    // Casting off can only happen at the START of a row — the working yarn has to be at
+    // the stitches being removed, and at the end of a row it is positioned to turn. So
+    // a cast-off at each edge always costs a pair of rows. Naming the edge rather than a
+    // side keeps it true whichever way the work is facing.
+    actBindOffEdge: (n) =>
+      terse ? `cast off ${n} st at the start of the row` : `cast off ${n} stitches at the beginning of the row`,
+    actBindOffNeck: (n) =>
+      terse ? `cast off ${n} st at the neck edge` : `cast off ${n} stitches at the neck edge`,
+    repeatOnce: (_end, count) =>
+      terse ? `Rpt once more (${count} times in all).` : `Repeat the last instruction once more (${count} times in all).`,
+    repeatRange: (_a, _b, count) =>
+      terse
+        ? `Rpt on the next ${count - 1} rows (${count} times in all).`
+        : `Repeat the last instruction on each of the next ${count - 1} rows (${count} times in all).`,
+    repeatEvery: (step, _list, count) =>
+      terse
+        ? `Rpt every ${ordinal(step)} row, ${count} times in all.`
+        : `Repeat the last instruction on every ${ordinal(step)} row until you have worked it ${count} times in all.`,
+    repeatAt: (list, count) =>
+      terse
+        ? `Rpt ${count - 1} more times.`
+        : `Repeat the last instruction ${count - 1} more times (${count} times in all).`,
+    divideNeck: (gap, _rc, n) =>
+      terse
+        ? `Work ${gap === 1 ? '1 row' : `${gap} rows`}, then cast off the centre ${n} st to divide for the neck.`
+        : `Work ${gap === 1 ? '1 row' : `${gap} rows`}, then cast off the centre ${n} stitches loosely to divide for the neck. Work each side separately from here.`,
+    // Machine parks half the bed; by hand you slip the waiting stitches onto a holder.
+    parkRight: () =>
+      terse
+        ? 'Slip the waiting stitches onto a holder.'
+        : 'Slip the stitches of the second side onto a holder and leave them; you will work this side first.',
+    castingOff: () => (terse ? 'Shaping the shoulder.' : 'Shaping the shoulder.'),
+    breakYarnGraft: () =>
+      terse ? 'Break the yarn, leaving a long tail.' : 'Break the yarn, leaving a tail long enough to join the shoulder.',
+    bindOffCentre: (n) => (terse ? `Cast off the centre ${n} st loosely.` : `Cast off the centre ${n} stitches loosely.`),
+    bindOffRemainingCap: (n) =>
+      terse ? `Cast off the remaining ${n} st loosely.` : `Cast off the remaining ${n} stitches loosely to close the cap.`,
+    bindOffAll: (n) => (terse ? `Cast off all ${n} st loosely.` : `Cast off all ${n} stitches loosely.`),
+    // Shoulders are short-rowed, then left LIVE on a holder so the two can be joined
+    // with a three-needle cast off. Grafting is not used here: it makes a soft join, and
+    // a shoulder carries the weight of the garment.
+    takeShouldersEach: (n) =>
+      terse
+        ? `Slip each shoulder onto its own holder — ${n} st each.`
+        : `Slip each shoulder onto its own holder, leaving the stitches live. There should be ${n} stitches on each shoulder.`,
+    takeShoulderThis: (n) =>
+      terse
+        ? `Slip this shoulder onto a holder — ${n} st.`
+        : `Slip this shoulder onto a holder, leaving the stitches live. There should be ${n} stitches on this shoulder.`,
+    pickUp: (n) =>
+      terse
+        ? `Pick up and knit ${n} st evenly round the neck.`
+        : `With the right side facing, pick up and knit ${n} stitches evenly around the neck edge, working across the stitches held at the back and front as you come to them.`,
+    setHold: () => '',
+    // Short rows by hand: leave the stitches unworked and turn. Working the wrap in on
+    // the following row is what closes the hole at the turn.
+    holdGroup: (count) =>
+      terse
+        ? `Leave ${count} st unworked, turn.`
+        : `Leave the last ${count} stitches of the row unworked and turn, ready to work back.`,
+    holdRepeatBack: (count) =>
+      terse
+        ? `Rpt, leaving ${count} st each time, to the end of the shoulder.`
+        : `Repeat the last two instructions, leaving ${count} stitches unworked each time, until every shoulder stitch has been left unworked.`,
+    mitreHeading: () => 'Shaping the point of the V.',
+    mitreWork: (_rc, count) =>
+      terse
+        ? `Dec 1 st each side of the centre st every other row, ${count} times.`
+        : `Work a centred double decrease at the marked centre stitch on every other row, ${count} times in all, so the centre stitch rides over the top as an unbroken line down the point of the V.`,
+    mitreMeetNote: () => '',
+    crossoverTitle: () => '',
+    crossoverBody: () => '',
+    takeOff: (n) =>
+      terse ? `Slip all ${n} st onto a holder.` : `Slip all ${n} stitches onto a holder, leaving them live.`,
+    // A picked-up band is worked straight onto the neckline, so there is nothing to
+    // ease on and no seam for a marker to line up with.
+    markWaypoints: () => '',
+    foldedTitle: () => '',
+    foldedBody: () => '',
+  };
+}
+
+function vocabFor(style: ProseStyle, technique: Technique = 'machine', units: Units = 'in'): Vocab {
+  if (technique === 'hand') return handVocab(style, units);
   return style === 'abbreviated' ? TERSE : VERBOSE;
 }
 
@@ -443,8 +627,30 @@ function neckish(section: string | undefined): boolean {
 // The walk.
 // ---------------------------------------------------------------------------
 
-export function renderPiece(rows: Row[], title: string, style: ProseStyle = 'verbose'): PieceProse {
-  const v = vocabFor(style);
+/**
+ * What a piece needs beyond its rows. `gauge` and `units` exist for hand knitting:
+ * a machine pattern counts rows off the dial and never needs a length, but a hand
+ * pattern says "until the piece measures 35 cm", so lengths must be renderable.
+ */
+export interface PieceOpts {
+  style?: ProseStyle;
+  technique?: Technique;
+  gauge?: Gauge;
+  units?: Units;
+}
+
+export function renderPiece(
+  rows: Row[],
+  title: string,
+  styleOrOpts: ProseStyle | PieceOpts = 'verbose',
+): PieceProse {
+  const o: PieceOpts = typeof styleOrOpts === 'string' ? { style: styleOrOpts } : styleOrOpts;
+  const style = o.style ?? 'verbose';
+  const technique = o.technique ?? 'machine';
+  const v = vocabFor(style, technique, o.units ?? 'in');
+  // Rows to inches, for the lengths hand prose measures to. Falls back to zero when
+  // no gauge is supplied — machine prose never reads it.
+  const rowIn = o.gauge ? 4 / o.gauge.bodyRow : 0;
   const lines: string[] = [];
   const evs = rows.map(classify);
   const announced = new Set<string>();
@@ -454,17 +660,37 @@ export function renderPiece(rows: Row[], title: string, style: ProseStyle = 'ver
 
   let prevCounter = 0; // last counter position we described
   let pending: { section?: string; last: Row } | null = null; // run of plain rows
+  let lastLineWasPlain = false; // the previous emitted line was a plain-run instruction
 
   const flushPlain = (withCarriage: boolean): void => {
     if (!pending) return;
     const c = counter(pending.last.index);
-    if (pending.section === 'rib') lines.push(v.ribUntil(c));
-    else lines.push(v.knitUntil(c, withCarriage ? pending.last.carriage : undefined));
+    // Machine reads the counter, which is relative to the last reset. Hand measures
+    // the fabric, which is absolute from the cast-on edge — so both are passed.
+    const lengthIn = pending.last.index * rowIn;
+    const line =
+      pending.section === 'rib'
+        ? v.ribUntil(c, lengthIn)
+        : v.knitUntil(c, lengthIn, withCarriage ? pending.last.carriage : undefined);
+    // Two plain runs can end up back to back once a register drops what sat between
+    // them — a machine resets its counter there, a hand knitter has nothing to do. Two
+    // consecutive "work until it measures X" lines read as a contradiction, and the
+    // later one subsumes the earlier, so replace rather than append.
+    if (lastLineWasPlain && lines.length && lines[lines.length - 1] !== '') lines[lines.length - 1] = line;
+    else say(line);
+    lastLineWasPlain = true;
     prevCounter = c;
     pending = null;
   };
 
+  /** Push a line unless this register had nothing to say (an empty vocab result). */
+  const say = (text: string): void => {
+    if (text) lines.push(text);
+    lastLineWasPlain = false;
+  };
+
   const heading = (text: string): void => {
+    if (!text) return;
     lines.push('');
     lines.push(text);
   };
@@ -476,22 +702,30 @@ export function renderPiece(rows: Row[], title: string, style: ProseStyle = 'ver
       case 'armhole':
         announced.add(key);
         heading('Shape the armholes.');
-        lines.push(v.marker());
+        say(v.marker());
         break;
       case 'cap':
         announced.add(key);
         heading('Shape the cap.');
-        lines.push(v.marker());
+        say(v.marker());
         break;
       case 'shoulder':
         announced.add(key);
         heading('Shape the shoulders.');
-        lines.push(v.setHold());
+        say(v.setHold());
         break;
       case 'neck':
         if (row.side === 'left' || row.side === 'right') {
           announced.add(key);
-          heading(`Shape the ${sideWord(row.side === 'left' ? 'L' : 'R')} ${row.piece === 'back' ? 'back' : 'front'} neck.`);
+          heading(
+            technique === 'hand'
+              ? // Named by working order, not by side: the work turns over every row,
+                // so "left" would mean the knitter's left on one row and the other on
+                // the next. First/second is true however the piece is facing.
+                `Shape the neck on the ${announced.has('neckside') ? 'second' : 'first'} side.`
+              : `Shape the ${sideWord(row.side === 'left' ? 'L' : 'R')} ${row.piece === 'back' ? 'back' : 'front'} neck.`,
+          );
+          announced.add('neckside');
         }
         break;
       default:
@@ -520,11 +754,11 @@ export function renderPiece(rows: Row[], title: string, style: ProseStyle = 'ver
         stocking ? v.resetToStocking(drop, (prev as Row).carriage) : v.resetPlain((prev as Row).carriage),
       );
       // Starting the second (right) neck half: the parked side rejoins the work.
-      if (row.side === 'right') lines.push(v.rejoinRight());
+      if (row.side === 'right') say(v.rejoinRight());
       baseline = (prev as Row).index;
       prevCounter = 0;
       if (drop) {
-        lines.push(v.stitchCount(row.stitches, true));
+        say(v.stitchCount(row.stitches, true));
         pending = { section: row.section, last: row }; // the drop is stated; body lead-in
         i += 1;
         continue;
@@ -546,25 +780,25 @@ export function renderPiece(rows: Row[], title: string, style: ProseStyle = 'ver
 
     if (ev.kind === 'cast_on') {
       const n = (ev.op as { count: number }).count;
-      lines.push(v.castOn(n, otherSide(row.carriage)));
-      lines.push(v.ribTension());
-      lines.push(v.setCounter());
+      say(v.castOn(n, otherSide(row.carriage)));
+      say(v.ribTension());
+      say(v.setCounter());
       i += 1;
       continue;
     }
 
     if (ev.kind === 'pick_up') {
       const n = (ev.op as { count: number }).count;
-      lines.push(v.pickUp(n));
-      lines.push(v.ribTension());
-      lines.push(v.setCounter());
+      say(v.pickUp(n));
+      say(v.ribTension());
+      say(v.setCounter());
       prevCounter = 0;
       i += 1;
       continue;
     }
 
     if (ev.kind === 'mark') {
-      lines.push(v.markWaypoints((ev.op as { positions: number[] }).positions));
+      say(v.markWaypoints((ev.op as { positions: number[] }).positions));
       prevCounter = counter(row.index);
       i += 1;
       continue;
@@ -572,7 +806,7 @@ export function renderPiece(rows: Row[], title: string, style: ProseStyle = 'ver
 
     if (ev.kind === 'take_off') {
       lines.push('');
-      lines.push(v.takeOff((ev.op as { count: number }).count));
+      say(v.takeOff((ev.op as { count: number }).count));
       i += 1;
       continue;
     }
@@ -596,9 +830,9 @@ export function renderPiece(rows: Row[], title: string, style: ProseStyle = 'ver
       }
       heading(v.mitreHeading());
       const last = counter(mitreRows[mitreRows.length - 1].index);
-      lines.push(v.mitreWork(last, mitreRows.length));
-      lines.push(v.stitchCount(mitreRows[mitreRows.length - 1].stitches, false));
-      lines.push(v.mitreMeetNote());
+      say(v.mitreWork(last, mitreRows.length));
+      say(v.stitchCount(mitreRows[mitreRows.length - 1].stitches, false));
+      say(v.mitreMeetNote());
       prevCounter = last;
       i = j;
       continue;
@@ -609,25 +843,25 @@ export function renderPiece(rows: Row[], title: string, style: ProseStyle = 'ver
       const n = (ev.op as { count: number }).count;
       switch (row.section) {
         case 'neck_split':
-          lines.push(v.divideNeck(c - prevCounter, c, n));
-          lines.push(v.parkRight());
+          say(v.divideNeck(c - prevCounter, c, n));
+          say(v.parkRight());
           break;
         case 'cap':
           lines.push('');
-          lines.push(v.castingOff());
-          lines.push(v.bindOffRemainingCap(n));
+          say(v.castingOff());
+          say(v.bindOffRemainingCap(n));
           break;
         case 'castoff': // neckband
           lines.push('');
-          lines.push(v.castingOff());
-          lines.push(v.bindOffAll(n));
+          say(v.castingOff());
+          say(v.bindOffAll(n));
           break;
         default: // back neck
           lines.push('');
-          lines.push(v.castingOff());
-          lines.push(v.breakYarnGraft());
-          lines.push(v.bindOffCentre(n));
-          lines.push(v.takeShouldersEach(row.stitches / 2));
+          say(v.castingOff());
+          say(v.breakYarnGraft());
+          say(v.bindOffCentre(n));
+          say(v.takeShouldersEach(row.stitches / 2));
       }
       prevCounter = c;
       i += 1;
@@ -639,7 +873,7 @@ export function renderPiece(rows: Row[], title: string, style: ProseStyle = 'ver
       const n = (ev.op as { count: number }).count;
       const side = (ev.op as { side: Carriage }).side;
       const action = neckish(row.section) ? v.actBindOffNeck(n) : v.actBindOffEdge(n, side);
-      lines.push(v.shapeLead(c - prevCounter, c, action));
+      say(v.shapeLead(c - prevCounter, c, action));
       prevCounter = c;
       i += 1;
       continue;
@@ -652,7 +886,13 @@ export function renderPiece(rows: Row[], title: string, style: ProseStyle = 'ver
     let j = i;
     while (j < evs.length) {
       if (evs[j].kind === kind) {
-        if (isResetBoundary(evs[j].row, evs[j - 1]?.row)) break;
+        // Only a boundary BETWEEN shaping rows ends the group. Testing the first row
+        // too meant that a shaping row which was itself a reset boundary broke the
+        // loop immediately, leaving the group empty — which crashed on the stitch-count
+        // checkpoint below, and would otherwise have spun forever, since j never
+        // advanced past i. Reachable from the app: v-neck + drop shoulder at Baby 20",
+        // Child 24" and Man 44", where the neck divides on the row the rib ends.
+        if (j > i && isResetBoundary(evs[j].row, evs[j - 1]?.row)) break;
         shapeRows.push(evs[j].row);
         j += 1;
       } else if (evs[j].kind === 'plain') {
@@ -668,7 +908,7 @@ export function renderPiece(rows: Row[], title: string, style: ProseStyle = 'ver
     const action =
       kind === 'dec_both' ? v.actDecBoth() : kind === 'inc_both' ? v.actIncBoth() : v.actDecNeck();
     for (const p of toPhases(allCounters)) {
-      lines.push(v.shapeLead(p.start - prevCounter, p.start, action));
+      say(v.shapeLead(p.start - prevCounter, p.start, action));
       if (p.count > 1) {
         const inPhase = allCounters.filter((c) => c >= p.start && c <= p.end);
         lines.push(repeatLine(p, inPhase, v));
@@ -678,7 +918,7 @@ export function renderPiece(rows: Row[], title: string, style: ProseStyle = 'ver
     }
     // Stitch-count checkpoint. A one-edge neck shaping works an off-centre half, so
     // it is not split left/right.
-    lines.push(v.stitchCount(shapeRows[shapeRows.length - 1].stitches, kind !== 'dec_edge'));
+    say(v.stitchCount(shapeRows[shapeRows.length - 1].stitches, kind !== 'dec_edge'));
     i = j;
   }
 
@@ -687,16 +927,25 @@ export function renderPiece(rows: Row[], title: string, style: ProseStyle = 'ver
   // point instead of the mitre. Neither is a construction fork (see the memory notes).
   if (rows.some((r) => r.section === 'take_off')) {
     lines.push('');
-    lines.push(v.foldedTitle());
-    lines.push(v.foldedBody());
+    say(v.foldedTitle());
+    say(v.foldedBody());
     if (rows.some((r) => r.section === 'mitre')) {
       lines.push('');
-      lines.push(v.crossoverTitle());
-      lines.push(v.crossoverBody());
+      say(v.crossoverTitle());
+      say(v.crossoverBody());
     }
   }
 
-  return { title, lines };
+  // Members with no equivalent in this register return an empty string (a hand knitter
+  // has no carriage to report, no counter to reset). Drop those, and any blank run they
+  // leave behind, so one register's absences do not punch holes in the other's layout.
+  const tidied: string[] = [];
+  for (const line of lines) {
+    if (line === '' && (tidied.length === 0 || tidied[tidied.length - 1] === '')) continue;
+    tidied.push(line);
+  }
+  while (tidied.length && tidied[tidied.length - 1] === '') tidied.pop();
+  return { title, lines: tidied };
 }
 
 /**
@@ -731,6 +980,9 @@ function renderHolds(
     } else break;
   }
 
+  const say = (text: string): void => {
+    if (text) lines.push(text);
+  };
   const frontHalf = !!evs[start].row.side;
   const last = holds[holds.length - 1];
   let tail = holds.length - 1; // trailing holds sharing the last group's count
@@ -741,22 +993,22 @@ function renderHolds(
     // steady count, then repeat the pair.
     const showThrough = Math.min(tail + 1, holds.length - 1);
     for (let k = 0; k <= showThrough; k++) {
-      lines.push(v.holdGroup(holds[k].count, holds[k].side, holds[k].c));
+      say(v.holdGroup(holds[k].count, holds[k].side, holds[k].c));
     }
     if (showThrough < holds.length - 1) {
-      lines.push(v.holdRepeatBack(last.count, last.c, last.carriage));
+      say(v.holdRepeatBack(last.count, last.c, last.carriage));
     }
   } else {
     // Front half: one edge, a plain return between holds.
     for (let k = 0; k <= tail; k++) {
-      lines.push(v.holdGroup(holds[k].count, holds[k].side, holds[k].c));
+      say(v.holdGroup(holds[k].count, holds[k].side, holds[k].c));
     }
     if (tail < holds.length - 1) {
       const rest = holds.slice(tail + 1).map((h) => pad(h.c));
-      lines.push(v.repeatAt(rest, holds.length - tail));
+      say(v.repeatAt(rest, holds.length - tail));
     }
-    lines.push(v.takeShoulderThis(evs[start].row.stitches));
-    lines.push(v.breakYarnGraft());
+    say(v.takeShoulderThis(evs[start].row.stitches));
+    say(v.breakYarnGraft());
   }
   return i;
 }
