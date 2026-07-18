@@ -181,3 +181,107 @@ body {
 .notice.err { background: #fbe3e3; color: #8a2b2b; border: 1px solid #efc0c0; }
 
 footer.foot { text-align: center; color: var(--ink-soft); font-size: .8rem; padding: 24px 0 8px; }
+
+/* ---------------------------------------------------------------------------
+ * Print. The printed pattern is a different document from the page, not the
+ * page with its furniture hidden: on screen you look at one piece behind tabs,
+ * on paper you need all of them. PrintDoc builds it; these rules swap which of
+ * the two is visible. "Save as PDF" in the print dialogue uses this same path.
+ * ------------------------------------------------------------------------- */
+
+.printdoc { display: none; }
+
+@media print {
+  /* Hide the app; show the document. */
+  .masthead, .page { display: none !important; }
+  .printdoc { display: block; }
+
+  @page { margin: 14mm; }
+
+  html, body {
+    background: #fff; color: #000;
+    /* Paper is not a screen — drop the tinted ground and let the ink be ink. */
+  }
+
+  .print-sheet {
+    break-after: page;
+    page-break-after: always; /* older engines */
+  }
+  .print-sheet:last-child { break-after: auto; page-break-after: auto; }
+
+  .print-head { margin-bottom: 10mm; border-bottom: 1.5pt solid #000; padding-bottom: 3mm; }
+  .print-head h1 { font-family: var(--serif); font-size: 20pt; margin: 0; }
+  .print-meta { font-size: 10pt; margin: 2mm 0 0; }
+
+  .print-piece-title {
+    font-family: var(--serif); font-size: 15pt; margin: 0 0 4mm;
+    break-after: avoid; page-break-after: avoid; /* never orphan a heading */
+  }
+
+  /* Blocking diagrams get their own sheets at the end of the document, one apiece,
+     as big as the page allows — they are blocked against, not read alongside the
+     instructions. The height cap leaves room for the heading and nothing else, so
+     the drawing fills the rest of the sheet. */
+  .print-diagram {
+    display: flex; justify-content: center;
+    margin: 0;
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .print-diagram svg { max-width: 100%; height: auto; }
+  .print-diagram.big svg { max-height: 240mm; width: auto; }
+
+  /* Instructions run the full width beneath the diagram — no narrow column, since
+     nothing sits alongside them any more. */
+  .print-prose { font-size: 10pt; line-height: 1.45; }
+  .print-prose p { margin: 0 0 1.8mm; break-inside: avoid; page-break-inside: avoid; }
+
+  /* Concise in two columns — the shorter document that choosing concise implies. */
+  .print-prose.two-col { columns: 2; column-gap: 10mm; column-fill: auto; }
+
+  /* The knit chart takes the place of the prose, so it gets the full width. */
+  .print-chart { display: flex; justify-content: center; break-inside: avoid; page-break-inside: avoid; }
+  .print-chart svg { max-width: 100%; height: auto; }
+
+  /* --- Roller templates, tiled ------------------------------------------------
+     A template is measured with a ruler, so it must print at intrinsic size. We cut
+     it into page-sized tiles ourselves (see tiling.ts) rather than hoping the
+     browser spills it — Firefox does, Chrome/Safari clip, and Firefox's dialogue
+     resets to "fit to page width" on every open. Each tile is strictly smaller than
+     the printable area, so shrink-to-fit is a no-op and 1:1 survives the default.
+     Nothing in here may set max-width on the SVG: that would scale the drawing,
+     which is the exact failure this whole mode exists to prevent. */
+  /* Fixed height, clipped. tiling.ts subtracts exactly this from every tile's
+     drawing area; if the heading grows past it the window is pushed onto a second
+     sheet, which is what an unbudgeted heading did before. Keep to two lines. */
+  .printdoc.templates .tile-head {
+    height: 12mm; overflow: hidden;
+    font-size: 9pt; line-height: 1.25; margin: 0;
+  }
+  .printdoc.templates .tile-head strong { font-family: var(--serif); font-size: 11pt; }
+  .printdoc.templates .tile-meta { font-size: 8pt; color: #444; }
+
+  .cover-list { font-size: 10pt; line-height: 1.5; margin: 0 0 6mm; padding-left: 5mm; }
+  .cover-list li { margin-bottom: 1.5mm; }
+
+  .tile-window {
+    position: relative;
+    overflow: hidden;          /* the window: shows one tile's region only */
+    outline: 0.3pt solid #999; /* trim guide */
+  }
+  .tile-shift { position: absolute; }
+  .tile-shift svg { display: block; max-width: none; width: auto; height: auto; }
+
+  /* The strip duplicated on the next sheet — tape here. */
+  .tile-overlap { position: absolute; background: rgba(0, 0, 0, .05); pointer-events: none; }
+  .tile-overlap.right { top: 0; bottom: 0; right: 0; width: 10mm; border-left: 0.3pt dashed #888; }
+  .tile-overlap.bottom { left: 0; right: 0; bottom: 0; height: 10mm; border-top: 0.3pt dashed #888; }
+
+  /* Corner crop marks — trim to these before taping. */
+  .crop { position: absolute; width: 4mm; height: 4mm; }
+  .crop.tl { top: 0; left: 0; border-top: 0.5pt solid #000; border-left: 0.5pt solid #000; }
+  .crop.tr { top: 0; right: 0; border-top: 0.5pt solid #000; border-right: 0.5pt solid #000; }
+  .crop.bl { bottom: 0; left: 0; border-bottom: 0.5pt solid #000; border-left: 0.5pt solid #000; }
+  .crop.br { bottom: 0; right: 0; border-bottom: 0.5pt solid #000; border-right: 0.5pt solid #000; }
+
+  .print-note { font-size: 9pt; margin: 0 0 4mm; }
+}

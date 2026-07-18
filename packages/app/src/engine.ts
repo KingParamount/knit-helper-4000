@@ -73,13 +73,24 @@ export function resolveSize(category: Category, chest: number): ReturnType<typeo
   return findSize(category, chest, 'in');
 }
 
-export function buildPatternText(input: BuildInput, style: ProseStyle): string | null {
+/**
+ * The pattern as structured pieces. The screen joins them into one block of text;
+ * the print sheet pairs each with its schematic, so it needs them apart.
+ * renderPattern's order is back, front, sleeves, neckband, then Making Up — the
+ * first four line up with PieceId, and Making Up has no piece to draw.
+ */
+export function buildPattern(input: BuildInput, style: ProseStyle): Pattern | null {
   const size = resolveSize(input.category, input.chest);
   if (!size) return null;
   const g = gaugeFromSwatch(input.swatch);
   const neck = input.neck ?? 'round';
   const shoulder = input.shoulder ?? 'set_in';
-  const pattern: Pattern = renderPattern(assembleGarment(size, input.ease, g, neck, shoulder), style);
+  return renderPattern(assembleGarment(size, input.ease, g, neck, shoulder), style);
+}
+
+export function buildPatternText(input: BuildInput, style: ProseStyle): string | null {
+  const pattern = buildPattern(input, style);
+  if (!pattern) return null;
   return pattern.pieces.map((p) => `${p.title}\n${p.lines.join('\n')}`).join('\n\n\n');
 }
 

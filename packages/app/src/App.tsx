@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
-import { availableChests } from '@knit-helper-4000/engine';
+import { availableChests, schematicMetrics } from '@knit-helper-4000/engine';
 import type { Category, Units, NeckStyle, ShoulderStyle } from '@knit-helper-4000/engine';
 import {
   DEFAULT_SWATCH,
+  buildPattern,
   buildPatternText,
   buildSchematics,
   gaugeFromSwatch,
@@ -20,6 +21,8 @@ import {
   IconEase, IconCrew, IconVneck, IconShoulder, IconSleeve,
   IconDocFull, IconDocShort, IconChart, IconRoller, IconPrint,
 } from './icons';
+import { PrintDoc } from './PrintDoc';
+import { PAPERS, planTiles, describePlan, type PaperId } from './tiling';
 import './theme.css';
 
 type OutputId = 'full' | 'concise' | 'chart' | 'knitleader' | 'knitradar';
@@ -125,6 +128,8 @@ export function App(): JSX.Element {
   const [output, setOutput] = useState<OutputId>('full');
   const [piece, setPiece] = useState<PieceId>('back');
   const [help, setHelp] = useState(false);
+  const [paper, setPaper] = useState<PaperId>('a4');
+  const [landscape, setLandscape] = useState(false);
 
   const chests = useMemo(() => availableChests(category, 'in'), [category]);
   const chooseCategory = (c: Category): void => {
@@ -157,11 +162,64 @@ export function App(): JSX.Element {
 
   const diagramSvg = (pid: PieceId, factor?: number): string =>
     schematics ? svgFor(schematics[pid], { scale: 'measured', units, grid: !factor, scaleFactor: factor }) : '';
+
+  /**
+   * On paper a CSS pixel IS 1/96 inch, so a measured drawing only comes out at true
+   * physical size at 96 px per inch. The screen's default (46) is a sensible viewing
+   * density but would print every drawing at just under half size — including the
+   * roller templates, where exact size is the whole point, and their own "10 cm"
+   * calibration line, which is drawn in the same scaled space and so shrinks with it.
+   */
+  const PRINT_PX_PER_IN = 96;
+  const printDiagramSvg = (pid: PieceId, factor?: number): string =>
+    schematics
+      ? svgFor(schematics[pid], {
+          scale: 'measured',
+          units,
+          grid: !factor,
+          scaleFactor: factor,
+          pxPerUnit: PRINT_PX_PER_IN,
+        })
+      : '';
   const chartSvg = (pid: PieceId): string =>
     schematics ? svgFor(schematics[pid], { scale: 'stitch', chart: true, grid: true }) : '';
 
   const scaleFactor = output === 'knitleader' ? 0.5 : output === 'knitradar' ? 0.25 : undefined;
   const templateOnly = output === 'knitleader' || output === 'knitradar';
+
+  // The printed sheet is its own document over the same engine output, so it carries
+  // every piece regardless of which tab is open on screen. Concise stays concise.
+  const printPattern = useMemo(
+    () => buildPattern(input, output === 'concise' ? 'abbreviated' : 'verbose'),
+    [category, chest, ease, neck, shoulder, swatch, output],
+  );
+  // How each template gets cut across sheets. Measured from the drawing's true size,
+  // which the engine computes without building the SVG (schematicMetrics).
+  const paperRec = PAPERS.find((p) => p.id === paper) ?? PAPERS[0];
+  const tilePlanFor = (pid: PieceId) => {
+    const m = schematics
+      ? schematicMetrics(schematics[pid], {
+          scale: 'measured',
+          scaleFactor,
+          pxPerUnit: PRINT_PX_PER_IN,
+        })
+      : { W: 0, H: 0 };
+    return planTiles(m.W, m.H, paperRec, landscape);
+  };
+  // The Back is the widest piece, so its plan is the one worth previewing.
+  const backPlanTiles = schematics ? tilePlanFor('back') : null;
+
+  const printLabels = {
+    sizeLabel: `${category} ${sizeVal} ${sizeUnit}`,
+    styleLabel: [
+      neck === 'v' ? 'V-neck' : 'Crew neck',
+      shoulder === 'drop' ? 'drop shoulder' : 'set-in sleeve',
+      // "moderate ease", not a bare "moderate" — on paper the word has to carry
+      // its own meaning, with no selector above it to say what it refers to.
+      ease ? `${EASES.find((e) => e.id === ease)?.label.toLowerCase() ?? ''} ease` : '',
+    ].filter(Boolean).join(' · '),
+    gaugeLabel: `${gauge.st} sts / ${gauge.row} rows to ${units === 'cm' ? '10 cm' : '4 in'}`,
+  };
 
   return (
     <>
@@ -327,13 +385,73 @@ export function App(): JSX.Element {
         <Section label="Print">
           <Tile className="full">
             <div className="btn-row">
-              <Btn icon={<IconPrint />} label="Print this" state="normal" onClick={() => window.print()} />
+              <Btn
+                icon={<IconPrint />}
+                label={templateOnly ? 'Print the templates' : output === 'chart' ? 'Print the charts' : 'Print the pattern'}
+                state={printPattern ? 'normal' : 'blocked'}
+                onClick={() => window.print()}
+              />
             </div>
+            {templateOnly && (
+              <div style={{ marginTop: 12 }}>
+                <div className="btn-row">
+                  {PAPERS.map((p) => (
+                    <Btn
+                      key={p.id}
+                      label={p.label}
+                      state={paper === p.id ? 'selected' : 'normal'}
+                      onClick={() => setPaper(p.id)}
+                    />
+                  ))}
+                  <Btn
+                    label="Landscape"
+                    state={landscape ? 'selected' : 'normal'}
+                    onClick={() => setLandscape(!landscape)}
+                  />
+                </div>
+              </div>
+            )}
+            <p style={{ fontSize: '.85rem', color: 'var(--ink-soft)', marginTop: 10 }}>
+              {templateOnly ? (
+                <>
+                  Each piece is cut into sheets you tape together — the Back takes{' '}
+                  <strong>{backPlanTiles ? describePlan(backPlanTiles) : '—'}</strong> on{' '}
+                  {paperRec.label}
+                  {landscape ? ' landscape' : ''}. Choose the same paper in the print
+                  dialogue. Every sheet is smaller than the page, so the scale setting
+                  should not matter — but check the 10&nbsp;cm line with a ruler before
+                  you knit to it.
+                </>
+              ) : (
+                `Prints every piece${output === 'chart' ? ' with its chart' : ''}, and the making up — not just the piece shown above. Choose “Save as PDF” in the print dialogue to keep a copy.`
+              )}
+            </p>
           </Tile>
         </Section>
 
         <footer className="foot">Knit-Helper 4000 — sweaters, standard sizes. More garments and custom sizes on the way.</footer>
       </div>
+
+      {/* The print document: off-screen always, revealed only by @media print. */}
+      {printPattern && (
+        <PrintDoc
+          pattern={printPattern}
+          mode={templateOnly ? 'templates' : output === 'chart' ? 'chart' : 'prose'}
+          twoColumn={output === 'concise'}
+          chartFor={chartSvg}
+          tilePlanFor={tilePlanFor}
+          svgFor={(pid) => printDiagramSvg(pid, scaleFactor)}
+          sizeLabel={printLabels.sizeLabel}
+          styleLabel={printLabels.styleLabel}
+          gaugeLabel={printLabels.gaugeLabel}
+          units={units}
+          templateLabel={
+            templateOnly
+              ? `${output === 'knitleader' ? 'KnitLeader — half scale' : 'KnitRadar — quarter scale'}. Print at 100%; the 10 cm line checks it came out true.`
+              : undefined
+          }
+        />
+      )}
 
       {help && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(8,20,45,.6)', display: 'grid', placeItems: 'center', padding: 20 }} onClick={() => setHelp(false)}>
