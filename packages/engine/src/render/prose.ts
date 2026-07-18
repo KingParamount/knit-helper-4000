@@ -83,6 +83,13 @@ function andList(items: string[]): string {
 // The vocabulary — every user-facing phrase, in two registers.
 // ---------------------------------------------------------------------------
 
+/**
+ * Which face a shaping instruction is worked on. 'alternating' is a phase that shapes
+ * on every row and so works both faces — which only a hand knitter has to care about,
+ * since a machine bed never turns over.
+ */
+export type Facing = 'rs' | 'ws' | 'alternating';
+
 interface Vocab {
   carr(side: Carriage): string; // carriage-position suffix (leading space)
   castOn(n: number, carriageEnd: Carriage): string;
@@ -96,9 +103,9 @@ interface Vocab {
   knitUntil(rc: number, lengthIn: number, carriage?: Carriage): string;
   marker(): string;
   shapeLead(gap: number, rc: number, action: string): string;
-  actDecBoth(): string;
-  actIncBoth(): string;
-  actDecNeck(): string;
+  actDecBoth(facing: Facing): string;
+  actIncBoth(facing: Facing): string;
+  actDecNeck(facing: Facing): string;
   actBindOffEdge(n: number, side: Carriage): string;
   actBindOffNeck(n: number): string;
   repeatOnce(end: number, count: number): string;
@@ -124,6 +131,8 @@ interface Vocab {
   crossoverTitle(): string;
   crossoverBody(): string;
   takeOff(n: number): string;
+  /** Finishing a band that was worked in place (hand only; machine sews its band on). */
+  bandCastOff(n: number): string;
   markWaypoints(positions: number[]): string;
   foldedTitle(): string;
   foldedBody(): string;
@@ -166,9 +175,9 @@ const VERBOSE: Vocab = {
     'Hang a marker of contrast yarn on the right and left edge stitches; the markers line up when you set the sleeve into the armhole.',
   shapeLead: (gap, rc, action) =>
     `Knit ${gap === 1 ? '1 row' : `${gap} rows`} to row counter ${pad(rc)}, then ${action}.`,
-  actDecBoth: () => 'decrease 1 stitch at either end of the row',
-  actIncBoth: () => 'increase 1 stitch at either end of the row',
-  actDecNeck: () => 'decrease 1 stitch at the neck edge',
+  actDecBoth: (_rs) => 'decrease 1 stitch at either end of the row',
+  actIncBoth: (_rs) => 'increase 1 stitch at either end of the row',
+  actDecNeck: (_rs) => 'decrease 1 stitch at the neck edge',
   actBindOffEdge: (n, side) => `cast off ${n} stitches at the ${sideWord(side)} hand edge`,
   actBindOffNeck: (n) => `cast off ${n} stitches at the neck edge`,
   repeatOnce: (end, count) =>
@@ -215,6 +224,7 @@ const VERBOSE: Vocab = {
     'For a crossed-over point instead of the mitre, work the band straight (no end shaping), then lap one end over the other at the centre front and stitch both down neatly on the inside. It is the more casual finish.',
   takeOff: (n) =>
     `Take all ${n} stitches off onto 5–6 rows of waste yarn — they stay live, ready to block and seam.`,
+  bandCastOff: (n) => `Cast off all ${n} stitches loosely in rib.`,
   markWaypoints: (positions) =>
     `Hang a contrast-yarn marker at ${andList(positions.map((p) => `stitch ${p}`))} — this is where the band will meet the shoulder ${
       positions.length > 1 ? 'seams' : 'seam'
@@ -240,9 +250,9 @@ const TERSE: Vocab = {
   knitUntil: (rc, _lengthIn, carriage) => `Kn to RC ${pad(rc)}.` + (carriage ? TERSE.carr(carriage) : ''),
   marker: () => 'Hang marker on R and L edge sts (line up when setting in the sleeve).',
   shapeLead: (_gap, rc, action) => `Kn to RC ${pad(rc)}, then ${action}.`,
-  actDecBoth: () => 'dec 1 st at either end',
-  actIncBoth: () => 'inc 1 st at either end',
-  actDecNeck: () => 'dec 1 st at neck edge',
+  actDecBoth: (_rs) => 'dec 1 st at either end',
+  actIncBoth: (_rs) => 'inc 1 st at either end',
+  actDecNeck: (_rs) => 'dec 1 st at neck edge',
   actBindOffEdge: (n, side) => `BO ${n} st at ${edgeT(side)}`,
   actBindOffNeck: (n) => `BO ${n} st at neck edge`,
   repeatOnce: (end, count) => `Rpt instruction once more, at RC ${pad(end)} (total ${count} times).`,
@@ -274,6 +284,7 @@ const TERSE: Vocab = {
   crossoverBody: () =>
     'Crossed-over: work the band straight (no end shaping), lap one end over the other at centre front, stitch down inside.',
   takeOff: (n) => `Take all ${n} st off on 5–6 rows waste yarn (live, to block & seam).`,
+  bandCastOff: (n) => `BO all ${n} st loosely in rib.`,
   markWaypoints: (positions) =>
     `Hang a contrast marker at ${andList(positions.map((p) => `st ${p}`))} (band meets the shoulder ${
       positions.length > 1 ? 'seams' : 'seam'
@@ -379,10 +390,56 @@ function handVocab(style: ProseStyle, units: Units): Vocab {
       terse
         ? `Work ${gap === 1 ? '1 row' : `${gap} rows`}, then ${action}.`
         : `Work ${gap === 1 ? '1 row' : `${gap} rows`}, then ${action}.`,
-    actDecBoth: () =>
-      terse ? 'dec 1 st at each end (ssk at the start, k2tog at the end)' : 'decrease 1 stitch at each end of the row — ssk at the start, k2tog at the end, so each decrease leans with its edge',
+    /*
+     * Shaping is conventionally worked on right-side rows, because the slant of a
+     * decrease reads on the knit face and barely shows on the purl one. This shaping
+     * does not all fall there: the armhole starts the row after the underarm cast-offs,
+     * so its alternate-row phases land on wrong-side rows, and the fastest phase works
+     * every row and therefore both faces whatever we do.
+     *
+     * We name the decrease for the row's facing rather than move the shaping. The row
+     * array is shared with the machine pattern, whose proportions are validated against
+     * real published patterns; re-cadencing it for hand would deepen the armhole and put
+     * the hand version outside everything that validation covers. Purl-side paired
+     * decreases exist for exactly this case.
+     *
+     * The pairing mirrors: an edge keeps its lean whichever face is being worked. On a
+     * right-side row ssk opens the row and k2tog closes it; on a wrong-side row the work
+     * is turned, so the edge that ssk shaped is now at the END of the row and takes ssp,
+     * and the k2tog edge opens the row and takes p2tog.
+     *
+     * FLAGGED FOR A KNITTER: most of the armhole lands on wrong-side rows. It is
+     * workable and the decreases lean correctly, but a hand knitter may simply prefer
+     * the whole armhole shifted a row so it falls on right-side rows instead.
+     */
+    actDecBoth: (facing) => {
+      if (facing === 'rs') {
+        return terse
+          ? 'dec 1 st at each end (ssk at the start, k2tog at the end)'
+          : 'decrease 1 stitch at each end of the row — ssk at the start, k2tog at the end, so each decrease leans with its edge';
+      }
+      if (facing === 'ws') {
+        return terse
+          ? 'dec 1 st at each end (p2tog at the start, ssp at the end)'
+          : 'decrease 1 stitch at each end of the row — p2tog at the start, ssp at the end, which lean to match the decreases worked on the right side';
+      }
+      // Every row, so both faces: give the knitter the pair for each.
+      return terse
+        ? 'dec 1 st at each end (RS: ssk/k2tog; WS: p2tog/ssp)'
+        : 'decrease 1 stitch at each end of the row, working ssk at the start and k2tog at the end on right-side rows, and p2tog at the start and ssp at the end on wrong-side rows';
+    },
     actIncBoth: () => (terse ? 'inc 1 st at each end' : 'increase 1 stitch at each end of the row'),
-    actDecNeck: () => (terse ? 'dec 1 st at the neck edge' : 'decrease 1 stitch at the neck edge'),
+    actDecNeck: (facing) => {
+      if (facing === 'rs') return terse ? 'dec 1 st at the neck edge' : 'decrease 1 stitch at the neck edge';
+      if (facing === 'ws') {
+        return terse
+          ? 'dec 1 st at the neck edge (purlwise)'
+          : 'decrease 1 stitch at the neck edge, working the decrease purlwise';
+      }
+      return terse
+        ? 'dec 1 st at the neck edge (purlwise on WS rows)'
+        : 'decrease 1 stitch at the neck edge, working it purlwise on wrong-side rows';
+    },
     // Casting off can only happen at the START of a row — the working yarn has to be at
     // the stitches being removed, and at the end of a row it is positioned to turn. So
     // a cast-off at each edge always costs a pair of rows. Naming the edge rather than a
@@ -447,7 +504,10 @@ function handVocab(style: ProseStyle, units: Units): Vocab {
       terse
         ? `Rpt, leaving ${count} st each time, to the end of the shoulder.`
         : `Repeat the last two instructions, leaving ${count} stitches unworked each time, until every shoulder stitch has been left unworked.`,
-    mitreHeading: () => 'Shaping the point of the V.',
+    mitreHeading: () =>
+      terse
+        ? 'Shaping the V point. Mark the centre stitch.'
+        : 'Shaping the point of the V. Before you begin, mark the stitch at the exact centre front of the band — the shaping runs down either side of it and it must not be lost.',
     mitreWork: (_rc, count) =>
       terse
         ? `Dec 1 st each side of the centre st every other row, ${count} times.`
@@ -457,6 +517,10 @@ function handVocab(style: ProseStyle, units: Units): Vocab {
     crossoverBody: () => '',
     takeOff: (n) =>
       terse ? `Slip all ${n} st onto a holder.` : `Slip all ${n} stitches onto a holder, leaving them live.`,
+    bandCastOff: (n) =>
+      terse
+        ? `Cast off all ${n} st loosely in rib.`
+        : `Cast off all ${n} stitches loosely in rib — a tight cast-off here will stop the neck going over the head.`,
     // A picked-up band is worked straight onto the neckline, so there is nothing to
     // ease on and no seam for a marker to line up with.
     markWaypoints: () => '',
@@ -780,7 +844,13 @@ export function renderPiece(
 
     if (ev.kind === 'cast_on') {
       const n = (ev.op as { count: number }).count;
-      say(v.castOn(n, otherSide(row.carriage)));
+      // The neckband is the same strip of stitches either way, but it arrives on the
+      // needles differently. A machine casts it on separately and sews it to the
+      // neckline afterwards, because picking a curved neck up onto the bed is awkward;
+      // a hand knitter picks the stitches up straight off the neckline and carries on,
+      // which is why the hand version needs no easing markers and no seam for the band.
+      if (technique === 'hand' && row.piece === 'collar') say(v.pickUp(n));
+      else say(v.castOn(n, otherSide(row.carriage)));
       say(v.ribTension());
       say(v.setCounter());
       i += 1;
@@ -806,7 +876,12 @@ export function renderPiece(
 
     if (ev.kind === 'take_off') {
       lines.push('');
-      say(v.takeOff((ev.op as { count: number }).count));
+      // The machine takes every piece off on waste yarn, the band included, because
+      // the band is sewn on later. A hand knitter's band was picked up and worked in
+      // place, so it is finished here — cast off, not held. Body pieces still hold
+      // live, for the three-needle join at the shoulder.
+      if (technique === 'hand' && row.piece === 'collar') say(v.bandCastOff((ev.op as { count: number }).count));
+      else say(v.takeOff((ev.op as { count: number }).count));
       i += 1;
       continue;
     }
@@ -905,10 +980,23 @@ export function renderPiece(
     }
     const allCounters = shapeRows.map((r) => counter(r.index));
     const carriageAt = new Map(shapeRows.map((r) => [counter(r.index), r.carriage]));
-    const action =
-      kind === 'dec_both' ? v.actDecBoth() : kind === 'inc_both' ? v.actIncBoth() : v.actDecNeck();
+    // Right side is the odd row, working flat from a cast-on. A phase whose rows are
+    // all one parity is worked wholly on that face; an every-row phase alternates.
+    const indexAt = new Map(shapeRows.map((r) => [counter(r.index), r.index]));
+    const facingOf = (p: Phase): Facing => {
+      const covered = shapeRows.filter((r) => {
+        const c = counter(r.index);
+        return c >= p.start && c <= p.end;
+      });
+      const odd = covered.filter((r) => r.index % 2 === 1).length;
+      if (odd === covered.length) return 'rs';
+      if (odd === 0) return 'ws';
+      return 'alternating';
+    };
+    const actionFor = (f: Facing): string =>
+      kind === 'dec_both' ? v.actDecBoth(f) : kind === 'inc_both' ? v.actIncBoth(f) : v.actDecNeck(f);
     for (const p of toPhases(allCounters)) {
-      say(v.shapeLead(p.start - prevCounter, p.start, action));
+      say(v.shapeLead(p.start - prevCounter, p.start, actionFor(facingOf(p))));
       if (p.count > 1) {
         const inPhase = allCounters.filter((c) => c >= p.start && c <= p.end);
         lines.push(repeatLine(p, inPhase, v));
@@ -1035,11 +1123,112 @@ export interface Pattern {
  * own block.) A stretchy join is called out only where it matters — the neckband and
  * the armholes — with an example; other seams take any method.
  */
+
+/**
+ * Making up a hand-knitted garment. The order differs from the machine version because
+ * the neckband is not a separate strip:
+ *
+ *  - Nothing comes off on waste yarn, so there is nothing to unpick. Shoulders and the
+ *    back neck were left LIVE on holders.
+ *  - Shoulders are joined with a three-needle cast off, worked straight from those live
+ *    stitches. It makes a firmer, less bulky join than casting off and sewing, and a
+ *    shoulder carries the weight of the garment. Grafting is deliberately not used here
+ *    for the same reason — it gives a soft join.
+ *  - The band is picked up around the finished neckline and worked in place, so there is
+ *    no band to ease on, no markers to match to seams, and no band seam. That is why one
+ *    shoulder is joined before the band and the other after: the open shoulder is what
+ *    lets the neckline be worked flat, and closing it afterwards closes the band too.
+ *
+ * The V mitre is worked as the band is knitted (a centred double decrease down a marked
+ * centre stitch), not seamed afterwards — so the machine version's "seam the mitred ends
+ * at the centre front" step has no counterpart here.
+ */
+function handMakingUpProse(neck: NeckStyle, shoulder: ShoulderStyle, style: ProseStyle): PieceProse {
+  const verbose = style !== 'abbreviated';
+  const lines: string[] = [];
+  const stretchy = 'a stretchy seam such as mattress stitch';
+
+  lines.push(
+    verbose
+      ? 'Block each piece to the measurements on its schematic and let it dry before you start. Leave the shoulder and neck stitches on their holders until you come to them.'
+      : 'Block all pieces to the schematic measurements; let dry. Leave held stitches on their holders.',
+  );
+  if (verbose) {
+    lines.push(
+      'Work seams with the right sides together unless a step says otherwise, and join loosely enough that the seam stretches with the fabric.',
+    );
+  }
+
+  // 1 — one shoulder, so the neckline can be worked as a single flat edge.
+  lines.push('');
+  lines.push(
+    verbose
+      ? 'Join one shoulder with a three-needle cast off: hold the front and back shoulder stitches on their needles with the right sides together, and cast them off together through both. Leave the other shoulder on its holders for now — it stays open so the neckband can be worked flat.'
+      : 'Join one shoulder with a three-needle cast off. Leave the other open.',
+  );
+
+  // 2 — the band, worked in place.
+  lines.push('');
+  lines.push(
+    verbose
+      ? 'Work the neckband as given, picking the stitches up around the neckline with the right side facing and knitting across the held stitches as you reach them. Cast off loosely in rib — a tight cast-off here will stop the neck going over the head.'
+      : 'Work the neckband as given, picking up round the neckline. Cast off loosely in rib.',
+  );
+  if (neck === 'v') {
+    lines.push(
+      verbose
+        ? 'The point of the V is shaped as you work the band, so there is nothing to seam at the centre front.'
+        : 'The V point is shaped in the band; nothing to seam at centre front.',
+    );
+  }
+
+  // 3 — the second shoulder, closing the band with it.
+  lines.push('');
+  lines.push(
+    verbose
+      ? 'Join the second shoulder in the same way, taking the seam straight through the ends of the neckband so the band closes with it.'
+      : 'Join the second shoulder, through the band ends.',
+  );
+
+  // 4 — sleeves.
+  lines.push('');
+  if (shoulder === 'drop') {
+    lines.push(
+      verbose
+        ? `Sew in the sleeves. Centre each sleeve's straight top edge on the shoulder seam and sew it to the straight armhole edge down each side, using ${stretchy}.`
+        : `Sew in the sleeves: straight top to the armhole edge, centred on the shoulder seam.`,
+    );
+  } else {
+    lines.push(
+      verbose
+        ? `Set in the sleeves. Ease each sleeve cap into its armhole, matching the top of the cap to the shoulder seam and the underarm cast-offs to each other, using ${stretchy}.`
+        : `Set in the sleeves: ease each cap into its armhole, cap top to shoulder seam.`,
+    );
+  }
+
+  lines.push('');
+  lines.push(
+    verbose
+      ? 'Join the sides: seam each side and its sleeve underarm in one line, from the cuff to the hem.'
+      : 'Join the sides: cuff to hem in one line each side.',
+  );
+
+  lines.push('');
+  lines.push(
+    verbose
+      ? 'Darn in the ends along a seam or a row of stitches on the wrong side, and give the seams a final press if the yarn takes one.'
+      : 'Darn in the ends; press the seams if the yarn allows.',
+  );
+  return { title: 'Making Up', lines };
+}
+
 export function makingUpProse(
   neck: NeckStyle,
   shoulder: ShoulderStyle,
   style: ProseStyle = 'verbose',
+  technique: Technique = 'machine',
 ): PieceProse {
+  if (technique === 'hand') return handMakingUpProse(neck, shoulder, style);
   const verbose = style !== 'abbreviated';
   const lines: string[] = [];
   const stretchy = verbose ? 'a stretchy join (e.g. mattress stitch)' : 'stretchy join (e.g. mattress stitch)';
@@ -1129,15 +1318,16 @@ export function renderPattern(
     neck: NeckStyle;
     shoulder: ShoulderStyle;
   },
-  style: ProseStyle = 'verbose',
+  styleOrOpts: ProseStyle | PieceOpts = 'verbose',
 ): Pattern {
+  const o: PieceOpts = typeof styleOrOpts === 'string' ? { style: styleOrOpts } : styleOrOpts;
   return {
     pieces: [
-      renderPiece(garment.back, 'The Back', style),
-      renderPiece(garment.front, 'The Front', style),
-      renderPiece(garment.sleeveLeft, 'The Sleeves (make 2)', style),
-      renderPiece(garment.neckband, 'Neckband', style),
-      makingUpProse(garment.neck, garment.shoulder, style),
+      renderPiece(garment.back, 'The Back', o),
+      renderPiece(garment.front, 'The Front', o),
+      renderPiece(garment.sleeveLeft, 'The Sleeves (make 2)', o),
+      renderPiece(garment.neckband, 'Neckband', o),
+      makingUpProse(garment.neck, garment.shoulder, o.style ?? 'verbose', o.technique ?? 'machine'),
     ],
   };
 }

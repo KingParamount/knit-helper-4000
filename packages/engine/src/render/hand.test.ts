@@ -22,7 +22,7 @@ import { backRows } from '../pieces/back';
 import { frontRows } from '../pieces/front';
 import { sleeveRows } from '../pieces/sleeve';
 import { neckbandRows } from '../pieces/neckband';
-import { renderPiece } from './prose';
+import { renderPiece, makingUpProse } from './prose';
 import type { Row } from '../row';
 
 const G = DEFAULT_GAUGE;
@@ -48,6 +48,9 @@ function handLines(size: (typeof SIZES)[number], neck: NeckStyle, shoulder: Shou
     for (const [rows, title] of pieces) {
       out.push(...renderPiece(rows, title, { style, technique: 'hand', gauge: G, units: 'cm' }).lines);
     }
+    // Making Up is where left/right would most easily creep back in — the machine
+    // version names the left and right shoulders — so it is guarded too.
+    out.push(...makingUpProse(neck, shoulder, style, 'hand').lines);
   }
   return out;
 }
@@ -83,8 +86,10 @@ describe('hand register: no machine idiom survives the translation', () => {
 describe('hand register: never names a left or right edge', () => {
   // "right side" and "wrong side" are the FACE of the fabric, not a direction, and are
   // the correct hand vocabulary — strip them before looking for directional left/right.
+  // Both the open and hyphenated forms — "the right side" and "right-side rows" are
+  // equally the face of the fabric rather than a direction.
   const stripFaces = (line: string): string =>
-    line.replace(/\bright side\b/gi, 'RS').replace(/\bwrong side\b/gi, 'WS');
+    line.replace(/\bright[- ]sides?\b/gi, 'RS').replace(/\bwrong[- ]sides?\b/gi, 'WS');
 
   for (const size of SIZES) {
     for (const neck of NECKS) {
@@ -134,5 +139,36 @@ describe('hand register: never dictates fabric, needles or yarn', () => {
     expect(lines.filter((l) => /\b\d+(\.\d+)?\s*mm\b/i.test(l)), 'named a needle size').toEqual([]);
     expect(lines.filter((l) => /\bDK\b|4[- ]ply|aran|worsted|chunky/i.test(l)), 'named a yarn weight').toEqual([]);
     expect(lines.some((l) => /tension swatch/i.test(l)), 'should point back at the swatch').toBe(true);
+  });
+});
+
+describe('hand register: names the decrease that suits the row it falls on', () => {
+  // Caught a live bug: Facing is a three-state string ('rs' | 'ws' | 'alternating'),
+  // and code branching on its truthiness claimed every row was a right-side row —
+  // which typechecks perfectly, because all three values are non-empty strings.
+  // Purl-side decreases appearing somewhere in the output is the evidence that the
+  // facing is actually being read.
+  const lines = handLines(SIZES[2], 'round', 'set_in');
+
+  it('uses knit decreases on right-side rows and purl ones on wrong-side rows', () => {
+    const knitwise = lines.filter((l) => /\bssk\b|\bk2tog\b/.test(l));
+    const purlwise = lines.filter((l) => /\bp2tog\b|\bssp\b|purlwise/.test(l));
+    expect(knitwise.length, 'expected knit decreases somewhere').toBeGreaterThan(0);
+    // The armhole begins the row after the underarm cast-offs, so its alternate-row
+    // phases land on wrong-side rows. If this ever reaches zero, either the geometry
+    // moved or the facing is being ignored again.
+    expect(purlwise.length, 'expected purl-side decreases on the wrong-side phases').toBeGreaterThan(0);
+  });
+
+  it('never gives a purl decrease and a knit decrease for the same single-face row', () => {
+    // A phase worked wholly on one face must name one pairing, not both. Only an
+    // every-row phase (which genuinely covers both faces) may mention the two.
+    // The abbreviated register writes the alternating case as "RS: …; WS: …", the
+    // verbose one spells it out — both are legitimately two pairings on one line.
+    const alternating = /right-side rows|\bRS:/;
+    const single = lines.filter(
+      (l) => /(ssk|k2tog)/.test(l) && /(p2tog|ssp)/.test(l) && !alternating.test(l),
+    );
+    expect(single, `mixed pairings on a single-face row: ${single[0] ?? ''}`).toEqual([]);
   });
 });
