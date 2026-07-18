@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
 import { availableChests } from '@knit-helper-4000/engine';
-import type { Category, Units } from '@knit-helper-4000/engine';
+import type { Category, Units, NeckStyle, ShoulderStyle } from '@knit-helper-4000/engine';
 import {
   DEFAULT_SWATCH,
   buildPatternText,
@@ -119,6 +119,8 @@ export function App(): JSX.Element {
   const [category, setCategory] = useState<Category>('Woman');
   const [chest, setChest] = useState(36);
   const [ease, setEase] = useState<EaseId>('moderate');
+  const [neck, setNeck] = useState<NeckStyle>('round');
+  const [shoulder, setShoulder] = useState<ShoulderStyle>('set_in');
   const [swatch, setSwatch] = useState<Swatch>(DEFAULT_SWATCH);
   const [output, setOutput] = useState<OutputId>('full');
   const [piece, setPiece] = useState<PieceId>('back');
@@ -143,15 +145,15 @@ export function App(): JSX.Element {
       : chest;
   const sizeUnit = young ? (category === 'Baby' ? 'months' : 'years') : units === 'cm' ? 'cm chest' : 'in chest';
 
-  const input = { category, chest, units, ease, swatch };
+  const input = { category, chest, units, ease, neck, shoulder, swatch };
   const gauge = gaugeReadout(gaugeFromSwatch(swatch));
 
   // Live outputs — the engine is pure and fast, so this runs every render.
   const patternText = useMemo(
     () => buildPatternText(input, output === 'concise' ? 'abbreviated' : 'verbose'),
-    [category, chest, ease, swatch, output],
+    [category, chest, ease, neck, shoulder, swatch, output],
   );
-  const schematics = useMemo(() => buildSchematics(input), [category, chest, ease, swatch]);
+  const schematics = useMemo(() => buildSchematics(input), [category, chest, ease, neck, shoulder, swatch]);
 
   const diagramSvg = (pid: PieceId, factor?: number): string =>
     schematics ? svgFor(schematics[pid], { scale: 'measured', units, grid: !factor, scaleFactor: factor }) : '';
@@ -218,16 +220,16 @@ export function App(): JSX.Element {
           </Tile>
           <Tile title="Neckline">
             <div className="btn-row">
-              <Btn icon={<IconCrew />} label="Crew" state="selected" />
-              <Btn icon={<IconVneck />} label="V-neck" state="soon" />
+              <Btn icon={<IconCrew />} label="Crew" state={neck === 'round' ? 'selected' : 'normal'} onClick={() => setNeck('round')} />
+              <Btn icon={<IconVneck />} label="V-neck" state={neck === 'v' ? 'selected' : 'normal'} onClick={() => setNeck('v')} />
               <Btn icon={<IconCrew />} label="Scoop" state="soon" />
               <Btn icon={<IconCrew />} label="Boat" state="soon" />
             </div>
           </Tile>
           <Tile title="Shoulder">
             <div className="btn-row">
-              <Btn icon={<IconShoulder />} label="Set-in" state="selected" />
-              <Btn icon={<IconShoulder />} label="Drop" state="soon" />
+              <Btn icon={<IconShoulder />} label="Set-in" state={shoulder === 'set_in' ? 'selected' : 'normal'} onClick={() => setShoulder('set_in')} />
+              <Btn icon={<IconShoulder />} label="Drop" state={shoulder === 'drop' ? 'selected' : 'normal'} onClick={() => setShoulder('drop')} />
               <Btn icon={<IconShoulder />} label="Raglan" state="soon" />
               <Btn icon={<IconShoulder />} label="Saddle" state="soon" />
               <Btn icon={<IconShoulder />} label="Round yoke" state="soon" />
