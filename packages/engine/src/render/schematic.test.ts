@@ -11,16 +11,16 @@ const s = backSchematic(rows, plan, DEFAULT_GAUGE);
 
 describe('back schematic outline', () => {
   it('spans the body width and full length in stitch/row units', () => {
-    expect(s.widthSts).toBe(144);
+    expect(s.widthSts).toBe(146);
     expect(s.heightRows).toBe(246);
-    expect(Math.max(...s.outline.map((p) => Math.abs(p.x)))).toBe(72); // half the body
+    expect(Math.max(...s.outline.map((p) => Math.abs(p.x)))).toBe(73); // half the body
     expect(Math.max(...s.outline.map((p) => p.y))).toBe(246);
     expect(s.outline.length).toBeGreaterThan(6);
   });
 
   it('reports the key measures from the plan', () => {
     const w = (label: string) => s.measures.find((m) => m.label === label);
-    expect(w('width')?.sts).toBe(144);
+    expect(w('width')?.sts).toBe(146);
     expect(w('back neck')?.sts).toBe(46);
     expect(w('armhole')?.rows).toBe(85); // 8.5in armhole depth
     expect(w('length')?.rows).toBe(246);
@@ -55,17 +55,17 @@ describe('front / sleeve / neckband schematics', () => {
       frontNeckPlan(W36, 'moderate', DEFAULT_GAUGE),
       DEFAULT_GAUGE,
     );
-    expect(f.widthSts).toBe(144);
+    expect(f.widthSts).toBe(146);
     expect(f.heightRows).toBe(246); // from the plan, not the two halves' running index
     expect(f.measures.find((m) => m.label === 'neck depth')?.rows).toBeGreaterThan(20);
-    expect(Math.max(...f.outline.map((p) => Math.abs(p.x)))).toBe(72);
+    expect(Math.max(...f.outline.map((p) => Math.abs(p.x)))).toBe(73);
   });
 
   it('sleeve: widens from cuff to the upper arm, then a cap', () => {
     const sp = sleevePlan(W36, 'moderate', DEFAULT_GAUGE);
     const s = sleeveSchematic(sleeveRows('sleeve_l', W36, 'moderate', DEFAULT_GAUGE), sp, DEFAULT_GAUGE);
-    expect(s.widthSts).toBe(94); // widest at the underarm
-    expect(s.measures.find((m) => m.label === 'cuff')?.sts).toBe(50);
+    expect(s.widthSts).toBe(94); // widest at the underarm (top pinned to the armhole)
+    expect(s.measures.find((m) => m.label === 'cuff')?.sts).toBe(52);
     expect(s.measures.find((m) => m.label === 'upper arm')?.sts).toBe(94);
   });
 

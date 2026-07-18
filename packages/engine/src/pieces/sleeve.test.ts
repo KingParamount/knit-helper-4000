@@ -18,10 +18,10 @@ describe('sleeve plan (Woman 36", moderate, default gauge)', () => {
   const p = sleevePlan(W36, 'moderate', G);
 
   it('casts on the cuff and tapers to the sleeve top', () => {
-    expect(p.bodyCuffSts).toBe(50); // (wrist 5.75 + 1") × 30/4, rounded even
-    expect(p.ribCastOnSts).toBe(51); // rib cast on odd (cuff + 1, extra on the right)
-    expect(p.incPerSide).toBe(22); // (94 − 50)/2
-    expect(p.sleeveTopSts).toBe(94); // 50 + 2×22 (upper arm + style-scaled bicep ease), even
+    expect(p.bodyCuffSts).toBe(52); // (wrist 5.75 + 1") × 30/4, rounded even
+    expect(p.ribCastOnSts).toBe(53); // rib cast on odd (cuff + 1, extra on the right)
+    expect(p.incPerSide).toBe(21); // (94 − 52)/2
+    expect(p.sleeveTopSts).toBe(94); // 52 + 2×21 — the top is pinned to the armhole, no seam allowance
   });
 
   it('lays out rib, taper and cap counts', () => {
@@ -51,12 +51,12 @@ describe('sleeve rows', () => {
   });
 
   it('casts on the odd cuff, drops to even, and increases by 2 per increase row', () => {
-    expect(rows[0].ops).toEqual([{ kind: 'cast_on', count: 51 }]); // odd rib
+    expect(rows[0].ops).toEqual([{ kind: 'cast_on', count: 53 }]); // odd rib
     expect(rows.find((r) => r.section === 'taper')!.ops).toEqual([
       { kind: 'decrease', count: 1, side: 'R' }, // drop to even at the change to stocking
     ]);
     const incRows = rows.filter((r) => r.ops.some((o) => o.kind === 'increase'));
-    expect(incRows).toHaveLength(22);
+    expect(incRows).toHaveLength(21);
   });
 
   it('casts off each underarm on its carriage-end side', () => {

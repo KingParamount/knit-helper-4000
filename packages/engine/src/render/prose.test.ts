@@ -16,7 +16,7 @@ const has = (piece: { lines: string[] }, text: string): boolean =>
 describe('cast-on, tension and counter (verbose)', () => {
   it('casts on odd rib, sets rib tension, then the counter', () => {
     expect(back.lines[0]).toBe(
-      'Cast on 145 stitches (72 left, 73 right), ending with the carriage on the right.',
+      'Cast on 147 stitches (73 left, 74 right), ending with the carriage on the right.',
     );
     expect(back.lines[1]).toBe('Set the tension to main tension, minus 2 whole numbers.');
     expect(back.lines[2]).toBe('Set the row counter to 000.');
@@ -25,7 +25,7 @@ describe('cast-on, tension and counter (verbose)', () => {
 
   it('drops the odd stitch and resets tension at the change to stocking', () => {
     expect(has(back, 'Reset the row counter to 000, change to stocking stitch, set the tension back to main tension, and decrease 1 stitch at the right hand edge. The carriage should be on the left.')).toBe(true);
-    expect(has(back, 'There should be 144 stitches (72 left, 72 right).')).toBe(true);
+    expect(has(back, 'There should be 146 stitches (73 left, 73 right).')).toBe(true);
   });
 });
 
@@ -48,7 +48,7 @@ describe('armhole shaping (verbose)', () => {
   it('states a decrease once then repeats it, per phase', () => {
     expect(has(back, 'Knit 1 row to row counter 139, then decrease 1 stitch at either end of the row.')).toBe(true);
     expect(has(back, 'Repeat the last instruction for row counts 140 to 143 (making a total of 5 times). The carriage should be on the right.')).toBe(true);
-    expect(has(back, 'on every 2nd row, at row counts 147, 149, 151, 153, 155 and 157 (making a total of 7 times)')).toBe(true);
+    expect(has(back, 'on every 2nd row, at row counts 147, 149, 151, 153, 155, 157 and 159 (making a total of 8 times)')).toBe(true);
   });
 });
 
@@ -68,14 +68,14 @@ describe('back neck scoop + shoulders (verbose) — holds phrased as shaping', (
 
 describe('abbreviated mode', () => {
   it('abbreviates cast-on, tension, counter and rib', () => {
-    expect(backT.lines[0]).toBe('CO 145 st (72L, 73R), COR.');
+    expect(backT.lines[0]).toBe('CO 147 st (73L, 74R), COR.');
     expect(backT.lines[1]).toBe('Set to MT-2.');
     expect(backT.lines[2]).toBe('RC to 000.');
     expect(has(backT, 'Work your rib to RC 025. Mock rib: see machine manual.')).toBe(true);
   });
   it('abbreviates the transition, shaping and carriage', () => {
     expect(has(backT, 'RC to 000, change to st st, set to MT, dec 1 st at RH. COL.')).toBe(true);
-    expect(has(backT, '144 st (72L, 72R).')).toBe(true);
+    expect(has(backT, '146 st (73L, 73R).')).toBe(true);
     expect(has(backT, 'Kn to RC 137, then BO 8 st at RH.')).toBe(true);
     expect(has(backT, 'Kn to RC 139, then dec 1 st at either end.')).toBe(true);
     expect(has(backT, 'Rpt instruction for RC 140 to 143 (total 5 times). COR.')).toBe(true);

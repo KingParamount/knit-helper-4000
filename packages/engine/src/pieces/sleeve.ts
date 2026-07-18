@@ -15,6 +15,7 @@ import { garmentWidths } from '../dimensions';
 import { type Gauge, stitchesFor, evenStitchesFor, rowsFor, ribRowsFor } from '../gauge';
 import { type Row, type Piece, carriageForRow } from '../row';
 import { backPlan, armholeShaping, armholeOpening } from './back';
+import { SEAM_ALLOWANCE_STS } from './seams';
 
 /** Cuff = wrist + this ease. ASSUMPTION (flag) — a ribbed cuff also stretches. */
 export const CUFF_EASE_IN = 1.0;
@@ -60,11 +61,19 @@ export function sleevePlan(
   const w = garmentWidths(size, style, shoulder);
   const body = backPlan(size, style, gauge, shoulder);
 
-  const bodyCuffSts = evenStitchesFor(size.wrist + CUFF_EASE_IN, gauge); // even
+  // One underarm seam, eating a stitch from each of the sleeve's two edges — cut it
+  // wider at both cuff and top so the sewn tube measures what it should.
+  const bodyCuffSts = evenStitchesFor(size.wrist + CUFF_EASE_IN, gauge) + 2 * SEAM_ALLOWANCE_STS; // even
   const ribCastOnSts = bodyCuffSts + 1; // rib cast on odd, extra on the right
   const ribRows = ribRowsFor(size.rib_body, gauge);
   // Sleeve length = arm length + the sourced length ease (ease_arml), less the rib.
   const taperRows = rowsFor(size.arm_length + size.ease_arml, gauge) - ribRows;
+  // NB the allowance is deliberately NOT added at the top. The sleeve top is not a
+  // free edge — it is sewn into the armhole, and the Tier-A join invariant requires
+  // the two to match. Widening it breaks that join (it did: drop-shoulder Child sizes
+  // failed, where two stitches is a large fraction of a small armhole). The underarm
+  // seam eats fabric along the tube, so the cuff carries the allowance and the top
+  // stays pinned to the armhole it has to fit.
   const incPerSide = Math.round((stitchesFor(w.sleeveTop, gauge) - bodyCuffSts) / 2);
   const sleeveTopSts = bodyCuffSts + 2 * incPerSide; // even
 

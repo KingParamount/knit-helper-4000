@@ -29,6 +29,8 @@ import {
 import './theme.css';
 
 type OutputId = 'full' | 'concise' | 'chart' | 'knitleader' | 'knitradar';
+/** How the garment is made. Only 'machine' is built; the others are on the way. */
+type Method = 'machine' | 'hand' | 'crochet';
 
 // ---- small building blocks --------------------------------------------------
 
@@ -136,6 +138,21 @@ function Measure({ inches, onChange, units }: { inches: number; onChange: (inche
   );
 }
 
+/**
+ * A plain whole-number field, for the stitch and row COUNTS a swatch is measured
+ * over. Distances get the eighths stepper (Measure); counts are just typed.
+ */
+function Count({ value, onChange, min = 1 }: { value: number; onChange: (n: number) => void; min?: number }): JSX.Element {
+  return (
+    <span className="numfield">
+      <input
+        type="number" min={min} step={1} value={value}
+        onChange={(e) => onChange(Math.max(min, parseInt(e.target.value) || min))}
+      />
+    </span>
+  );
+}
+
 // ---- app --------------------------------------------------------------------
 
 const EASES: { id: EaseId; label: string }[] = [
@@ -164,6 +181,7 @@ export function App(): JSX.Element {
   const [output, setOutput] = useState<OutputId>('full');
   const [piece, setPiece] = useState<PieceId>('back');
   const [help, setHelp] = useState(false);
+  const [method, setMethod] = useState<Method>('machine');
   const [paper, setPaper] = useState<PaperId>('a4');
   const [landscape, setLandscape] = useState(false);
   const paperRec = PAPERS.find((p) => p.id === paper) ?? PAPERS[0];
@@ -188,7 +206,7 @@ export function App(): JSX.Element {
   const sizeUnit = young ? (category === 'Baby' ? 'months' : 'years') : units === 'cm' ? 'cm chest' : 'in chest';
 
   const input = { category, chest, units, ease, neck, shoulder, swatch };
-  const gauge = gaugeReadout(gaugeFromSwatch(swatch));
+  const gauge = gaugeReadout(gaugeFromSwatch(swatch), units);
 
   // Live outputs — the engine is pure and fast, so this runs every render.
   const patternText = useMemo(
@@ -326,7 +344,7 @@ export function App(): JSX.Element {
       // its own meaning, with no selector above it to say what it refers to.
       ease ? `${EASES.find((e) => e.id === ease)?.label.toLowerCase() ?? ''} ease` : '',
     ].filter(Boolean).join(' · '),
-    gaugeLabel: `${gauge.st} sts / ${gauge.row} rows to ${units === 'cm' ? '10 cm' : '4 in'}`,
+    gaugeLabel: `${gauge.st} sts / ${gauge.row} rows to ${gauge.span}`,
   };
 
   return (
@@ -419,10 +437,10 @@ export function App(): JSX.Element {
             <div className="swatch">
               My tension swatch measures{' '}
               <Measure inches={swatch.stDist} units={units} onChange={(v) => setSwatch({ ...swatch, stDist: v })} /> across{' '}
-              <strong>{swatch.stCount}</strong> stitches, and{' '}
+              <Count value={swatch.stCount} onChange={(n) => setSwatch({ ...swatch, stCount: n })} /> stitches, and{' '}
               <Measure inches={swatch.rowDist} units={units} onChange={(v) => setSwatch({ ...swatch, rowDist: v })} /> up{' '}
-              <strong>{swatch.rowCount}</strong> rows.{' '}
-              <span style={{ color: '#f0dcc6', fontWeight: 700 }}>→ {gauge.st} sts × {gauge.row} rows / 4in</span>{' '}
+              <Count value={swatch.rowCount} onChange={(n) => setSwatch({ ...swatch, rowCount: n })} /> rows.{' '}
+              <span style={{ color: '#f0dcc6', fontWeight: 700 }}>→ {gauge.st} sts × {gauge.row} rows / {gauge.span}</span>{' '}
               <button className="help-link" onClick={() => setHelp(true)}>How do I knit a swatch?</button>
             </div>
           </Tile>
@@ -432,18 +450,24 @@ export function App(): JSX.Element {
         <Section label="Technique">
           <Tile title="Method">
             <div className="btn-row">
-              <Btn label="Machine" state="selected" />
+              <Btn label="Machine" state={method === 'machine' ? 'selected' : 'normal'} onClick={() => setMethod('machine')} />
               <Btn label="Hand knit" state="soon" />
               <Btn label="Crochet" state="soon" />
             </div>
           </Tile>
-          <Tile title="Construction">
-            <div className="btn-row">
-              <Btn label="Flat, bottom-up" state="selected" />
-              <Btn label="In the round" state="soon" />
-              <Btn label="Top-down" state="soon" />
-            </div>
-          </Tile>
+          {/* Construction is a hand-knitting choice. A domestic machine knits flat and
+              bottom-up — in the round needs a ribber and is not what these patterns
+              are — so offering the choice there would be offering a decision that
+              isn't one. It appears when a hand technique is selected. */}
+          {method !== 'machine' && (
+            <Tile title="Construction">
+              <div className="btn-row">
+                <Btn label="Flat, bottom-up" state="selected" />
+                <Btn label="In the round" state="soon" />
+                <Btn label="Top-down" state="soon" />
+              </div>
+            </Tile>
+          )}
         </Section>
 
         {/* 6 — output choice */}
@@ -584,11 +608,63 @@ export function App(): JSX.Element {
 
       {help && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(8,20,45,.6)', display: 'grid', placeItems: 'center', padding: 20 }} onClick={() => setHelp(false)}>
-          <div className="tile plain" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+          <div className="tile plain" style={{ maxWidth: 560, maxHeight: '86vh', overflow: 'auto' }} onClick={(e) => e.stopPropagation()}>
             <div className="tile-title">Knitting a tension swatch</div>
-            <p>Cast on a good handful of stitches and knit a square in stocking stitch. Let it rest (block it as you would the finished piece).</p>
-            <p><strong>Measure over lots of stitches, not four inches.</strong> Lay a ruler across <strong>{swatch.stCount} stitches</strong> and read the distance; do the same up <strong>{swatch.rowCount} rows</strong>. Measuring over a big count makes small errors tiny.</p>
-            <p>Type those two measurements above and Knit-Helper works out your gauge.</p>
+
+            <p>
+              <strong>Count first, then measure.</strong> Most patterns tell you to count
+              stitches across four inches. Do it the other way round: fix the number of
+              stitches and measure how far they reach. A miscount can only ever be half a
+              stitch, so spreading it over {swatch.stCount} stitches instead of a handful
+              makes the error small — and a ruler reads far finer than a stitch count can.
+            </p>
+            <p>
+              Both boxes matter. This generator gives you numbered rows, not &ldquo;knit
+              until it looks right&rdquo;, so the <strong>row</strong> figure carries as
+              much weight as the stitch one.
+            </p>
+
+            <h3 style={{ fontFamily: 'var(--serif)', margin: '16px 0 6px', color: 'var(--navy)' }}>On a machine</h3>
+            <p>
+              Knit a band well wider than you need. Mark your count by knitting a couple of
+              rows in a contrast colour, then {swatch.rowCount} rows of your yarn, then
+              contrast again — the marked block is what you measure. Take the swatch off on
+              waste yarn rather than casting it off: a cast-off edge locks the fabric and
+              stops it relaxing, which is the thing you are trying to measure.
+            </p>
+            <p>
+              Hang the same weight you will use for the garment, and leave the swatch to
+              rest before measuring — a few hours at least, longer for wool. Lay it flat and
+              let it settle into its own shape; do not pin it out.
+            </p>
+            <p style={{ fontSize: '.9rem', color: 'var(--ink-soft)' }}>
+              Note your tension dial setting by marking it in the fabric, not on paper. Dial
+              numbers do not carry across machines — two of the same model can differ — so
+              the number is only ever a note to yourself.
+            </p>
+
+            <h3 style={{ fontFamily: 'var(--serif)', margin: '16px 0 6px', color: 'var(--navy)' }}>By hand</h3>
+            <p>
+              Cast on about half as many stitches again as you mean to measure, so the count
+              sits in the middle away from the edges — the outermost stitches are always
+              looser. Aim for at least 15&nbsp;cm square. Work it in the stitch you will use
+              for the garment, on the needles you mean to use.
+            </p>
+            <p>
+              Then treat it exactly as you will treat the finished garment. If you will wash
+              the jumper, wash the swatch: soaking and drying can change a fabric by several
+              per cent, where a steam press often changes it barely at all. Whichever you
+              choose, the garment gets the same.
+            </p>
+            <p>
+              Measure once it is dry, in the middle of the fabric, without stretching it.
+            </p>
+            <p style={{ fontSize: '.9rem', color: 'var(--ink-soft)' }}>
+              If you knit your garment in the round, swatch in the round too. Most knitters
+              purl at a different tension from the way they knit, so a flat swatch can be
+              out by a sixth against the tube it is meant to predict.
+            </p>
+
             <button className="ghost-btn" style={{ background: 'var(--navy)' }} onClick={() => setHelp(false)}>Got it</button>
           </div>
         </div>

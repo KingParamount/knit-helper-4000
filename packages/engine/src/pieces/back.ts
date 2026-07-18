@@ -18,7 +18,7 @@ import {
   ribRowsFor,
 } from '../gauge';
 import { type Row, type Piece, carriageForRow } from '../row';
-import { seamEdgeLength, ARMHOLE_SECTIONS } from './seams';
+import { SEAM_ALLOWANCE_STS, seamEdgeLength, ARMHOLE_SECTIONS } from './seams';
 import { backNeckDepthRows } from '../neckopening';
 
 export interface PlanSection {
@@ -63,7 +63,9 @@ export function backPlan(
 ): BackPlan {
   const w = garmentWidths(size, style, shoulder);
 
-  const bodySts = evenStitchesFor(w.chest / 2, gauge); // even plain panel
+  // Two side seams, each eating a stitch from this panel's edges — cut it wider so
+  // the sewn-up garment measures what the pattern says. Adding two keeps it even.
+  const bodySts = evenStitchesFor(w.chest / 2, gauge) + 2 * SEAM_ALLOWANCE_STS; // even plain panel
   const ribCastOnSts = bodySts + 1; // rib cast on odd, extra stitch on the right
   // A drop shoulder knits the body straight — no armhole narrowing — so the "upper
   // back" is the full body width; a set-in narrows to the across-back measurement.

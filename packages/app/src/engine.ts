@@ -52,9 +52,25 @@ export function gaugeFromSwatch(s: Swatch): Gauge {
   };
 }
 
-/** Human gauge readout, per 4in / 10cm. */
-export function gaugeReadout(g: Gauge): { st: number; row: number } {
-  return { st: Math.round(g.bodySt), row: Math.round(g.bodyRow) };
+/**
+ * Human gauge readout, over the span the caller is going to LABEL it with.
+ *
+ * 10cm and 4in are used interchangeably by nearly every knitting source, and they are
+ * not the same: 10cm is 3.937in, 1.6% short. The engine holds gauge per 4in (rule 3,
+ * one canonical unit), so reading that number out under a "10 cm" label overstates it
+ * — small, but the same order as the half-stitch miscount the whole count-first swatch
+ * method exists to avoid. Convert at the render boundary, where every other unit
+ * conversion happens.
+ */
+const IN_PER_10CM = 10 / 2.54;
+
+export function gaugeReadout(g: Gauge, units: Units = 'in'): { st: number; row: number; span: string } {
+  const factor = units === 'cm' ? IN_PER_10CM / 4 : 1;
+  return {
+    st: Math.round(g.bodySt * factor),
+    row: Math.round(g.bodyRow * factor),
+    span: units === 'cm' ? '10 cm' : '4 in',
+  };
 }
 
 export interface BuildInput {

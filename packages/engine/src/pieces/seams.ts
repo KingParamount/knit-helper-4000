@@ -8,6 +8,27 @@
 import type { Row } from '../row';
 import type { Gauge } from '../gauge';
 
+/**
+ * Stitches consumed by a seam, per edge.
+ *
+ * A mattress-stitch seam takes up roughly one whole stitch from each of the two edges
+ * it joins, so a piece sized to its finished width comes out narrower once sewn. Two
+ * side seams cost four stitches around the body — about half an inch at machine gauge:
+ * small, but a systematic loss in one direction, which is worse than it is large.
+ *
+ * There is no convention to defer to. Sources note that patterns "frequently" allow for
+ * the seam stitch and no authority requires it, so this is our decision: pieces are cut
+ * a stitch wider at each seamed edge and the seam eats the difference, which makes the
+ * finished measurement the one the pattern claims.
+ *
+ * Applied to the VERTICAL seams — body sides and the sleeve underarm — where the loss
+ * lands on the chest and upper-arm measurements the fit checks care about. The armhole
+ * and shoulder seams run row-wise and cost length rather than width; that allowance is
+ * not modelled, and the cap-fits-armhole invariant balances both of those edges against
+ * each other anyway, so an allowance there would have to be added to both at once.
+ */
+export const SEAM_ALLOWANCE_STS = 1;
+
 /** Body armhole edge: the curved decreases plus the straight run to the shoulder. */
 export const ARMHOLE_SECTIONS = new Set(['armhole', 'upper_back']);
 /** Sleeve-cap edge: everything from the underarm to the crown. */

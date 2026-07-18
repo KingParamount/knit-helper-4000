@@ -18,8 +18,8 @@ describe('back piece plan (Woman 36", moderate, default gauge)', () => {
   const p = backPlan(W36, 'moderate', G);
 
   it('casts on half the finished chest and narrows to the back width', () => {
-    expect(p.bodySts).toBe(144); // (38.34/2) × 30/4, rounded even
-    expect(p.ribCastOnSts).toBe(145); // rib cast on odd (body + 1, extra on the right)
+    expect(p.bodySts).toBe(146); // (38.34/2) × 30/4, rounded even
+    expect(p.ribCastOnSts).toBe(147); // rib cast on odd (body + 1, extra on the right)
     expect(p.upperBackSts).toBe(99); // 13.25 × 30/4
     expect(p.backNeckSts).toBe(46); // 6.13 × 30/4
   });
@@ -33,7 +33,7 @@ describe('back piece plan (Woman 36", moderate, default gauge)', () => {
   });
 
   it('reports the armhole shaping target', () => {
-    expect(p.shaping.armholeDecTotal).toBe(45); // 144 − 99, split both sides
+    expect(p.shaping.armholeDecTotal).toBe(47); // 144 − 99, split both sides
   });
 });
 
@@ -43,9 +43,9 @@ describe('lower back rows', () => {
   it('runs from cast-on to the underarm', () => {
     expect(rows).toHaveLength(161); // rib 25 + body 136
     expect(rows[0].index).toBe(1);
-    expect(rows[0].ops).toEqual([{ kind: 'cast_on', count: 145 }]); // odd rib
-    expect(rows.slice(0, 25).every((r) => r.stitches === 145)).toBe(true); // rib odd
-    expect(rows[rows.length - 1].stitches).toBe(144); // body even (after the drop)
+    expect(rows[0].ops).toEqual([{ kind: 'cast_on', count: 147 }]); // odd rib
+    expect(rows.slice(0, 25).every((r) => r.stitches === 147)).toBe(true); // rib odd
+    expect(rows[rows.length - 1].stitches).toBe(146); // body even (after the drop)
     expect(rows.every((r) => r.piece === 'back')).toBe(true);
   });
 
@@ -53,7 +53,7 @@ describe('lower back rows', () => {
     expect(rows[24].section).toBe('rib'); // row 25
     expect(rows[25].section).toBe('body'); // row 26
     expect(rows[25].ops).toEqual([{ kind: 'decrease', count: 1, side: 'R' }]);
-    expect(rows[25].stitches).toBe(144);
+    expect(rows[25].stitches).toBe(146);
   });
 
   it('alternates the carriage deterministically, no two rows the same', () => {
@@ -84,14 +84,14 @@ describe('armhole shaping (graduated / curved scye)', () => {
   it('reconciles to the achieved back width', () => {
     expect(rows[rows.length - 1].stitches).toBe(98);
     // 161 lower + 2 cast-off + 5 (every row) + 14 (7 dec + 7 plain) + 12 (3 dec + 9 plain)
-    expect(rows).toHaveLength(194);
+    expect(rows).toHaveLength(196);
   });
 
   it('decreases fastest at the bottom of the scye', () => {
     const decRows = rows
       .filter((r) => r.section === 'armhole' && r.ops.some((o) => o.kind === 'decrease'))
       .map((r) => r.index);
-    expect(decRows).toHaveLength(15);
+    expect(decRows).toHaveLength(16);
     // first five are consecutive (every row); gaps widen higher up
     expect(decRows.slice(0, 5)).toEqual([164, 165, 166, 167, 168]);
     expect(decRows[decRows.length - 1] - decRows[decRows.length - 2]).toBe(4); // every 4th near top
