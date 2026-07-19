@@ -105,16 +105,21 @@ export function sleevePlan(
   // Design the cap TO the armhole: choose the height so the cap perimeter eases
   // CAP_EASE over the armhole opening it sews into. `sleeveRows` builds each side
   // edge as `capDecPerSide` single decreases (diagonal steps) plus the remaining
-  // plain rows (vertical), so per-side length = capDecPerSide·diag + (H − 3 −
-  // capDecPerSide)·rh and perimeter = 2·side + crown. Invert that for H. (Holds for
-  // capDecPerSide ≥ 6, i.e. every garment size; below that the fast zones overlap.)
+  // plain rows (vertical), so per-side length = capDecPerSide·diag + (H − 2 −
+  // capDecPerSide)·rh and perimeter = 2·side + crown. Invert that for H.
+  //
+  // The 2 is the underarm cast-off rows, which the seam measurement excludes. It used
+  // to be 3, discounting the crown take-off row as well — but that row is real height
+  // on the seamed edge and is measured. A constant one-row error: invisible at a fine
+  // gauge (3% of a woman's cap) and material at a coarse one (7% of a baby's), which is
+  // why it only surfaced once a second gauge was swept.
   const sw = 4 / gauge.bodySt; // inches per stitch
   const rh = 4 / gauge.bodyRow; // inches per row
   const diag = Math.hypot(sw, rh);
   const crownLen = capTopSts * sw;
   const targetPerimeter = armholeOpening(size, style, gauge) * (1 + CAP_EASE);
-  const idealHeight = 3 + capDecPerSide + (targetPerimeter - crownLen - 2 * capDecPerSide * diag) / (2 * rh);
-  const minHeight = 3 + capDecPerSide; // all decreases, no plain rows — the flattest cap
+  const idealHeight = 2 + capDecPerSide + (targetPerimeter - crownLen - 2 * capDecPerSide * diag) / (2 * rh);
+  const minHeight = 2 + capDecPerSide; // all decreases, no plain rows — the flattest cap
   const maxHeight = rowsFor(w.armholeDepth, gauge); // never taller than the armhole
   const capHeightRows = Math.round(Math.min(maxHeight, Math.max(minHeight, idealHeight)));
 
@@ -182,7 +187,13 @@ export function sleeveRows(
   push([{ kind: 'bind_off', count: p.underarmCastOff, side: carriageForRow(index + 1) }], 'cap');
   push([{ kind: 'bind_off', count: p.underarmCastOff, side: carriageForRow(index + 1) }], 'cap');
 
-  const fast = Math.min(CAP_FAST_EACH_END, p.capDecPerSide);
+  // Half the decreases at most, so the two fast zones cannot overlap. Taking
+  // CAP_FAST_EACH_END from each end works 2× that many, which is more than the plan
+  // allows once capDecPerSide falls below 6 — and it does at a coarse gauge on a small
+  // sleeve. The cap then over-decreased, leaving fewer live stitches than the crown
+  // take-off claimed (a Baby 18" at 18 sts × 22.4 rows built 6 decreases against a plan
+  // of 5, and took off 6 stitches with 4 on the needles).
+  const fast = Math.min(CAP_FAST_EACH_END, Math.floor(p.capDecPerSide / 2));
   const middleDecs = Math.max(0, p.capDecPerSide - 2 * fast);
   const middleRows = Math.max(middleDecs, p.capHeightRows - 2 - 2 * fast - 1);
   for (let i = 0; i < fast; i++) push([{ kind: 'decrease', count: 1, side: 'both' }], 'cap'); // fast bottom

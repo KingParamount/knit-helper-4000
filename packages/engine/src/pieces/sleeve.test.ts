@@ -28,7 +28,7 @@ describe('sleeve plan (Woman 36", moderate, default gauge)', () => {
     expect(p.ribRows).toBe(25); // 2.5"
     expect(p.taperRows).toBe(158); // (arm length 16.75" + ease_arml 1.5") − rib
     expect(p.underarmCastOff).toBe(8); // matches the body armhole underarm
-    expect(p.capHeightRows).toBe(55); // solved so the cap perimeter eases +5% over the armhole
+    expect(p.capHeightRows).toBe(54); // solved so the cap perimeter eases +5% over the armhole
     expect(p.capTopSts).toBe(22); // crown = what remains after symmetric shaping (even)
     expect(p.capDecPerSide).toBe(28); // (94 − 16 − crown target) / 2
   });

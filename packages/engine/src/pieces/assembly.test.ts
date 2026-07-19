@@ -120,9 +120,6 @@ describe('assembly invariants hold at a second, non-4:3 gauge', () => {
   for (const size of inSizes) {
     const rep = assemblyReport(size, 'moderate', G2);
     for (const inv of rep.invariants) {
-      // Cap fit is a KNOWN RED at a coarse gauge on the smallest pieces — see the
-      // checkpoint below. Everything else must hold at any gauge.
-      if (inv.label === 'cap fits armhole') continue;
       it(`${size.category} ${size.chest}" @18×22.4 — ${inv.label} (${inv.detail})`, () => {
         expect(inv.ok).toBe(true);
       });
@@ -130,17 +127,18 @@ describe('assembly invariants hold at a second, non-4:3 gauge', () => {
   }
 });
 
-it('CHECKPOINT: cap fit drifts at a coarse gauge on small pieces (known red)', () => {
+it('CHECKPOINT: cap fit at a coarse gauge (was a red; now fixed)', () => {
   /*
-   * Found the moment a second gauge was swept, having been invisible while everything
-   * ran at DEFAULT_GAUGE. The cap is designed TO the armhole, so its shaping is
-   * quantised to whole stitches and rows; on a small piece at a coarse gauge there are
-   * few of either, and the rounding is a large fraction of the total. The cap ends up
-   * needing more easing than an armhole that size can take.
+   * Sweeping a second gauge found two real faults here, both invisible at DEFAULT_GAUGE:
    *
-   * Reported rather than asserted, like the hip-clearance red: it is a real gap, and a
-   * baby's jumper in chunky yarn is an ordinary thing to want, so this should be fixed
-   * — but silently widening the tolerance would be pretending the cap fits.
+   *  - the two fast-decrease zones overlapped once capDecPerSide fell below 6, so the
+   *    cap worked more decreases than the plan allowed and took off more stitches than
+   *    were live (a Baby 18" claimed a 6-stitch crown with 4 on the needles);
+   *  - the height solver discounted the crown take-off row, which the seam measurement
+   *    counts. A constant one-row error: 3% of a woman's cap, 7% of a baby's.
+   *
+   * Both fixed; this now prints the margin rather than a failure list, and the sweep
+   * above asserts cap fit at this gauge like every other invariant.
    */
   const rows: string[] = [];
   let worst = 0;
