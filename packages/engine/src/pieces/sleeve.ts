@@ -74,7 +74,15 @@ export function sleevePlan(
   // failed, where two stitches is a large fraction of a small armhole). The underarm
   // seam eats fabric along the tube, so the cuff carries the allowance and the top
   // stays pinned to the armhole it has to fit.
-  const incPerSide = Math.round((stitchesFor(w.sleeveTop, gauge) - bodyCuffSts) / 2);
+  // Measure against the UNROUNDED target. stitchesFor() would round the sleeve top to a
+  // whole stitch first, and halving that rounds again — two roundings compounding in the
+  // same direction. A Baby 18" at 12 sts/4in wants 22.50 stitches: pre-rounding gives 23,
+  // then (23 − 16)/2 = 3.5 rounds up to 4 increases and lands on 24 (8.00"), where the
+  // exact target picks 3 and lands on 22 (7.33") — the nearer of the two counts an even
+  // total can reach. Invisible at a fine gauge, where half a stitch is a rounding error;
+  // a third of an inch on chunky yarn.
+  const exactTopSts = (w.sleeveTop * gauge.bodySt) / 4;
+  const incPerSide = Math.round((exactTopSts - bodyCuffSts) / 2);
   const sleeveTopSts = bodyCuffSts + 2 * incPerSide; // even
 
   // A drop sleeve has no cap: it tapers to the top and binds off straight. The whole

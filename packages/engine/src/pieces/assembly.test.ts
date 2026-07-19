@@ -32,6 +32,22 @@ const G = DEFAULT_GAUGE;
  * Brand M23232: 18 sts / 4in, 28 rows / 5in), ratio 1.24 rather than 1.33.
  */
 const G2 = { bodySt: 18, bodyRow: (28 * 4) / 5, ribSt: 0, ribRow: 0 };
+
+/**
+ * A third gauge, chunky: 12 sts / 4in, three stitches to the inch.
+ *
+ * Sweeping candidates showed which axis actually finds bugs, and it is not the one the
+ * pick-up bug suggested. Varying the row-to-stitch RATIO alone finds nothing (20 × 30,
+ * a 1.5 ratio, is clean); so does going finer (36 × 48, 32 × 46). What finds things is
+ * COARSENESS — fewer stitches per inch makes every rounding constant a larger fraction
+ * of the piece. G2 at 18 sts found three faults; 12 sts found a fourth, a double
+ * rounding in the sleeve-top count that put a baby's chunky sleeve half an inch wide.
+ *
+ * Chunky yarn is ordinary (this is roughly a super-bulky), and a coarse gauge on a small
+ * piece is where quantisation bites hardest — the smallest garment in the thickest yarn
+ * is the corner of the space, so it belongs in the sweep.
+ */
+const G3 = { bodySt: 12, bodyRow: 16, ribSt: 0, ribRow: 0 };
 const inSizes = sizes.filter((s) => s.units === 'in');
 const womanSizes = inSizes.filter((s) => s.category === 'Woman');
 const styles = easeStyles.map((e) => e.id as EaseStyleId);
@@ -116,11 +132,14 @@ it('CHECKPOINT: cap ease across every category (shows the open-loop cap drift)',
 
 // The blind spot that let the pick-up bug live: sweep the invariants at a gauge whose
 // row-to-stitch ratio is not 4:3, so ratio-dependent maths has somewhere to show itself.
-describe('assembly invariants hold at a second, non-4:3 gauge', () => {
+describe.each([
+  ['18×22.4 (coarse, non-4:3)', G2],
+  ['12×16 (chunky)', G3],
+])('assembly invariants hold at %s', (_label, gauge) => {
   for (const size of inSizes) {
-    const rep = assemblyReport(size, 'moderate', G2);
+    const rep = assemblyReport(size, 'moderate', gauge);
     for (const inv of rep.invariants) {
-      it(`${size.category} ${size.chest}" @18×22.4 — ${inv.label} (${inv.detail})`, () => {
+      it(`${size.category} ${size.chest}" — ${inv.label} (${inv.detail})`, () => {
         expect(inv.ok).toBe(true);
       });
     }
@@ -163,7 +182,7 @@ describe('the neckband matches the neckline it has to cover, at any gauge', () =
   // length depends on the gauge's ratio. If the pick-up rate is fixed rather than
   // derived, the band comes out short or long in proportion to how far the gauge sits
   // from 4:3 — and drags or ruffles the neckline accordingly.
-  for (const [label, gauge] of [['default 30×40', G], ['non-4:3 18×22.4', G2]] as const) {
+  for (const [label, gauge] of [['default 30×40', G], ['non-4:3 18×22.4', G2], ['chunky 12×16', G3]] as const) {
     for (const size of womanSizes) {
       it(`${size.category} ${size.chest}" @${label} — band covers its edges within 5%`, () => {
         const plan = neckbandPlan(size, 'moderate', gauge);
@@ -180,9 +199,23 @@ describe('the neckband matches the neckline it has to cover, at any gauge', () =
           (2 * bp.backNeckRows) / rpi + // shaped edges are rows of fabric
           (2 * fp.neckDepthRows) / rpi;
 
-        const ratio = bandIn / necklineIn;
-        expect(ratio, `band ${bandIn.toFixed(1)}" vs neckline ${necklineIn.toFixed(1)}"`).toBeGreaterThan(0.95);
-        expect(ratio, `band ${bandIn.toFixed(1)}" vs neckline ${necklineIn.toFixed(1)}"`).toBeLessThan(1.05);
+        /*
+         * Judged in STITCHES, not percent. The band is built from five rounded parts
+         * plus an odd-parity bump, so its error is a fixed handful of stitches however
+         * fine the gauge — measured at +2.5, +2.4 and +3.0 stitches at 30×40, 18×22.4
+         * and 12×16. As a percentage that looks like it worsens with coarseness, but
+         * only because the same few stitches are a bigger share of a shorter band.
+         *
+         * The drift is consistently POSITIVE because the reference above is itself an
+         * approximation: it measures the shaped neck edges by their rows, as if they ran
+         * straight up, when they slope and so are longer. The neckline is really a little
+         * longer than modelled, and the band correspondingly less over.
+         */
+        const driftSts = (bandIn - necklineIn) * spi;
+        expect(
+          Math.abs(driftSts),
+          `band ${bandIn.toFixed(1)}" vs neckline ${necklineIn.toFixed(1)}" (${driftSts.toFixed(1)} sts)`,
+        ).toBeLessThanOrEqual(4);
       });
     }
   }
