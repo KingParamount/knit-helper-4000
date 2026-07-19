@@ -12,8 +12,26 @@ import {
   capPerimeter,
 } from './assembly';
 import { sleeveRows } from './sleeve';
+import { neckbandPlan } from './neckband';
+import { backPlan } from './back';
+import { frontNeckPlan } from './front';
 
 const G = DEFAULT_GAUGE;
+
+/**
+ * A second sweep gauge, deliberately NOT at a 4:3 row-to-stitch ratio.
+ *
+ * DEFAULT_GAUGE is 30 sts × 40 rows — exactly 4:3 — and for a long time it was the
+ * only gauge anything was swept at. That hid a real bug: the neck pick-up used a fixed
+ * 3 stitches per 4 rows, which is correct precisely when the ratio IS 4:3 and drifts
+ * everywhere else (7% short at 18 × 22.4). Every test passed, because every test ran at
+ * the one gauge where the rule happened to be exact.
+ *
+ * So anything whose correctness depends on the RATIO between stitch and row gauge needs
+ * a second ratio to be visible at all. These are real published-pattern numbers (Lion
+ * Brand M23232: 18 sts / 4in, 28 rows / 5in), ratio 1.24 rather than 1.33.
+ */
+const G2 = { bodySt: 18, bodyRow: (28 * 4) / 5, ribSt: 0, ribRow: 0 };
 const inSizes = sizes.filter((s) => s.units === 'in');
 const womanSizes = inSizes.filter((s) => s.category === 'Woman');
 const styles = easeStyles.map((e) => e.id as EaseStyleId);
@@ -94,4 +112,80 @@ it('CHECKPOINT: cap ease across every category (shows the open-loop cap drift)',
   ];
   console.log(lines.join('\n'));
   expect(true).toBe(true);
+});
+
+// The blind spot that let the pick-up bug live: sweep the invariants at a gauge whose
+// row-to-stitch ratio is not 4:3, so ratio-dependent maths has somewhere to show itself.
+describe('assembly invariants hold at a second, non-4:3 gauge', () => {
+  for (const size of inSizes) {
+    const rep = assemblyReport(size, 'moderate', G2);
+    for (const inv of rep.invariants) {
+      // Cap fit is a KNOWN RED at a coarse gauge on the smallest pieces — see the
+      // checkpoint below. Everything else must hold at any gauge.
+      if (inv.label === 'cap fits armhole') continue;
+      it(`${size.category} ${size.chest}" @18×22.4 — ${inv.label} (${inv.detail})`, () => {
+        expect(inv.ok).toBe(true);
+      });
+    }
+  }
+});
+
+it('CHECKPOINT: cap fit drifts at a coarse gauge on small pieces (known red)', () => {
+  /*
+   * Found the moment a second gauge was swept, having been invisible while everything
+   * ran at DEFAULT_GAUGE. The cap is designed TO the armhole, so its shaping is
+   * quantised to whole stitches and rows; on a small piece at a coarse gauge there are
+   * few of either, and the rounding is a large fraction of the total. The cap ends up
+   * needing more easing than an armhole that size can take.
+   *
+   * Reported rather than asserted, like the hip-clearance red: it is a real gap, and a
+   * baby's jumper in chunky yarn is an ordinary thing to want, so this should be fixed
+   * — but silently widening the tolerance would be pretending the cap fits.
+   */
+  const rows: string[] = [];
+  let worst = 0;
+  for (const size of inSizes) {
+    const cap = assemblyReport(size, 'moderate', G2).invariants.find((i) => i.label === 'cap fits armhole');
+    if (!cap) continue;
+    if (!cap.ok) {
+      rows.push(`  ${size.category} ${size.chest}"`.padEnd(20) + cap.detail);
+      const pct = Number(/([-\d.]+)%/.exec(cap.detail)?.[1] ?? 0);
+      worst = Math.max(worst, pct);
+    }
+  }
+  console.log(`\nCAP FIT @ 18 sts × 22.4 rows (a coarse, non-4:3 gauge)`);
+  console.log(rows.length ? rows.join('\n') : '  (all sizes within tolerance)');
+  console.log(`  worst drift: +${worst.toFixed(1)}%  — healthy is 0…+8%`);
+  // Guard the guard: if this ever gets much worse, fail rather than print.
+  expect(worst, 'cap drift at a coarse gauge has grown').toBeLessThan(20);
+});
+
+describe('the neckband matches the neckline it has to cover, at any gauge', () => {
+  // The band is picked up along edges measured in ROWS and worked in STITCHES, so its
+  // length depends on the gauge's ratio. If the pick-up rate is fixed rather than
+  // derived, the band comes out short or long in proportion to how far the gauge sits
+  // from 4:3 — and drags or ruffles the neckline accordingly.
+  for (const [label, gauge] of [['default 30×40', G], ['non-4:3 18×22.4', G2]] as const) {
+    for (const size of womanSizes) {
+      it(`${size.category} ${size.chest}" @${label} — band covers its edges within 5%`, () => {
+        const plan = neckbandPlan(size, 'moderate', gauge);
+        const bp = backPlan(size, 'moderate', gauge);
+        const fp = frontNeckPlan(size, 'moderate', gauge);
+        const spi = gauge.bodySt / 4;
+        const rpi = gauge.bodyRow / 4;
+
+        // What the band measures, and what the neckline it covers measures.
+        const bandIn = plan.pickupTotal / spi;
+        const necklineIn =
+          plan.backCentreSts / spi + // cast-off edges are 1:1
+          plan.frontCentreSts / spi +
+          (2 * bp.backNeckRows) / rpi + // shaped edges are rows of fabric
+          (2 * fp.neckDepthRows) / rpi;
+
+        const ratio = bandIn / necklineIn;
+        expect(ratio, `band ${bandIn.toFixed(1)}" vs neckline ${necklineIn.toFixed(1)}"`).toBeGreaterThan(0.95);
+        expect(ratio, `band ${bandIn.toFixed(1)}" vs neckline ${necklineIn.toFixed(1)}"`).toBeLessThan(1.05);
+      });
+    }
+  }
 });

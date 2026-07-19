@@ -21,7 +21,28 @@ import { type Row, carriageForRow } from '../row';
 import { backPlan } from './back';
 import { frontNeckPlan } from './front';
 
-/** Stitches per row along a shaped/vertical neck edge (3 per 4 rows). */
+/**
+ * Stitches to pick up per ROW of a vertical/shaped neck edge, for THIS gauge.
+ *
+ * The rule of thumb is 3 stitches for every 4 rows, and it is quoted everywhere — but
+ * it is a field approximation, not an algorithm. The band has to cover a length: an
+ * edge `n` rows tall measures n / rowsPerInch, and covering that takes
+ * n × stitchesPerInch / rowsPerInch stitches. So the rate is the gauge's own
+ * stitch-to-row ratio, and 3/4 is only right when rows and stitches sit at exactly
+ * 4:3.
+ *
+ * Our DEFAULT_GAUGE is 30 sts × 40 rows — precisely 4:3 — so the fixed rule was exact
+ * there and quietly wrong everywhere else: 7% short at 18 sts × 22.4 rows, 4% short at
+ * a hand 4-ply, 3% over at aran. A band 7% short of its neckline drags the neck in.
+ *
+ * It also hid from the whole test suite, which swept only DEFAULT_GAUGE — the one
+ * gauge at which the bug does not exist. Hence the second sweep gauge in fit.test.ts.
+ */
+export function pickupPerRow(gauge: Gauge): number {
+  return gauge.bodySt / gauge.bodyRow;
+}
+
+/** The rule-of-thumb rate, kept for reference: exact only at a 4:3 row-to-stitch gauge. */
 export const PICKUP_PER_ROW = 3 / 4;
 
 export interface NeckbandPlan {
@@ -45,12 +66,12 @@ export function neckbandPlan(
 ): NeckbandPlan {
   const bp = backPlan(size, style, gauge, shoulder);
   const backCentreSts = bp.backNeckCentreSts; // centre cast-off of the back scoop
-  const backSidePickup = Math.round(bp.backNeckRows * PICKUP_PER_ROW);
+  const backSidePickup = Math.round(bp.backNeckRows * pickupPerRow(gauge));
   const fp = frontNeckPlan(size, style, gauge, neck, shoulder);
   // A crew has a front centre cast-off to follow; a V has none (frontCentre = 0) — the
   // two long V edges run down to the point, which is the band's two ends.
   const frontCentreSts = neck === 'v' ? 0 : fp.frontNeckSts - 2 * stitchesFor(1.5, gauge);
-  const frontSidePickup = Math.round(fp.neckDepthRows * PICKUP_PER_ROW);
+  const frontSidePickup = Math.round(fp.neckDepthRows * pickupPerRow(gauge));
   // Cast on odd (extra on the right) so both selvedges are knit stitches.
   const raw = backCentreSts + 2 * backSidePickup + frontCentreSts + 2 * frontSidePickup;
   const pickupTotal = raw % 2 === 0 ? raw + 1 : raw;
