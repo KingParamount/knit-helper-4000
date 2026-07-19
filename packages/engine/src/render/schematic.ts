@@ -615,6 +615,22 @@ export interface SvgOpts {
   grid?: boolean;
   /** Stitch mode: draw a per-stitch chart (grid every 1 st/row) for knitting from. */
   chart?: boolean;
+  /**
+   * How the chart's axes are numbered.
+   *
+   * 'bed' (default) counts outward from a centre zero — a needle-bed coordinate, and
+   * exactly what a machine knitter sets needles by.
+   *
+   * 'hand' counts in from the edges instead, because a hand knitter has no centre
+   * landmark on their needle: stitches from the right along the bottom (the direction a
+   * right-side row is worked) and from the left along the top, so a stitch can be found
+   * from whichever edge the shaping is nearer. Row numbers alternate sides — odd on the
+   * right, even on the left — which is how a chart says which way to read each row. A
+   * chart with numbers down one side only implies every row runs the same way, and a
+   * piece with a neck split or an off-centre mitre worked backwards is a different
+   * garment.
+   */
+  axes?: 'bed' | 'hand';
   units?: 'in' | 'cm' | 'both';
   /** Output pixels per stitch (stitch mode) or per inch (measured, before scaleFactor). */
   pxPerUnit?: number;
@@ -661,6 +677,7 @@ export interface SchematicMetrics {
   H: number; // overall height
   cellW: number;
   cellH: number;
+  handAxes: boolean; // chart axes counted from the edges rather than a centre zero
   inPerSt: number; // inches of blocked fabric per stitch
   inPerRow: number;
   pad: number;
@@ -691,13 +708,18 @@ export function schematicMetrics(s: PieceSchematic, opts: SvgOpts = {}): Schemat
   const cellH = measured ? inPerRow * px * factor : px;
 
   const chart = !measured && (opts.chart ?? false);
+  const handAxes = chart && (opts.axes ?? 'bed') === 'hand';
   const pad = 82;
-  const padX = chart ? 128 : 82; // wider side margins so the chart annotations fit
-  const topExtra = chart ? 30 : 0; // a strip above the grid for the key
+  // Wider side margins so the chart annotations fit — wider still for hand charts,
+  // which number rows down both sides and need a lane of their own for them.
+  const padX = chart ? (handAxes ? 156 : 128) : 82;
+  // A strip above the grid for the key, plus room for the top stitch scale when the
+  // axes are numbered from the edges.
+  const topExtra = chart ? (handAxes ? 48 : 30) : 0;
   return {
     W: s.widthSts * cellW + padX * 2,
     H: s.heightRows * cellH + pad * 2 + topExtra,
-    cellW, cellH, inPerSt, inPerRow, pad, padX, topExtra, measured, chart, factor, px,
+    cellW, cellH, handAxes, inPerSt, inPerRow, pad, padX, topExtra, measured, chart, factor, px,
   };
 }
 
@@ -709,7 +731,7 @@ export function schematicMetrics(s: PieceSchematic, opts: SvgOpts = {}): Schemat
 export function schematicSvg(s: PieceSchematic, opts: SvgOpts = {}): string {
   const grid = opts.grid ?? true;
   const units = opts.units ?? 'both';
-  const { W, H, cellW, cellH, inPerSt, inPerRow, pad, padX, topExtra, measured, chart, factor, px } =
+  const { W, H, cellW, cellH, handAxes, inPerSt, inPerRow, pad, padX, topExtra, measured, chart, factor, px } =
     schematicMetrics(s, opts);
   const halfW = s.widthSts / 2;
 
@@ -750,24 +772,58 @@ export function schematicSvg(s: PieceSchematic, opts: SvgOpts = {}): string {
     const g: string[] = ['<g font-size="10" fill="#8a96a2">'];
     if (chart) {
       const tier = (k: number): number => (mul(k, 10) ? 2 : mul(k, 5) ? 1 : 0);
+      const totalSts = Math.round(halfW * 2);
       for (let k = 1; k - 0.5 <= halfW + 1e-6; k += 1) {
         const t = tier(k);
         for (const cx of [k - 0.5, -(k - 0.5)]) {
           g.push(`<line x1="${X(cx).toFixed(1)}" y1="${Y(0).toFixed(1)}" x2="${X(cx).toFixed(1)}" y2="${Y(s.heightRows).toFixed(1)}" ${strokes[t]}/>`);
         }
-        if (t === 2) {
+        if (t === 2 && !handAxes) {
           g.push(`<text x="${X(k - 0.5).toFixed(1)}" y="${(Y(0) + 17).toFixed(1)}" text-anchor="middle">${k}R</text>`);
           g.push(`<text x="${X(-(k - 0.5)).toFixed(1)}" y="${(Y(0) + 17).toFixed(1)}" text-anchor="middle">${k}L</text>`);
         }
       }
-      // The centre gap itself (between 1L and 1R) is 0 — a label, not a line.
-      g.push(`<text x="${X(0).toFixed(1)}" y="${(Y(0) + 17).toFixed(1)}" text-anchor="middle" fill="#5b6873">0</text>`);
+      if (handAxes) {
+        // Counted in from each edge. Bottom runs right-to-left, the direction a
+        // right-side row is worked; top runs left-to-right for the other edge.
+        const label = (n: number, x: number, y: number): void => {
+          g.push(`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle">${n}</text>`);
+        };
+        for (let n = 1; n <= totalSts; n++) {
+          if (n !== 1 && !mul(n, 10)) continue;
+          label(n, X(halfW - n + 0.5), Y(0) + 17); // from the right, along the bottom
+          label(n, X(-halfW + n - 0.5), Y(s.heightRows) - 10); // from the left, along the top
+        }
+        g.push(
+          `<text x="${(X(halfW) + 8).toFixed(1)}" y="${(Y(0) + 17).toFixed(1)}" text-anchor="start" fill="#5b6873">sts from the right →</text>`,
+        );
+        g.push(
+          `<text x="${(X(-halfW) - 8).toFixed(1)}" y="${(Y(s.heightRows) - 10).toFixed(1)}" text-anchor="end" fill="#5b6873">← sts from the left</text>`,
+        );
+      } else {
+        // The centre gap itself (between 1L and 1R) is 0 — a label, not a line.
+        g.push(`<text x="${X(0).toFixed(1)}" y="${(Y(0) + 17).toFixed(1)}" text-anchor="middle" fill="#5b6873">0</text>`);
+      }
       for (let k = 1; k - 0.5 <= s.heightRows + 1e-6; k += 1) {
         const t = tier(k);
         g.push(`<line x1="${X(-halfW).toFixed(1)}" y1="${Y(k - 0.5).toFixed(1)}" x2="${X(halfW).toFixed(1)}" y2="${Y(k - 0.5).toFixed(1)}" ${strokes[t]}/>`);
-        if (t === 2) g.push(`<text x="${(X(-halfW) - 8).toFixed(1)}" y="${(Y(k - 0.5) + 3.5).toFixed(1)}" text-anchor="end">${k}</text>`);
+        if (handAxes) {
+          // Every 5th row, so both parities get numbered — and each sits on the side the
+          // row is worked FROM. Odd rows are right-side rows, read right to left.
+          if (t >= 1) {
+            const odd = k % 2 === 1;
+            const x = odd ? X(halfW) + 8 : X(-halfW) - 8;
+            g.push(
+              `<text x="${x.toFixed(1)}" y="${(Y(k - 0.5) + 3.5).toFixed(1)}" text-anchor="${odd ? 'start' : 'end'}">${k}</text>`,
+            );
+          }
+        } else if (t === 2) {
+          g.push(`<text x="${(X(-halfW) - 8).toFixed(1)}" y="${(Y(k - 0.5) + 3.5).toFixed(1)}" text-anchor="end">${k}</text>`);
+        }
       }
-      g.push(`<text x="${(X(-halfW) - 8).toFixed(1)}" y="${(Y(0) + 17).toFixed(1)}" text-anchor="end" fill="#5b6873">st · r</text>`);
+      if (!handAxes) {
+        g.push(`<text x="${(X(-halfW) - 8).toFixed(1)}" y="${(Y(0) + 17).toFixed(1)}" text-anchor="end" fill="#5b6873">st · r</text>`);
+      }
     } else {
       const minorU = inch ? 0.5 : 1;
       const majorU = inch ? 1 : 5;
@@ -878,7 +934,11 @@ export function schematicSvg(s: PieceSchematic, opts: SvgOpts = {}): string {
       const cy = (Y(mid - 0.5) + 3.2).toFixed(1);
       if (right) {
         lastR = mid;
-        annos.push(`<text x="${(X(halfW) + 10).toFixed(1)}" y="${cy}" text-anchor="start">${label}</text>`);
+        // Hand charts number rows down the right-hand side, so the shaping notes move
+        // out past that lane rather than printing on top of it.
+        annos.push(
+          `<text x="${(X(halfW) + (handAxes ? 34 : 10)).toFixed(1)}" y="${cy}" text-anchor="start">${label}</text>`,
+        );
       } else {
         lastL = mid;
         annos.push(`<text x="${(X(-halfW) - 28).toFixed(1)}" y="${cy}" text-anchor="end">${label}</text>`);

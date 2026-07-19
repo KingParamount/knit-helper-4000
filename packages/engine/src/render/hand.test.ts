@@ -22,7 +22,7 @@ import { backRows } from '../pieces/back';
 import { frontRows } from '../pieces/front';
 import { sleeveRows } from '../pieces/sleeve';
 import { neckbandRows, neckbandPlan } from '../pieces/neckband';
-import { neckbandSchematic } from './schematic';
+import { neckbandSchematic, schematicSvg } from './schematic';
 import { renderPiece, makingUpProse, renderPattern } from './prose';
 import { assembleGarment } from '../pieces/garment';
 import type { Row } from '../row';
@@ -315,5 +315,41 @@ describe('the hand V mitre is charted at the centre FRONT, not the middle of the
     }).lines;
     expect(lines.join(' ')).toMatch(/open shoulder/i);
     expect(lines.join(' ')).toMatch(/back neck first|back neck first, then/i);
+  });
+});
+
+describe('hand charts are numbered for a knitter, not for a needle bed', () => {
+  const size = SIZES[2];
+  const s = neckbandSchematic(neckbandRows(size, 'moderate', G, 'v', 'set_in', 'hand'),
+    neckbandPlan(size, 'moderate', G, 'v', 'set_in'), G);
+  const hand = schematicSvg(s, { scale: 'stitch', chart: true, grid: true, axes: 'hand' });
+  const bed = schematicSvg(s, { scale: 'stitch', chart: true, grid: true });
+
+  it('counts stitches in from both edges instead of out from a centre zero', () => {
+    expect(hand).toContain('sts from the right');
+    expect(hand).toContain('sts from the left');
+    // The bed coordinate — 30L, 30R — is a place on a machine, not on a needle.
+    expect(hand).not.toMatch(/>\d+L</);
+    expect(hand).not.toMatch(/>\d+R</);
+  });
+
+  it('leaves the machine chart on its bed coordinate', () => {
+    expect(bed).toMatch(/>\d+L</);
+    expect(bed).toMatch(/>\d+R</);
+    expect(bed).not.toContain('sts from the right');
+  });
+
+  it('numbers rows on both sides, so each row says which way it is read', () => {
+    // Odd rows are right-side rows and are read from the right, so their numbers sit
+    // there; even rows sit on the left. Numbers down one side only would imply every
+    // row runs the same way, and a neck split worked backwards is a mirrored piece.
+    const anchors: [string, number][] = [...hand.matchAll(/text-anchor="(start|end)"[^>]*>(\d+)</g)].map(
+      (m) => [m[1], Number(m[2])],
+    );
+    const rowNums = anchors.filter(([, n]) => n <= s.heightRows);
+    expect(rowNums.length, 'expected numbered rows').toBeGreaterThan(0);
+    for (const [anchor, n] of rowNums) {
+      expect(anchor, `row ${n} should sit on the side it is worked from`).toBe(n % 2 === 1 ? 'start' : 'end');
+    }
   });
 });

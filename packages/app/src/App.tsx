@@ -291,7 +291,17 @@ export function App(): JSX.Element {
     });
   };
   const chartSvg = (pid: PieceId): string =>
-    schematics ? svgFor(schematics[pid], { scale: 'stitch', chart: true, grid: true }) : '';
+    schematics
+      ? svgFor(schematics[pid], {
+          scale: 'stitch',
+          chart: true,
+          grid: true,
+          // A hand knitter has no centre-zero landmark on their needle, and needs to
+          // know which way each row runs; a machine knitter sets needles by the bed
+          // coordinate and is told the carriage side in the prose.
+          axes: technique === 'hand' ? 'hand' : 'bed',
+        })
+      : '';
 
   const scaleFactor = output === 'knitleader' ? 0.5 : output === 'knitradar' ? 0.25 : undefined;
   const templateOnly = output === 'knitleader' || output === 'knitradar';
