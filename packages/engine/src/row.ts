@@ -20,7 +20,14 @@ export type Op =
   | { kind: 'cast_on'; count: number }
   | { kind: 'pick_up'; count: number } // pick up and knit along an edge (e.g. a neckband)
   | { kind: 'bind_off'; count: number; side: 'L' | 'R' | 'both' | 'center' }
-  | { kind: 'decrease'; count: number; side: 'L' | 'R' | 'both' }
+  /**
+   * `side: 'center'` is a centred double decrease worked at a marked centre stitch —
+   * the hand convention for a V-neckband mitre. `count` is the stitches removed (2 for
+   * a CDD), so the running total arithmetic is the same as a single-sided decrease.
+   * A machine cannot work one: you cannot decrease mid-bed without shifting every
+   * needle, which is why the machine band mitres at its two ends instead.
+   */
+  | { kind: 'decrease'; count: number; side: 'L' | 'R' | 'both' | 'center' }
   | { kind: 'increase'; count: number; side: 'L' | 'R' | 'both' }
   | { kind: 'hold'; count: number; side: 'L' | 'R' }
   | { kind: 'take_off'; count: number } // off the machine on waste yarn; stitches stay live

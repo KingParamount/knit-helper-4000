@@ -216,7 +216,10 @@ export function App(): JSX.Element {
     () => buildPatternText(input, output === 'concise' ? 'abbreviated' : 'verbose'),
     [category, chest, ease, neck, shoulder, swatch, output, technique],
   );
-  const schematics = useMemo(() => buildSchematics(input), [category, chest, ease, neck, shoulder, swatch]);
+  const schematics = useMemo(
+    () => buildSchematics(input),
+    [category, chest, ease, neck, shoulder, swatch, technique],
+  );
 
   const diagramSvg = (pid: PieceId, factor?: number): string =>
     schematics ? svgFor(schematics[pid], { scale: 'measured', units, grid: !factor, scaleFactor: factor }) : '';
@@ -600,6 +603,7 @@ export function App(): JSX.Element {
           mode={templateOnly ? 'templates' : output === 'chart' ? 'chart' : 'prose'}
           twoColumn={output === 'concise'}
           chartFor={chartSvg}
+          handBand={technique === 'hand'}
           tilePlanFor={tilePlanFor}
           sheetRoomMm={sheetRoomMm}
           pageHeightMm={pageHeightMm}

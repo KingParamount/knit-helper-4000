@@ -31,6 +31,12 @@ import type { Gauge } from '../gauge';
 export interface PieceProse {
   title: string;
   lines: string[];
+  /**
+   * Which piece this is, where it is one. Renderers used to match prose to schematics
+   * by position in the pieces array, which broke the moment hand knitting split its
+   * making-up in two and moved a block in front of the neckband.
+   */
+  piece?: 'back' | 'front' | 'sleeve' | 'neckband';
 }
 
 export type ProseStyle = 'verbose' | 'abbreviated';
@@ -1033,7 +1039,14 @@ export function renderPiece(
     tidied.push(line);
   }
   while (tidied.length && tidied[tidied.length - 1] === '') tidied.pop();
-  return { title, lines: tidied };
+  const p0 = rows[0]?.piece;
+  const piece =
+    p0 === 'back' ? 'back'
+    : p0 === 'front' ? 'front'
+    : p0 === 'collar' ? 'neckband'
+    : p0 === 'sleeve_l' || p0 === 'sleeve_r' ? 'sleeve'
+    : undefined;
+  return { title, lines: tidied, piece };
 }
 
 /**
@@ -1143,14 +1156,23 @@ export interface Pattern {
  * centre stitch), not seamed afterwards — so the machine version's "seam the mitred ends
  * at the centre front" step has no counterpart here.
  */
-function handMakingUpProse(neck: NeckStyle, shoulder: ShoulderStyle, style: ProseStyle): PieceProse {
+/**
+ * The hand pattern's making-up comes in TWO parts, and the neckband sits between them.
+ *
+ * A hand knitter picks the band up off the neckline — which does not exist until a
+ * shoulder is joined. Putting all of the making-up at the end (right for the machine,
+ * whose band is knitted separately as its own strip) would mean the pattern could not
+ * be worked from the first line to the last: you would reach the neckband with nothing
+ * to pick up from. So blocking and the first shoulder come BEFORE the band, and the
+ * rest — the second shoulder, which closes the band's ends with it, then sleeves, sides
+ * and ends — comes after.
+ */
+function handBeforeBandProse(style: ProseStyle): PieceProse {
   const verbose = style !== 'abbreviated';
   const lines: string[] = [];
-  const stretchy = 'a stretchy seam such as mattress stitch';
-
   lines.push(
     verbose
-      ? 'Block each piece to the measurements on its schematic and let it dry before you start. Leave the shoulder and neck stitches on their holders until you come to them.'
+      ? 'Block each piece to the measurements on its schematic and let it dry before you go on. Leave the shoulder and neck stitches on their holders until you come to them.'
       : 'Block all pieces to the schematic measurements; let dry. Leave held stitches on their holders.',
   );
   if (verbose) {
@@ -1158,32 +1180,36 @@ function handMakingUpProse(neck: NeckStyle, shoulder: ShoulderStyle, style: Pros
       'Work seams with the right sides together unless a step says otherwise, and join loosely enough that the seam stretches with the fabric.',
     );
   }
-
-  // 1 — one shoulder, so the neckline can be worked as a single flat edge.
   lines.push('');
   lines.push(
     verbose
-      ? 'Join one shoulder with a three-needle cast off: hold the front and back shoulder stitches on their needles with the right sides together, and cast them off together through both. Leave the other shoulder on its holders for now — it stays open so the neckband can be worked flat.'
+      ? 'Join one shoulder with a three-needle cast off: hold the front and back shoulder stitches on their needles with the right sides together, and cast them off together through both. Leave the other shoulder on its holders — it stays open so the neckband can be worked flat.'
       : 'Join one shoulder with a three-needle cast off. Leave the other open.',
   );
-
-  // 2 — the band, worked in place.
   lines.push('');
   lines.push(
     verbose
-      ? 'Work the neckband as given, picking the stitches up around the neckline with the right side facing and knitting across the held stitches as you reach them. Cast off loosely in rib — a tight cast-off here will stop the neck going over the head.'
-      : 'Work the neckband as given, picking up round the neckline. Cast off loosely in rib.',
+      ? 'The neckband is picked up from this neckline next, so work it before you close the second shoulder.'
+      : 'Work the neckband next, before closing the second shoulder.',
   );
+  return { title: 'Joining the First Shoulder', lines };
+}
+
+function handMakingUpProse(neck: NeckStyle, shoulder: ShoulderStyle, style: ProseStyle): PieceProse {
+  const verbose = style !== 'abbreviated';
+  const lines: string[] = [];
+  const stretchy = 'a stretchy seam such as mattress stitch';
+
   if (neck === 'v') {
     lines.push(
       verbose
-        ? 'The point of the V is shaped as you work the band, so there is nothing to seam at the centre front.'
+        ? 'The point of the V was shaped as you worked the band, so there is nothing to seam at the centre front.'
         : 'The V point is shaped in the band; nothing to seam at centre front.',
     );
+    lines.push('');
   }
 
-  // 3 — the second shoulder, closing the band with it.
-  lines.push('');
+  // The second shoulder, closing the band with it.
   lines.push(
     verbose
       ? 'Join the second shoulder in the same way, taking the seam straight through the ends of the neckband so the band closes with it.'
@@ -1321,14 +1347,23 @@ export function renderPattern(
   styleOrOpts: ProseStyle | PieceOpts = 'verbose',
 ): Pattern {
   const o: PieceOpts = typeof styleOrOpts === 'string' ? { style: styleOrOpts } : styleOrOpts;
+  const style = o.style ?? 'verbose';
+  const technique = o.technique ?? 'machine';
+  const body = [
+    renderPiece(garment.back, 'The Back', o),
+    renderPiece(garment.front, 'The Front', o),
+    renderPiece(garment.sleeveLeft, 'The Sleeves (make 2)', o),
+  ];
+  const band = renderPiece(garment.neckband, 'Neckband', o);
+  const makingUp = makingUpProse(garment.neck, garment.shoulder, style, technique);
+  // A hand knitter picks the band up off a neckline that only exists once a shoulder is
+  // joined, so that join has to precede the band for the pattern to be workable in
+  // order. A machine band is a separate strip, so all of its making-up waits to the end.
   return {
-    pieces: [
-      renderPiece(garment.back, 'The Back', o),
-      renderPiece(garment.front, 'The Front', o),
-      renderPiece(garment.sleeveLeft, 'The Sleeves (make 2)', o),
-      renderPiece(garment.neckband, 'Neckband', o),
-      makingUpProse(garment.neck, garment.shoulder, o.style ?? 'verbose', o.technique ?? 'machine'),
-    ],
+    pieces:
+      technique === 'hand'
+        ? [...body, handBeforeBandProse(style), band, makingUp]
+        : [...body, band, makingUp],
   };
 }
 

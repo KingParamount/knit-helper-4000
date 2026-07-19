@@ -22,7 +22,8 @@ import { backRows } from '../pieces/back';
 import { frontRows } from '../pieces/front';
 import { sleeveRows } from '../pieces/sleeve';
 import { neckbandRows } from '../pieces/neckband';
-import { renderPiece, makingUpProse } from './prose';
+import { renderPiece, makingUpProse, renderPattern } from './prose';
+import { assembleGarment } from '../pieces/garment';
 import type { Row } from '../row';
 
 const G = DEFAULT_GAUGE;
@@ -170,5 +171,54 @@ describe('hand register: names the decrease that suits the row it falls on', () 
       (l) => /(ssk|k2tog)/.test(l) && /(p2tog|ssp)/.test(l) && !alternating.test(l),
     );
     expect(single, `mixed pairings on a single-face row: ${single[0] ?? ''}`).toEqual([]);
+  });
+});
+
+describe('hand construction: the band mitres where a hand knitter actually decreases', () => {
+  it('shapes the V at a centred double decrease, not at the two ends', () => {
+    const size = SIZES[2];
+    const hand = neckbandRows(size, 'moderate', G, 'v', 'set_in', 'hand');
+    const machine = neckbandRows(size, 'moderate', G, 'v', 'set_in', 'machine');
+
+    const sides = (rows: typeof hand): string[] =>
+      rows.flatMap((r) => r.ops.filter((o) => o.kind === 'decrease').map((o) => String((o as { side: string }).side)));
+
+    expect(new Set(sides(hand))).toEqual(new Set(['center']));
+    expect(new Set(sides(machine))).toEqual(new Set(['both']));
+
+    // The same stitches leave the band either way — only the place differs. If these
+    // ever diverge, one of the two constructions has stopped matching its plan.
+    expect(hand[hand.length - 1].stitches).toBe(machine[machine.length - 1].stitches);
+  });
+
+  it('leaves a crew band unshaped in both techniques', () => {
+    const hand = neckbandRows(SIZES[2], 'moderate', G, 'round', 'set_in', 'hand');
+    expect(hand.flatMap((r) => r.ops.filter((o) => o.kind === 'decrease'))).toEqual([]);
+  });
+});
+
+describe('hand pattern can be worked from the first line to the last', () => {
+  // The band is picked up off a neckline that does not exist until a shoulder is
+  // joined. If all the making-up sat at the end — right for a machine, whose band is a
+  // separate strip — the knitter would reach the neckband with nothing to pick up from.
+  for (const neck of NECKS) {
+    for (const shoulder of SHOULDERS) {
+      it(`${neck}/${shoulder} — joins a shoulder before the neckband`, () => {
+        const garment = assembleGarment(SIZES[2], 'moderate', G, neck, shoulder);
+        const titles = renderPattern(garment, { technique: 'hand', gauge: G, units: 'cm' }).pieces.map(
+          (p) => p.title,
+        );
+        const shoulderStep = titles.findIndex((x) => /shoulder/i.test(x));
+        const band = titles.findIndex((x) => /neckband/i.test(x));
+        expect(shoulderStep, 'expected a shoulder-joining step').toBeGreaterThanOrEqual(0);
+        expect(shoulderStep, `shoulder must precede the band: ${titles.join(' -> ')}`).toBeLessThan(band);
+      });
+    }
+  }
+
+  it('machine keeps its making-up at the end, where the separate band allows', () => {
+    const garment = assembleGarment(SIZES[2], 'moderate', G, 'v', 'set_in');
+    const titles = renderPattern(garment, { technique: 'machine' }).pieces.map((p) => p.title);
+    expect(titles[titles.length - 1]).toMatch(/making up/i);
   });
 });

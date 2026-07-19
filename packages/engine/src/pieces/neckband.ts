@@ -15,7 +15,7 @@
  * front centre), ~3 sts per 4 rows along the shaped side edges. Depth from the neck rib.
  */
 
-import type { SizeRecord, EaseStyleId, NeckStyle, ShoulderStyle } from '../data/types';
+import type { SizeRecord, EaseStyleId, NeckStyle, ShoulderStyle, Technique } from '../data/types';
 import { type Gauge, stitchesFor, ribRowsFor } from '../gauge';
 import { type Row, carriageForRow } from '../row';
 import { backPlan } from './back';
@@ -91,6 +91,7 @@ export function neckbandRows(
   gauge: Gauge,
   neck: NeckStyle = 'round',
   shoulder: ShoulderStyle = 'set_in',
+  technique: Technique = 'machine',
 ): Row[] {
   const p = neckbandPlan(size, style, gauge, neck, shoulder);
   const rows: Row[] = [];
@@ -111,7 +112,20 @@ export function neckbandRows(
   // Leaves two rows spare — one for the marker row (penultimate), one for the take-off.
   const bodyRows = Math.max(0, p.bandRows - 2);
   for (let i = 1; i <= bodyRows; i++) {
-    if (neck === 'v' && i <= p.mitreRows) push([{ kind: 'decrease', count: 1, side: 'both' }], 'mitre');
+    if (neck === 'v' && i <= p.mitreRows) {
+      // The SAME two stitches leave the band either way, but from different places, and
+      // the chart has to show which. A machine cannot decrease mid-bed, so its band
+      // mitres at the two ends and is seamed into a point at the centre front. A hand
+      // knitter picked the band up around the neckline, so the point is shaped where it
+      // actually is: a centred double decrease at a marked centre stitch, which rides
+      // over the top as an unbroken line down the V.
+      push(
+        technique === 'hand'
+          ? [{ kind: 'decrease', count: 2, side: 'center' }]
+          : [{ kind: 'decrease', count: 1, side: 'both' }],
+        'mitre',
+      );
+    }
     else push([], neck === 'v' ? 'mitre' : 'rib');
   }
   // Penultimate row: hang the waypoint markers.

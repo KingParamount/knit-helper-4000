@@ -61,6 +61,8 @@ export interface PrintDocProps {
   chartBandsFor?: (piece: PieceId) => BandPlan;
   /** Full-page blocking diagram, rendered at the scale it will print. */
   blockingSvgFor?: (piece: PieceId) => string;
+  /** Hand knitting: the band is worked in place, so it has no blocking shape. */
+  handBand?: boolean;
   /** Paper the document is laid out for; @page is emitted to match. */
   paperLabel: string;
   landscape: boolean;
@@ -144,6 +146,7 @@ export function PrintDoc({
   pageHeightMm,
   chartBandsFor,
   blockingSvgFor,
+  handBand = false,
   paperLabel,
   landscape,
   sizeLabel,
@@ -248,7 +251,10 @@ export function PrintDoc({
     >
       <style>{patternPageRule}</style>
       {pattern.pieces.map((piece, i) => {
-        const id = PIECE_ORDER[i]; // undefined for Making Up — it has no piece to draw
+        // Identity comes from the piece itself, not its position. The hand pattern
+        // slots a making-up block in front of the neckband so it can be worked in
+        // order, which shifts every index after it.
+        const id = piece.piece;
         // Landscape charts fit the page WIDTH and run down it in full-width bands,
         // one per sheet. Splitting only one way means no sheet is ever a corner
         // sliver, and a chart is read row by row anyway, so a horizontal strip is
@@ -302,12 +308,29 @@ export function PrintDoc({
           you knit from the words, then block the finished piece against the drawing,
           so they are worth more as full-page references than as thumbnails wedged
           above the text they were competing with. */}
-      {PIECE_ORDER.map((id, i) => (
-        <Sheet key={`diagram-${id}`}>
-          <h2 className="print-piece-title">{pattern.pieces[i]?.title ?? ''} — blocking diagram</h2>
-          <div className="print-diagram big" dangerouslySetInnerHTML={{ __html: (blockingSvgFor ?? svgFor)(id) }} />
-        </Sheet>
-      ))}
+      {PIECE_ORDER.map((id) => {
+        const title = pattern.pieces.find((p) => p.piece === id)?.title ?? '';
+        // A hand knitter's neckband is picked up and worked straight onto the garment,
+        // so it is never blocked as a piece — there is no shape to block it to. Saying
+        // so is more use than drawing an outline nobody can act on.
+        if (handBand && id === 'neckband') {
+          return (
+            <Sheet key="diagram-neckband">
+              <h2 className="print-piece-title">{title}</h2>
+              <p className="print-prose">
+                The neckband is picked up and worked directly onto the neckline, so there
+                is nothing to block. See its chart for where the shaping falls.
+              </p>
+            </Sheet>
+          );
+        }
+        return (
+          <Sheet key={`diagram-${id}`}>
+            <h2 className="print-piece-title">{title} — blocking diagram</h2>
+            <div className="print-diagram big" dangerouslySetInnerHTML={{ __html: (blockingSvgFor ?? svgFor)(id) }} />
+          </Sheet>
+        );
+      })}
     </div>
   );
 }

@@ -528,10 +528,19 @@ export function neckbandSchematic(
   for (const r of rows) {
     const y = r.index - 1;
     const rh = r.stitches / 2;
-    if (r.ops.some((op) => op.kind === 'decrease')) {
-      // On the new edge stitch, as the body/sleeve charts place theirs.
-      marks.push({ kind: 'dec', x: rh - 0.5, y: y - 0.5, lean: 1 });
-      marks.push({ kind: 'dec', x: -rh + 0.5, y: y - 0.5, lean: -1 });
+    // Where the glyphs go follows what the row actually did, not an assumption about
+    // where a band decreases. Both mitres remove two stitches per row, so the outline
+    // narrows identically — only the position differs, and the position is the whole
+    // point of the chart: end decreases creep in from both edges, a centred double
+    // decrease marches straight up the middle.
+    for (const op of r.ops) {
+      if (op.kind !== 'decrease') continue;
+      if (op.side === 'center') {
+        marks.push({ kind: 'dec', x: 0, y: y - 0.5, centre: true });
+      } else {
+        if (op.side === 'R' || op.side === 'both') marks.push({ kind: 'dec', x: rh - 0.5, y: y - 0.5, lean: 1 });
+        if (op.side === 'L' || op.side === 'both') marks.push({ kind: 'dec', x: -rh + 0.5, y: y - 0.5, lean: -1 });
+      }
     }
     if (rh !== lastHalf) {
       rightPts.push({ x: rh, y });

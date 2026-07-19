@@ -130,11 +130,14 @@ export function buildSchematics(input: BuildInput): Record<PieceId, PieceSchemat
   const fnp = frontNeckPlan(size, input.ease, g, neck, shoulder);
   const sp = sleevePlan(size, input.ease, g, shoulder);
   const np = neckbandPlan(size, input.ease, g, neck, shoulder);
+  // Only the band's rows differ by technique — a hand V mitres at a centred double
+  // decrease, a machine one at its two ends — and the chart has to show which.
+  const technique = input.technique ?? 'machine';
   return {
     back: backSchematic(backRows(size, input.ease, g, shoulder), bp, g),
     front: frontSchematic(frontRows(size, input.ease, g, neck, shoulder), bp, fnp, g),
     sleeve: sleeveSchematic(sleeveRows('sleeve_l', size, input.ease, g, shoulder), sp, g),
-    neckband: neckbandSchematic(neckbandRows(size, input.ease, g, neck, shoulder), np, g),
+    neckband: neckbandSchematic(neckbandRows(size, input.ease, g, neck, shoulder, technique), np, g),
   };
 }
 
