@@ -21,7 +21,8 @@ import type { NeckStyle, ShoulderStyle } from '../data/types';
 import { backRows } from '../pieces/back';
 import { frontRows } from '../pieces/front';
 import { sleeveRows } from '../pieces/sleeve';
-import { neckbandRows } from '../pieces/neckband';
+import { neckbandRows, neckbandPlan } from '../pieces/neckband';
+import { neckbandSchematic } from './schematic';
 import { renderPiece, makingUpProse, renderPattern } from './prose';
 import { assembleGarment } from '../pieces/garment';
 import type { Row } from '../row';
@@ -220,5 +221,99 @@ describe('hand pattern can be worked from the first line to the last', () => {
     const garment = assembleGarment(SIZES[2], 'moderate', G, 'v', 'set_in');
     const titles = renderPattern(garment, { technique: 'machine' }).pieces.map((p) => p.title);
     expect(titles[titles.length - 1]).toMatch(/making up/i);
+  });
+});
+
+describe('every abbreviation the pattern uses is defined in it', () => {
+  // Atherley's rule: a knitter cannot be assumed to share our shorthand, and a pattern
+  // is often read long after it was printed, away from whatever explained it.
+  const CASES = [
+    ['machine', 'verbose'], ['machine', 'abbreviated'],
+    ['hand', 'verbose'], ['hand', 'abbreviated'],
+  ] as const;
+
+  for (const [technique, style] of CASES) {
+    it(`${technique}/${style} — defines what it uses, and nothing it does not`, () => {
+      const garment = assembleGarment(SIZES[2], 'moderate', G, 'v', 'set_in');
+      const pattern = renderPattern(garment, { style, technique, gauge: G, units: 'cm' });
+      const key = pattern.pieces.find((p) => p.title === 'Abbreviations');
+      const body = pattern.pieces.filter((p) => p.title !== 'Abbreviations').flatMap((p) => p.lines).join('\n');
+
+      // Anything shorthand that appears in the prose must appear in the key.
+      const shorthand: [string, RegExp][] = [
+        ['CO', /\bCO\b/], ['BO', /\bBO\b/], ['RC', /\bRC\b/],
+        ['COL', /\bCOL\b/], ['COR', /\bCOR\b/], ['MT', /\bMT\b/],
+        ['ssk', /\bssk\b/], ['k2tog', /\bk2tog\b/], ['p2tog', /\bp2tog\b/], ['ssp', /\bssp\b/],
+      ];
+      const defined = key ? key.lines.join('\n') : '';
+      for (const [abbr, re] of shorthand) {
+        if (re.test(body)) {
+          expect(defined, `${abbr} used but not defined`).toContain(abbr);
+        }
+      }
+      // And the key must not pad itself out with things the pattern never says.
+      if (key) {
+        for (const line of key.lines.filter((l) => l.includes('—'))) {
+          const abbr = line.split('—')[0].trim().split(',')[0].trim();
+          expect(body.toLowerCase(), `${abbr} defined but never used`).toContain(abbr.toLowerCase());
+        }
+      }
+    });
+  }
+
+  it('the verbose machine register needs no key, having no shorthand to explain', () => {
+    const garment = assembleGarment(SIZES[2], 'moderate', G, 'v', 'set_in');
+    const pattern = renderPattern(garment, { style: 'verbose', technique: 'machine' });
+    expect(pattern.pieces.find((p) => p.title === 'Abbreviations')).toBeUndefined();
+  });
+
+  it('both hand registers describe the SAME V mitre', () => {
+    // They diverged once: the terse one said "dec 1 st each side of the centre stitch",
+    // which is two decreases flanking the centre — a different operation that leaves the
+    // centre stitch unconsumed and gives two shaping lines instead of one.
+    const garment = assembleGarment(SIZES[2], 'moderate', G, 'v', 'set_in');
+    for (const style of ['verbose', 'abbreviated'] as const) {
+      const text = renderPattern(garment, { style, technique: 'hand', gauge: G, units: 'cm' })
+        .pieces.flatMap((p) => p.lines).join('\n');
+      expect(text, `${style} should specify a centred double decrease`).toMatch(/centred double decrease/i);
+    }
+  });
+});
+
+describe('the hand V mitre is charted at the centre FRONT, not the middle of the strip', () => {
+  // The band runs from the open shoulder, round the neckline, back to that shoulder.
+  // Its midpoint is therefore the centre BACK — so a mitre drawn at x=0 shapes the back
+  // of the neck. This was live for an hour and was caught by eye, not by a test.
+  const size = SIZES[2];
+  const plan = neckbandPlan(size, 'moderate', G, 'v', 'set_in');
+
+  it('places the decrease glyphs at the centre front, counted along the pick-up', () => {
+    const rows = neckbandRows(size, 'moderate', G, 'v', 'set_in', 'hand');
+    const s = neckbandSchematic(rows, plan, G);
+    const decs = s.marks.filter((m) => m.kind === 'dec');
+    expect(decs.length).toBe(plan.mitreRows);
+
+    // shoulder -> back side -> back centre -> back side -> other shoulder -> front edge
+    const centreFront = 2 * plan.backSidePickup + plan.backCentreSts + plan.frontSidePickup;
+    const expectedX = centreFront - plan.pickupTotal / 2;
+    for (const d of decs) expect(d.x).toBeCloseTo(expectedX, 6);
+
+    // And it must not be the middle of the strip, which is the centre back.
+    expect(Math.abs(expectedX), 'mitre must not sit at the strip midpoint').toBeGreaterThan(1);
+  });
+
+  it('a machine band still mitres at its two ends, which ARE the centre front', () => {
+    const rows = neckbandRows(size, 'moderate', G, 'v', 'set_in', 'machine');
+    const s = neckbandSchematic(rows, plan, G);
+    const xs = s.marks.filter((m) => m.kind === 'dec').map((m) => Math.abs(m.x));
+    expect(Math.min(...xs)).toBeGreaterThan(plan.pickupTotal / 2 - plan.mitreRows - 2);
+  });
+
+  it('the prose says where to start, since the chart counts from there', () => {
+    const lines = renderPiece(neckbandRows(size, 'moderate', G, 'v', 'set_in', 'hand'), 'Neckband', {
+      technique: 'hand', gauge: G, units: 'cm',
+    }).lines;
+    expect(lines.join(' ')).toMatch(/open shoulder/i);
+    expect(lines.join(' ')).toMatch(/back neck first|back neck first, then/i);
   });
 });

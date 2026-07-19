@@ -510,7 +510,16 @@ export function sleeveSchematic(
 
 export function neckbandSchematic(
   rows: Row[],
-  plan: { pickupTotal: number; bandRows: number; mitreRows?: number; finalSts?: number },
+  plan: {
+    pickupTotal: number;
+    bandRows: number;
+    mitreRows?: number;
+    finalSts?: number;
+    // Read only to site a worked-in-place mitre; a machine band mitres at its ends.
+    backSidePickup?: number;
+    backCentreSts?: number;
+    frontSidePickup?: number;
+  },
   gauge: Gauge,
 ): PieceSchematic {
   const half = plan.pickupTotal / 2;
@@ -524,6 +533,17 @@ export function neckbandSchematic(
   const finalHalf = finalSts / 2;
   const rightPts: Pt[] = [{ x: half, y: 0 }];
   const marks: ShapeMark[] = [];
+  /*
+   * Where the centre front lies along the band, for a band worked in place. The pick-up
+   * starts at the open shoulder and runs across the back neck first, so:
+   *   shoulder → back side edge → back centre → back side edge → other shoulder →
+   *   front V edge → CENTRE FRONT
+   * Everything needed is already in the plan, so the schematic can site the mitre
+   * without the band having to carry a position through the row array.
+   */
+  const mitreAtSt =
+    2 * (plan.backSidePickup ?? 0) + (plan.backCentreSts ?? 0) + (plan.frontSidePickup ?? 0);
+  const mitreX = mitreAtSt > 0 ? mitreAtSt - half : 0;
   let lastHalf = half;
   for (const r of rows) {
     const y = r.index - 1;
@@ -536,7 +556,17 @@ export function neckbandSchematic(
     for (const op of r.ops) {
       if (op.kind !== 'decrease') continue;
       if (op.side === 'center') {
-        marks.push({ kind: 'dec', x: 0, y: y - 0.5, centre: true });
+        // NOT the middle of the chart. "Centre" here means the marked CENTRE-FRONT
+        // stitch, and the strip's midpoint is the centre BACK — the band runs from one
+        // shoulder, round the neckline, back to the same shoulder, so the centre front
+        // sits at an offset along it, not halfway. Placing the glyph at x=0 mitred the
+        // band at the back of the neck.
+        //
+        // The offset is fixed as the band narrows: each centred double decrease takes
+        // one stitch from either side of the marked stitch, so the marked stitch loses
+        // one place from the left while the strip loses one from its half-width. The
+        // column of glyphs is therefore vertical.
+        marks.push({ kind: 'dec', x: mitreX, y: y - 0.5, centre: true });
       } else {
         if (op.side === 'R' || op.side === 'both') marks.push({ kind: 'dec', x: rh - 0.5, y: y - 0.5, lean: 1 });
         if (op.side === 'L' || op.side === 'both') marks.push({ kind: 'dec', x: -rh + 0.5, y: y - 0.5, lean: -1 });

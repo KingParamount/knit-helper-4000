@@ -495,10 +495,13 @@ function handVocab(style: ProseStyle, units: Units): Vocab {
       terse
         ? `Slip this shoulder onto a holder — ${n} st.`
         : `Slip this shoulder onto a holder, leaving the stitches live. There should be ${n} stitches on this shoulder.`,
+    // The starting point is not decoration: the chart sites the V mitre by counting
+    // along from here, so a knitter who began somewhere else would decrease in the
+    // wrong place. Prose and chart have to agree about where stitch 1 is.
     pickUp: (n) =>
       terse
-        ? `Pick up and knit ${n} st evenly round the neck.`
-        : `With the right side facing, pick up and knit ${n} stitches evenly around the neck edge, working across the stitches held at the back and front as you come to them.`,
+        ? `From the open shoulder, pick up and knit ${n} st evenly round the neck, back neck first.`
+        : `With the right side facing and beginning at the open shoulder, pick up and knit ${n} stitches evenly around the neck edge — across the back neck first, then down and around the front — knitting across the held stitches as you reach them.`,
     setHold: () => '',
     // Short rows by hand: leave the stitches unworked and turn. Working the wrap in on
     // the following row is what closes the hole at the turn.
@@ -515,8 +518,12 @@ function handVocab(style: ProseStyle, units: Units): Vocab {
         ? 'Shaping the V point. Mark the centre stitch.'
         : 'Shaping the point of the V. Before you begin, mark the stitch at the exact centre front of the band — the shaping runs down either side of it and it must not be lost.',
     mitreWork: (_rc, count) =>
+      // Both registers must describe the SAME operation. The terse wording used to say
+      // "dec 1 st each side of the centre stitch", which is a different thing: two
+      // separate decreases flanking the centre leave the centre stitch unconsumed and
+      // give two shaping lines instead of the single unbroken one a mitre wants.
       terse
-        ? `Dec 1 st each side of the centre st every other row, ${count} times.`
+        ? `Work a centred double decrease at the marked centre st every other row, ${count} times.`
         : `Work a centred double decrease at the marked centre stitch on every other row, ${count} times in all, so the centre stitch rides over the top as an unbroken line down the point of the V.`,
     mitreMeetNote: () => '',
     crossoverTitle: () => '',
@@ -1335,6 +1342,104 @@ export function makingUpProse(
   return { title: 'Making Up', lines };
 }
 
+
+// ---------------------------------------------------------------------------
+// The abbreviations key.
+// ---------------------------------------------------------------------------
+
+/**
+ * Every abbreviation a pattern uses has to be defined in it — a knitter cannot be
+ * assumed to share our shorthand, and a pattern is often read years after it is
+ * printed, away from whatever explained it. This was missing from the machine output
+ * too: the concise register has always emitted CO, BO and RC with nothing defining
+ * them.
+ *
+ * Only what is actually used gets listed, so the key stays short and true: the verbose
+ * machine register spells everything out and gets no key at all, while verbose HAND
+ * still needs one, because ssk and k2tog are abbreviations however much prose surrounds
+ * them.
+ *
+ * Definitions say how to work the thing, not just what the letters stand for. Expanding
+ * "ssk" to "slip, slip, knit" tells you nothing about how to slip, and slipping purlwise
+ * there twists the stitches — so the definitions describe the action and, where it
+ * matters, which way the result leans.
+ */
+interface Abbrev {
+  abbr: string;
+  /** Matched against the rendered lines to decide whether it earns a place. */
+  re: RegExp;
+  def: string;
+}
+
+const ABBREVS: Abbrev[] = [
+  // Shared shorthand.
+  { abbr: 'st, sts', re: /\b\d+ sts?\b/, def: 'stitch, stitches' },
+  { abbr: 'CO', re: /\bCO\b/, def: 'cast on' },
+  { abbr: 'BO', re: /\bBO\b/, def: 'cast off' },
+  { abbr: 'dec', re: /\bdec\b/, def: 'decrease' },
+  { abbr: 'inc', re: /\binc\b/, def: 'increase' },
+  { abbr: 'Kn', re: /\bKn\b/, def: 'knit' },
+  { abbr: 'Rpt', re: /\bRpt\b/, def: 'repeat' },
+  { abbr: 'st st', re: /\bst st\b/, def: 'stocking stitch' },
+
+  // Machine only — the bed does not move, so its left and right are fixed places.
+  { abbr: 'RC', re: /\bRC\b/, def: 'row counter — the reading on the machine’s counter' },
+  { abbr: 'COL', re: /\bCOL\b/, def: 'carriage on the left at the end of the row' },
+  { abbr: 'COR', re: /\bCOR\b/, def: 'carriage on the right at the end of the row' },
+  { abbr: 'MT', re: /\bMT\b/, def: 'main tension — the tension setting your tension swatch was knitted at' },
+  { abbr: 'MT-2', re: /\bMT-2\b/, def: 'main tension, less 2 whole numbers on the dial' },
+  { abbr: 'LH, RH', re: /\b[LR]H\b/, def: 'the left-hand and right-hand ends of the needle bed' },
+
+  // Hand only — the work turns every row, so these describe faces and leans.
+  { abbr: 'RS, WS', re: /\bRS\b|\bWS\b|right-side row|wrong-side row/, def: 'right side and wrong side — the two faces of the fabric' },
+  {
+    abbr: 'ssk',
+    re: /\bssk\b/,
+    def: 'slip 2 stitches separately knitwise, then knit them together through the back loops. Leans left.',
+  },
+  {
+    abbr: 'k2tog',
+    re: /\bk2tog\b/,
+    def: 'knit 2 stitches together. Leans right.',
+  },
+  {
+    abbr: 'p2tog',
+    re: /\bp2tog\b/,
+    def: 'purl 2 stitches together. Leans right when seen from the knit face.',
+  },
+  {
+    abbr: 'ssp',
+    re: /\bssp\b/,
+    def: 'slip 2 stitches separately knitwise, return them to the left needle, then purl them together through the back loops. Leans left when seen from the knit face.',
+  },
+  {
+    abbr: 'centred double decrease',
+    re: /centred double decrease/i,
+    def: 'slip 2 stitches together knitwise, knit 1, then pass the 2 slipped stitches over. Takes 3 stitches to 1 and does not lean — the centre stitch rides over the top.',
+  },
+  {
+    abbr: 'three-needle cast off',
+    re: /three-needle cast off/i,
+    def: 'with two sets of live stitches on their needles and the right sides together, knit one from each needle together and cast off as you go, joining and finishing the edge in one pass.',
+  },
+];
+
+/**
+ * The key for a rendered pattern — only the abbreviations it actually contains.
+ * Returns null when the prose spells everything out, which is the usual case for the
+ * verbose machine register.
+ */
+export function abbreviationsProse(pieces: PieceProse[], style: ProseStyle = 'verbose'): PieceProse | null {
+  const haystack = pieces.flatMap((p) => p.lines).join('\n');
+  const used = ABBREVS.filter((a) => a.re.test(haystack));
+  if (used.length === 0) return null;
+  const lines =
+    style === 'abbreviated'
+      ? used.map((a) => `${a.abbr} — ${a.def}`)
+      : ['These are the only abbreviations this pattern uses.', '', ...used.map((a) => `${a.abbr} — ${a.def}`)];
+  return { title: 'Abbreviations', lines };
+}
+
 export function renderPattern(
   garment: {
     back: Row[];
@@ -1359,12 +1464,13 @@ export function renderPattern(
   // A hand knitter picks the band up off a neckline that only exists once a shoulder is
   // joined, so that join has to precede the band for the pattern to be workable in
   // order. A machine band is a separate strip, so all of its making-up waits to the end.
-  return {
-    pieces:
-      technique === 'hand'
-        ? [...body, handBeforeBandProse(style), band, makingUp]
-        : [...body, band, makingUp],
-  };
+  const pieces =
+    technique === 'hand'
+      ? [...body, handBeforeBandProse(style), band, makingUp]
+      : [...body, band, makingUp];
+  // Built from the finished prose, so it can only ever list what is really there.
+  const key = abbreviationsProse(pieces, style);
+  return { pieces: key ? [...pieces, key] : pieces };
 }
 
 export function patternText(pattern: Pattern): string {
