@@ -33,7 +33,14 @@ export function capPerimeter(size: SizeRecord, style: EaseStyleId, gauge: Gauge)
   return 2 * cap + crown;
 }
 
-/** Cap ease as a fraction of the armhole opening. Small positive is the healthy band. */
+/**
+ * Raw tape-length ratio of the cap perimeter to the armhole opening, minus one. A
+ * geometric diagnostic ONLY — NOT the cap-fit criterion. It reads high (~+20–26%) for
+ * a correctly-filled set-in cap because the cap edge is a diagonal staircase whose
+ * tape runs far longer than a near-vertical armhole edge; the two are sewn row-for-row,
+ * not tape-to-tape. The fit test is the row/height fill in `assemblyReport` (a cap that
+ * fills ~0.85 of the armhole depth), not this number.
+ */
 export function capEase(size: SizeRecord, style: EaseStyleId, gauge: Gauge): number {
   return capPerimeter(size, style, gauge) / armholeOpening(size, style, gauge) - 1;
 }
@@ -87,11 +94,19 @@ export function assemblyReport(
       detail: `sleeve top ${sleeveTopIn.toFixed(1)}" ≈ armhole ${armholeOpenIn.toFixed(1)}"`,
     };
   } else {
-    const easePct = capEase(size, style, gauge) * 100;
+    // A set-in cap sews to the armhole selvedge ROW-FOR-ROW, so the two edges match
+    // by row count: the cap must fill nearly the whole armhole depth. (NOT by tape-
+    // length — the cap's diagonal staircase lets a short, flat cap fake a tape-match
+    // to a tall vertical armhole; that blind spot passed a 0.55×-armhole cap. See
+    // sleeve.ts CAP_FILL.) Real men's caps fill ~0.79–0.89 (Berroco Anthony).
+    const rowH = 4 / gauge.bodyRow;
+    const capHeightIn = sleeve.capHeightRows * rowH;
+    const armholeDepthIn = garmentWidths(size, style, 'set_in').armholeDepth;
+    const fill = capHeightIn / armholeDepthIn;
     join = {
       label: 'cap fits armhole',
-      ok: easePct >= -1 && easePct <= 10,
-      detail: `ease ${easePct >= 0 ? '+' : ''}${easePct.toFixed(1)}%`,
+      ok: fill >= 0.78 && fill <= 0.95,
+      detail: `cap fills ${(fill * 100).toFixed(0)}% of the armhole (${capHeightIn.toFixed(1)}"/${armholeDepthIn.toFixed(1)}")`,
     };
   }
 

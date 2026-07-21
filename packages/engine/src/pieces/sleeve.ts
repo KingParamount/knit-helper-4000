@@ -4,17 +4,17 @@
  *
  * The taper increases evenly from the cuff to the sleeve top. The cap casts off the
  * underarm to match the body, then a bell-shaped decrease (fast every-row zones at
- * the bottom and top, magic-formula even middle) up to a crown of ≈ (upper arm ÷ 4
- * − 0.5 cm). The cap *height* is not a fixed rule — it is solved so the cap
- * perimeter eases a small amount over the armhole opening it sews into (CAP_EASE),
- * which keeps the sleeve knittable across every body shape (see sleevePlan).
+ * the bottom and top, magic-formula even middle) up to a narrow crown (≈ CROWN_FRACTION
+ * of the sleeve top). The cap *height* fills the armhole it sews into: a set-in cap is
+ * sewn to the armhole selvedge ROW-FOR-ROW, so it must be nearly as many rows tall as
+ * the armhole is deep (CAP_FILL) — see sleevePlan.
  */
 
 import type { SizeRecord, EaseStyleId, ShoulderStyle } from '../data/types';
 import { garmentWidths } from '../dimensions';
-import { type Gauge, stitchesFor, evenStitchesFor, rowsFor, ribRowsFor } from '../gauge';
+import { type Gauge, evenStitchesFor, rowsFor, ribRowsFor } from '../gauge';
 import { type Row, type Piece, carriageForRow } from '../row';
-import { backPlan, armholeShaping, armholeOpening } from './back';
+import { backPlan, armholeShaping } from './back';
 import { SEAM_ALLOWANCE_STS } from './seams';
 
 /** Cuff = wrist + this ease. ASSUMPTION (flag) — a ribbed cuff also stretches. */
@@ -28,14 +28,24 @@ export function evenRows(count: number, span: number): number[] {
 }
 
 /**
- * Target cap ease: the cap perimeter is designed to run this fraction longer than
- * the armhole opening it sews into — a small positive ease that lets the sleeve
- * head sit without puckering. This replaces the old "armhole depth − 7.5 cm" rule,
- * a fixed length that did not scale: it left babies' caps far too short (7.5 cm is
- * most of an infant armhole) and, combined with the broad-backed male block, men's
- * caps too long. Designing to the armhole makes cap height a result, not an input.
+ * Cap fill: the cap height as a fraction of the armhole depth. A set-in cap is sewn
+ * to the armhole selvedge ROW-FOR-ROW — each cap row-end to one armhole row-end — so
+ * the two edges match by row COUNT, not by tape-length. (Tape-length is a trap: the
+ * cap edge is a diagonal staircase whose tape runs far longer than its height, so a
+ * short, flat cap can fake a tape-match to a tall vertical armhole. That is exactly
+ * how the old "ease the perimeter +5%" rule produced caps only ~0.55× the armhole.)
+ * Real men's set-in caps fill ~0.79–0.89 of the armhole depth (Berroco Anthony); we
+ * fill this fraction, floored so the decreases fit and capped at the armhole depth.
  */
-const CAP_EASE = 0.05;
+const CAP_FILL = 0.86;
+/**
+ * Crown width as a fraction of the sleeve top: the flat top the cap binds off. Real
+ * caps taper to a narrow crown (Anthony: 9–17 sts over a 69–99 st top, ~0.12–0.17),
+ * which is what lets the cap climb tall instead of spreading flat. Floored at
+ * MIN_CROWN_IN so a small sleeve's cap does not taper to a spike.
+ */
+const CROWN_FRACTION = 0.14;
+const MIN_CROWN_IN = 1.5;
 /** Decreases worked every row at each end of the cap (the fast bell ends). */
 const CAP_FAST_EACH_END = 3;
 
@@ -47,7 +57,7 @@ export interface SleevePlan {
   incPerSide: number;
   sleeveTopSts: number; // achieved at the underarm
   underarmCastOff: number; // matches the body armhole
-  capHeightRows: number; // ≈ armhole depth − 7.5 cm
+  capHeightRows: number; // fills ≈ CAP_FILL of the armhole depth
   capDecPerSide: number;
   capTopSts: number; // bound off at the top (the crown)
 }
@@ -103,33 +113,21 @@ export function sleevePlan(
   }
 
   const underarmCastOff = armholeShaping(body.bodySts, body.upperBackSts, gauge).castOffPerSide;
-  // Crown cast-off ≈ upper arm ÷ 4 − 0.5 cm; the cap width (and so the per-side
-  // decrease count) is fixed by the arm — only the height is free to shape.
-  const capTopTarget = stitchesFor(w.sleeveTop / 4 - 0.5 / 2.54, gauge);
+  // Crown: a narrow flat top (CROWN_FRACTION of the sleeve top, floored), even so the
+  // symmetric decreases empty the base to it exactly. The per-side decrease count is
+  // whatever it takes to get from the (post-underarm) base down to the crown.
+  const capTopTarget = evenStitchesFor(Math.max(w.sleeveTop * CROWN_FRACTION, MIN_CROWN_IN), gauge);
   const capDecPerSide = Math.round((sleeveTopSts - 2 * underarmCastOff - capTopTarget) / 2);
   // The crown is whatever is left after the symmetric shaping — even, by construction.
   const capTopSts = sleeveTopSts - 2 * underarmCastOff - 2 * capDecPerSide;
 
-  // Design the cap TO the armhole: choose the height so the cap perimeter eases
-  // CAP_EASE over the armhole opening it sews into. `sleeveRows` builds each side
-  // edge as `capDecPerSide` single decreases (diagonal steps) plus the remaining
-  // plain rows (vertical), so per-side length = capDecPerSide·diag + (H − 2 −
-  // capDecPerSide)·rh and perimeter = 2·side + crown. Invert that for H.
-  //
-  // The 2 is the underarm cast-off rows, which the seam measurement excludes. It used
-  // to be 3, discounting the crown take-off row as well — but that row is real height
-  // on the seamed edge and is measured. A constant one-row error: invisible at a fine
-  // gauge (3% of a woman's cap) and material at a coarse one (7% of a baby's), which is
-  // why it only surfaced once a second gauge was swept.
-  const sw = 4 / gauge.bodySt; // inches per stitch
-  const rh = 4 / gauge.bodyRow; // inches per row
-  const diag = Math.hypot(sw, rh);
-  const crownLen = capTopSts * sw;
-  const targetPerimeter = armholeOpening(size, style, gauge) * (1 + CAP_EASE);
-  const idealHeight = 2 + capDecPerSide + (targetPerimeter - crownLen - 2 * capDecPerSide * diag) / (2 * rh);
+  // Cap height fills the armhole it sews into (row-for-row, not tape-length — see
+  // CAP_FILL). Floored so every decrease still fits (the flattest cap works them all
+  // every row); capped at the armhole depth, which a cap never exceeds.
+  const idealHeight = Math.round(rowsFor(w.armholeDepth, gauge) * CAP_FILL);
   const minHeight = 2 + capDecPerSide; // all decreases, no plain rows — the flattest cap
   const maxHeight = rowsFor(w.armholeDepth, gauge); // never taller than the armhole
-  const capHeightRows = Math.round(Math.min(maxHeight, Math.max(minHeight, idealHeight)));
+  const capHeightRows = Math.min(maxHeight, Math.max(minHeight, idealHeight));
 
   return {
     ribCastOnSts,

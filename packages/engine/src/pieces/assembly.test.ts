@@ -6,12 +6,12 @@ import type { EaseStyleId } from '../data/types';
 import { DEFAULT_GAUGE } from '../gauge';
 import {
   assemblyReport,
-  capEase,
   seamEdgeLength,
   armholeOpening,
   capPerimeter,
 } from './assembly';
-import { sleeveRows } from './sleeve';
+import { sleeveRows, sleevePlan } from './sleeve';
+import { garmentWidths } from '../dimensions';
 import { neckbandPlan } from './neckband';
 import { backPlan } from './back';
 import { frontNeckPlan } from './front';
@@ -83,14 +83,18 @@ describe('assembly invariants across all ease styles', () => {
 });
 
 describe('sleeve cap fits the armhole (set-in "fits exactly"), all shapes', () => {
-  it('eases the cap a small non-negative amount over the armhole, every size and ease style', () => {
+  it('fills the armhole depth row-for-row (0.78–0.95×), every size and ease style', () => {
     for (const style of styles) {
       for (const size of inSizes) {
-        const easePct = capEase(size, style, G) * 100;
-        // Negative → cap too short to reach round the armhole; ≫10% → puckered head.
-        const label = `${style} ${size.category} ${size.chest}"`;
-        expect(easePct, `${label} cap ease ${easePct.toFixed(1)}%`).toBeGreaterThanOrEqual(-1);
-        expect(easePct, `${label} cap ease ${easePct.toFixed(1)}%`).toBeLessThanOrEqual(10);
+        // The cap sews to the armhole selvedge row-for-row, so it must be nearly as
+        // many rows tall as the armhole is deep. Too short → the sleeve pulls; taller
+        // than the armhole is geometrically impossible.
+        const fill =
+          (sleevePlan(size, style, G).capHeightRows * (4 / G.bodyRow)) /
+          garmentWidths(size, style, 'set_in').armholeDepth;
+        const label = `${style} ${size.category} ${size.chest}" fill ${(fill * 100).toFixed(0)}%`;
+        expect(fill, label).toBeGreaterThanOrEqual(0.78);
+        expect(fill, label).toBeLessThanOrEqual(0.95);
       }
     }
   });
@@ -114,15 +118,17 @@ describe('sleeve cap fits the armhole (set-in "fits exactly"), all shapes', () =
   });
 });
 
-it('CHECKPOINT: cap ease across every category (shows the open-loop cap drift)', () => {
+it('CHECKPOINT: cap fill across every category (cap height vs armhole depth)', () => {
   const lines = [
     '',
-    '  CAP FIT — moderate, 30×40 gauge  (cap perimeter vs armhole opening; healthy ≈ 0…+8%)',
+    '  CAP FIT — moderate, 30×40 gauge  (cap height ÷ armhole depth; healthy 0.78–0.95, real ≈ 0.85)',
     ...inSizes.map((s) => {
-      const e = capEase(s, 'moderate', G) * 100;
-      const flag = e < -1 ? ' too SHORT' : e > 10 ? ' too LONG' : '';
+      const fill =
+        (sleevePlan(s, 'moderate', G).capHeightRows * (4 / G.bodyRow)) /
+        garmentWidths(s, 'moderate', 'set_in').armholeDepth;
+      const flag = fill < 0.78 ? ' too FLAT' : fill > 0.95 ? ' too TALL' : '';
       const label = `${s.category} ${s.age ?? ''} ${s.chest}"`.replace(/\s+/g, ' ').trim();
-      return `  ${label.padEnd(16)} ease ${e >= 0 ? '+' : ''}${e.toFixed(1)}%${flag}`;
+      return `  ${label.padEnd(16)} fill ${fill.toFixed(2)}${flag}`;
     }),
     '',
   ];
@@ -146,35 +152,20 @@ describe.each([
   }
 });
 
-it('CHECKPOINT: cap fit at a coarse gauge (was a red; now fixed)', () => {
+it('CHECKPOINT: cap fill at a coarse gauge (rounding stays in band)', () => {
   /*
-   * Sweeping a second gauge found two real faults here, both invisible at DEFAULT_GAUGE:
-   *
-   *  - the two fast-decrease zones overlapped once capDecPerSide fell below 6, so the
-   *    cap worked more decreases than the plan allowed and took off more stitches than
-   *    were live (a Baby 18" claimed a 6-stitch crown with 4 on the needles);
-   *  - the height solver discounted the crown take-off row, which the seam measurement
-   *    counts. A constant one-row error: 3% of a woman's cap, 7% of a baby's.
-   *
-   * Both fixed; this now prints the margin rather than a failure list, and the sweep
-   * above asserts cap fit at this gauge like every other invariant.
+   * The fill target is a row count (armhole rows × CAP_FILL), so a coarse gauge with
+   * few rows to the inch is where rounding could push the ratio out of band. Print the
+   * fill each size lands at; the sweep above asserts the invariant at this gauge too.
    */
   const rows: string[] = [];
-  let worst = 0;
   for (const size of inSizes) {
     const cap = assemblyReport(size, 'moderate', G2).invariants.find((i) => i.label === 'cap fits armhole');
-    if (!cap) continue;
-    if (!cap.ok) {
-      rows.push(`  ${size.category} ${size.chest}"`.padEnd(20) + cap.detail);
-      const pct = Number(/([-\d.]+)%/.exec(cap.detail)?.[1] ?? 0);
-      worst = Math.max(worst, pct);
-    }
+    if (cap && !cap.ok) rows.push(`  ${size.category} ${size.chest}"`.padEnd(20) + cap.detail);
   }
-  console.log(`\nCAP FIT @ 18 sts × 22.4 rows (a coarse, non-4:3 gauge)`);
-  console.log(rows.length ? rows.join('\n') : '  (all sizes within tolerance)');
-  console.log(`  worst drift: +${worst.toFixed(1)}%  — healthy is 0…+8%`);
-  // Guard the guard: if this ever gets much worse, fail rather than print.
-  expect(worst, 'cap drift at a coarse gauge has grown').toBeLessThan(20);
+  console.log(`\nCAP FILL @ 18 sts × 22.4 rows (a coarse, non-4:3 gauge)`);
+  console.log(rows.length ? rows.join('\n') : '  (all sizes fill 0.78–0.95 of the armhole)');
+  expect(rows, rows.join('; ')).toEqual([]);
 });
 
 describe('the neckband matches the neckline it has to cover, at any gauge', () => {
