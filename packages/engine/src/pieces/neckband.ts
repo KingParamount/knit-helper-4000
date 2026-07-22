@@ -16,8 +16,7 @@
  */
 
 import type { SizeRecord, EaseStyleId, NeckStyle, BackNeckStyle, ShoulderStyle, Technique } from '../data/types';
-import { type Gauge, stitchesFor, ribRowsFor } from '../gauge';
-import { NECK_CURVE_IN } from '../neckopening';
+import { type Gauge, ribRowsFor } from '../gauge';
 import { type Row, carriageForRow } from '../row';
 import { backPlan } from './back';
 import { frontNeckPlan } from './front';
@@ -72,10 +71,11 @@ export function neckbandPlan(
   // curves each side over its depth (bp.backNeckPerSide is 0 exactly when the back is flat).
   const backSidePickup = bp.backNeckPerSide === 0 ? 0 : Math.round(bp.backNeckRows * pickupPerRow(gauge));
   const fp = frontNeckPlan(size, style, gauge, neck, shoulder);
-  // A crew has a front centre cast-off to follow; a V has none (frontCentre = 0) — the
-  // two long V edges run down to the point, which is the band's two ends.
-  const frontCentreSts = neck === 'v' ? 0 : fp.frontNeckSts - 2 * stitchesFor(NECK_CURVE_IN, gauge);
-  const frontSidePickup = Math.round(fp.neckDepthRows * pickupPerRow(gauge));
+  // The front centre cast-off comes straight from the piece's own split (0 for a V, whose
+  // two long edges are the band's ends; the full front neck for a flat, which has no side
+  // edge to pick up along). A flat front has no shaped side edge, like a flat back.
+  const frontCentreSts = fp.centreCastOff;
+  const frontSidePickup = neck === 'flat' ? 0 : Math.round(fp.neckDepthRows * pickupPerRow(gauge));
   // Cast on odd (extra on the right) so both selvedges are knit stitches.
   const raw = backCentreSts + 2 * backSidePickup + frontCentreSts + 2 * frontSidePickup;
   const pickupTotal = raw % 2 === 0 ? raw + 1 : raw;

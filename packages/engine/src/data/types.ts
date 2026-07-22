@@ -73,10 +73,13 @@ export type EaseStyleId =
   | 'oversized';
 
 /**
- * Front neck style. Uses the `neckline_front` option vocabulary ('round' = crew),
- * so the constraint validator and option list line up. Distinct from EaseStyleId.
+ * Front neck style, from the `neckline_front` option vocabulary ('round' = crew), so the
+ * constraint validator and option list line up. 'round' is a shallow crew scoop; 'scoop'
+ * is deeper and wider (its centre cast-off is smaller, the side curve longer); 'v' splits
+ * low to a point; 'flat' works straight to the shoulder and casts the neck off straight
+ * across (Front Neck Depth 0 — Knitware's flat front, the same shape as a flat back).
  */
-export type NeckStyle = 'round' | 'v';
+export type NeckStyle = 'round' | 'v' | 'scoop' | 'flat';
 
 /**
  * Back neck style, from the `neckline_back` option vocabulary. 'scoop' is a shallow

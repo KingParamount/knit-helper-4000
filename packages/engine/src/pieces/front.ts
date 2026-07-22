@@ -13,11 +13,44 @@ import type { SizeRecord, EaseStyleId, NeckStyle, ShoulderStyle } from '../data/
 import { type Gauge, rowsFor, stitchesFor } from '../gauge';
 import { type Row, carriageForRow } from '../row';
 import { backPlan, panelThroughArmhole, armholeShaping, splitIntoSteps, SHOULDER_STEP_STS } from './back';
-import { vNeckDepthIn, NECK_CURVE_IN } from '../neckopening';
+import { vNeckDepthIn, scoopDepthIn, NECK_CURVE_IN } from '../neckopening';
 
 /** Rows the crew neck occupies below the shoulder line. */
 export function frontNeckDepthRows(size: SizeRecord, gauge: Gauge): number {
   return rowsFor(size.neck_depth, gauge);
+}
+
+/**
+ * A scoop's centre cast-off as a fraction of the whole front neck. Knitware's scoop
+ * holds a smaller centre than a crew (~0.35 vs ~0.5) and takes the rest in a longer side
+ * curve, which is what makes it read as a scoop rather than a deep crew.
+ */
+const SCOOP_CENTRE_FRACTION = 0.35;
+/**
+ * A flat front works straight to the shoulder and casts the neck off in one line, so it
+ * still needs a little depth for the short-row shoulders to live in (we short-row where
+ * Knitware casts the shoulder off flat at neck depth 0). Same floor the back scoop uses.
+ */
+const FLAT_FRONT_DROP_IN = 1.25;
+
+/**
+ * How the front neck divides, by style: the centre cast-off and the per-side curve. The
+ * two must sum to the whole front neck (centre + 2·perSide = frontNeckSts). Single source
+ * so the piece and the neckband pickup cannot drift. A V has no centre (splits to a
+ * point); a flat casts the whole neck off straight (no side curve).
+ */
+export function frontNeckSplit(
+  neck: NeckStyle,
+  frontNeckSts: number,
+  gauge: Gauge,
+): { centreCastOff: number; perSide: number } {
+  if (neck === 'v') return { centreCastOff: 0, perSide: 0 };
+  if (neck === 'flat') return { centreCastOff: frontNeckSts, perSide: 0 };
+  const perSide =
+    neck === 'scoop'
+      ? Math.floor((frontNeckSts - Math.round(frontNeckSts * SCOOP_CENTRE_FRACTION)) / 2)
+      : stitchesFor(NECK_CURVE_IN, gauge); // round/crew: a fixed ~1.5" curve
+  return { centreCastOff: frontNeckSts - 2 * perSide, perSide };
 }
 
 /** `count` events spread as evenly as possible across `span` rows. */
@@ -33,6 +66,8 @@ export interface FrontNeckPlan {
   bodySts: number; // live stitches at the neck line
   frontNeckSts: number; // total removed for the neck (centre + the two edges)
   shoulderSts: number; // each shoulder — must equal the back shoulder to graft
+  centreCastOff: number; // stitches cast off flat at the centre (0 for a V; full width for flat)
+  perSide: number; // stitches shaped away each side (0 for V/flat)
 }
 
 export function frontNeckPlan(
@@ -45,17 +80,28 @@ export function frontNeckPlan(
   const plan = backPlan(size, style, gauge, shoulder);
   const bodySts = armholeShaping(plan.bodySts, plan.upperBackSts).achievedSts;
   const shoulderSts = Math.round((bodySts - plan.backNeckSts) / 2); // match the back
-  // A V's depth is ~a fraction of the armhole, floored to read as a V and capped for
-  // modesty on adults (vNeckDepthIn); a crew is a shallow scoop.
+  const frontNeckSts = bodySts - 2 * shoulderSts;
+  // Depth by style: a V is ~a fraction of the armhole (floored/capped); a scoop is a
+  // deeper fraction; a flat sits at the shoulder line (just the short-row floor); a crew
+  // is the measured neck depth.
   const armholeDepthIn = plan.armholeRows * (4 / gauge.bodyRow);
   const neckDepthRows =
-    neck === 'v' ? rowsFor(vNeckDepthIn(armholeDepthIn, size), gauge) : frontNeckDepthRows(size, gauge);
+    neck === 'v'
+      ? rowsFor(vNeckDepthIn(armholeDepthIn, size), gauge)
+      : neck === 'scoop'
+        ? rowsFor(scoopDepthIn(armholeDepthIn, size), gauge)
+        : neck === 'flat'
+          ? rowsFor(FLAT_FRONT_DROP_IN, gauge)
+          : frontNeckDepthRows(size, gauge);
+  const { centreCastOff, perSide } = frontNeckSplit(neck, frontNeckSts, gauge);
   return {
     neckLineRow: plan.totalRows - neckDepthRows,
     neckDepthRows,
     bodySts,
-    frontNeckSts: bodySts - 2 * shoulderSts,
+    frontNeckSts,
     shoulderSts,
+    centreCastOff,
+    perSide,
   };
 }
 
@@ -108,13 +154,13 @@ export function frontRows(
   const rows = frontToNeck(size, style, gauge, neck, shoulder);
   const fp = frontNeckPlan(size, style, gauge, neck, shoulder);
   const shoulderSteps = splitIntoSteps(fp.shoulderSts, SHOULDER_STEP_STS);
-  const perSide = stitchesFor(NECK_CURVE_IN, gauge); // crew: ~1.5" curve each neck edge
-  // Crew removes a centre chunk; a V divides at a single point (no centre cast-off).
-  const centreCastOff = neck === 'v' ? 0 : fp.frontNeckSts - 2 * perSide;
+  const perSide = fp.perSide;
+  const centreCastOff = fp.centreCastOff; // full front-neck width for a flat; 0 for a V
 
   let index = rows.length;
 
-  // Split row: crew casts off the centre; V just divides.
+  // Split row: a V just divides (no centre cast-off); every other style casts off its
+  // centre (a flat casts off the whole front neck straight across in one line).
   index += 1;
   rows.push({
     index,
@@ -141,12 +187,28 @@ export function frontRows(
       rows.push({ index, piece: 'front', stitches: sts, carriage: carriageForRow(index), ops, section, side });
     };
 
+    const fillToShoulder = (): void => {
+      const straight = Math.max(0, fp.neckDepthRows - used - 2 * shoulderSteps.length);
+      for (let i = 0; i < straight; i++) push([], 'upper_front');
+    };
+
     if (neck === 'v') {
       // Steady neck-edge decreases from the half width down to the shoulder, spread
       // over the deep V (leaving room for the shoulder short-rows at the top).
       const decsNeeded = sts - fp.shoulderSts;
       const shaperRows = Math.max(decsNeeded, fp.neckDepthRows - 2 * shoulderSteps.length);
       const decAt = new Set(evenlySpread(decsNeeded, shaperRows));
+      for (let r = 1; r <= shaperRows; r++) {
+        push(decAt.has(r) ? [{ kind: 'decrease', count: 1, side: neckEdge }] : [], 'neck');
+      }
+    } else if (neck === 'flat') {
+      // Flat: the whole neck came off at the split; nothing to shape, straight to the shoulder.
+      fillToShoulder();
+    } else if (neck === 'scoop') {
+      // Scoop: a small centre came off; the rest is a long side curve spread over the deep
+      // scoop (front-loaded like a crew but gradual), then straight to the shoulder.
+      const shaperRows = Math.max(perSide, fp.neckDepthRows - 2 * shoulderSteps.length);
+      const decAt = new Set(evenlySpread(perSide, shaperRows));
       for (let r = 1; r <= shaperRows; r++) {
         push(decAt.has(r) ? [{ kind: 'decrease', count: 1, side: neckEdge }] : [], 'neck');
       }
@@ -161,8 +223,7 @@ export function frontRows(
         push([{ kind: 'decrease', count: 1, side: neckEdge }], 'neck');
         if (d < shaping.decs - 1) push([], 'neck');
       }
-      const straight = Math.max(0, fp.neckDepthRows - used - 2 * shoulderSteps.length);
-      for (let i = 0; i < straight; i++) push([], 'upper_front');
+      fillToShoulder();
     }
 
     // Short-row the shoulder — held only on a row whose carriage ends at this half's

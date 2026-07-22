@@ -8,7 +8,7 @@
  * flat back (depth 0) makes it too snug on every size; scooping the back opens it.
  */
 
-import type { SizeRecord, BackNeckStyle } from './data/types';
+import type { SizeRecord, NeckStyle, BackNeckStyle } from './data/types';
 import { type Gauge, rowsFor } from './gauge';
 
 /**
@@ -66,6 +66,29 @@ export function vNeckDepthIn(armholeDepthIn: number, size: SizeRecord): number {
     maxVDepthIn(size),
     Math.max(MIN_V_DEPTH_IN, armholeDepthIn * VNECK_DEPTH_FRACTION),
   );
+}
+
+// --- Scoop depth (front and, later, the deeper back scoop) -----------------------
+/**
+ * A scoop is a deeper, wider round. Its depth is a fraction of the armhole (Knitware's
+ * scoop fronts measure ~0.55–0.60 of the armhole across the size range), floored so it
+ * is never shallower than a plain crew — otherwise a shallow-armhole size would give a
+ * "scoop" no deeper than the round it is meant to exceed.
+ */
+export const SCOOP_DEPTH_FRACTION = 0.57;
+export function scoopDepthIn(armholeDepthIn: number, size: SizeRecord): number {
+  return Math.max(size.neck_depth, armholeDepthIn * SCOOP_DEPTH_FRACTION);
+}
+
+/**
+ * Depth (inches) a front neck adds to the head opening, by style. A crew is the measured
+ * neck depth; a scoop is deeper, so for head-clearance it clears at least as well as a
+ * crew — we use the crew depth as a safe lower bound rather than the armhole (which the
+ * leaf module does not know). A flat front sits at the shoulder line and adds nothing.
+ * A V is open and is never head-checked, so it is treated as a crew here for completeness.
+ */
+export function frontOpeningDepthIn(size: SizeRecord, neck: NeckStyle): number {
+  return neck === 'flat' ? 0 : size.neck_depth;
 }
 
 /** Geometric neck-opening circumference (inches): ellipse of width W, total depth D. */

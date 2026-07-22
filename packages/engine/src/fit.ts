@@ -15,6 +15,7 @@ import {
   crewSuitable,
   neckOpeningPerimeter,
   backNeckDepthIn,
+  frontOpeningDepthIn,
   vNeckDepthIn,
   maxVDepthIn,
   MIN_V_DEPTH_IN,
@@ -31,11 +32,18 @@ export interface NeckHeadFit {
   marginPct: number;
 }
 
-export function neckHeadFit(size: SizeRecord, backNeck: BackNeckStyle = 'scoop'): NeckHeadFit {
-  // The opening is the ellipse of neck width × (front depth + the CHOSEN back depth).
-  // A flat back contributes only the floor drop, so its opening is smaller — which is
-  // exactly why a flat back can fail to clear the head where a scoop would not.
-  const opening = neckOpeningPerimeter(size.back_neck, size.neck_depth + backNeckDepthIn(size, backNeck));
+export function neckHeadFit(
+  size: SizeRecord,
+  neck: NeckStyle = 'round',
+  backNeck: BackNeckStyle = 'scoop',
+): NeckHeadFit {
+  // The opening is the ellipse of neck width × (chosen front depth + chosen back depth).
+  // A flat front or flat back drops its depth term, shrinking the opening — which is
+  // exactly why a flat neck can fail to clear the head where a scoop/crew would not.
+  const opening = neckOpeningPerimeter(
+    size.back_neck,
+    frontOpeningDepthIn(size, neck) + backNeckDepthIn(size, backNeck),
+  );
   const stretchedOpening = opening * NECK_STRETCH_MAX;
   const headCirc = size.head_circ;
   return {
@@ -52,9 +60,10 @@ export type NeckFitVerdict = 'ok' | 'crew_unsuitable' | 'neck_too_small';
 /** Classify a size's crew-neck fit: ok, wrong style for the body, or still too small. */
 export function neckFitVerdict(
   size: SizeRecord,
+  neck: NeckStyle = 'round',
   backNeck: BackNeckStyle = 'scoop',
 ): { verdict: NeckFitVerdict; fit: NeckHeadFit } {
-  const fit = neckHeadFit(size, backNeck);
+  const fit = neckHeadFit(size, neck, backNeck);
   let verdict: NeckFitVerdict;
   if (!crewSuitable(size)) verdict = 'crew_unsuitable';
   else if (fit.fits) verdict = 'ok';
@@ -63,14 +72,25 @@ export function neckFitVerdict(
 }
 
 /**
- * May a flat back neck be offered at this size, given the front? A flat back loses the
- * scoop depth that opens a crew over the head, so a crew front must still clear the head
- * at the flat (floor) depth; a V front is open and always may. The UI uses this to block
- * the flat option where it would produce an unwearable neck (the agreed policy).
+ * May a flat neck (front and/or back) be offered at this size + neck combination? A flat
+ * neck drops the depth that opens a crew over the head, so the head must still clear at
+ * the chosen depths; a V front is open and always may. The UI uses this to block the flat
+ * options where they would produce an unwearable neck (the agreed policy). Scoop never
+ * blocks — it only opens the neck further.
  */
+export function neckClearsHead(size: SizeRecord, neck: NeckStyle, backNeck: BackNeckStyle): boolean {
+  if (neck === 'v') return true; // open
+  return neckHeadFit(size, neck, backNeck).fits;
+}
+
+/** May a flat BACK be offered, given the current front neck? */
 export function flatBackAllowed(size: SizeRecord, neck: NeckStyle = 'round'): boolean {
-  if (neck === 'v') return true;
-  return neckHeadFit(size, 'flat').fits;
+  return neckClearsHead(size, neck, 'flat');
+}
+
+/** May a flat FRONT be offered, given the current back neck? */
+export function flatFrontAllowed(size: SizeRecord, backNeck: BackNeckStyle = 'scoop'): boolean {
+  return neckClearsHead(size, 'flat', backNeck);
 }
 
 // --- The full Tier-B fit sweep: does the finished garment fit a human of this size? ---
@@ -109,7 +129,7 @@ export function fitReport(
   backNeck: BackNeckStyle = 'scoop',
 ): FitReport {
   const w = garmentWidths(size, style, shoulder);
-  const neckFit = neckFitVerdict(size, backNeck);
+  const neckFit = neckFitVerdict(size, neck, backNeck);
   const upperArmEase = w.sleeveTop - size.upper_arm;
   const shoulderWidth = (size.back_width - size.back_neck) / 2;
   const chestEase = w.chest - size.chest;
