@@ -96,13 +96,16 @@ export type BackNeckStyle = 'scoop' | 'flat';
  * 'drop' knits the body straight (no armhole shaping) and the sleeve to a straight
  * wide top (no cap) that sews to the armhole edge. Distinct from EaseStyleId.
  *
- * 'saddle' and 'raglan' are the agreed next additions (each a CAST-OFF-AND-SEW shoulder,
- * not the hold-live/3-needle join set_in/drop use — see the coverage-map memory for the
- * build recipe). They are a substantial rewrite of the above-armhole construction, so
- * they are NOT in the union yet: adding the value without the construction would silently
- * emit a set-in garment. Add each value here as its construction lands.
+ * 'saddle' shares the set-in armhole, but the shoulders are CAST OFF (not short-rowed and
+ * held) and the sleeve cap continues into a straight strap that spans each shoulder to the
+ * neck; the strap seams to the front and back shoulders and its end joins the neckline. A
+ * cast-off (or waste-yarn) edge can seam to the strap's row edge; a live-held shoulder
+ * cannot, which is why saddle drops the hold/3-needle join (King, 2026-07-22).
+ *
+ * 'raglan' is the remaining planned addition (also cast-off-and-sew) — not in the union
+ * yet; see the coverage-map memory for its recipe.
  */
-export type ShoulderStyle = 'set_in' | 'drop';
+export type ShoulderStyle = 'set_in' | 'drop' | 'saddle';
 
 /**
  * How the garment is made. Matches the `method` option vocabulary in options.json,

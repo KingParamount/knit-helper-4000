@@ -226,11 +226,17 @@ export function frontRows(
       fillToShoulder();
     }
 
-    // Short-row the shoulder — held only on a row whose carriage ends at this half's
-    // armhole edge, so it does not hole (machine-holding-hole rule). Matches the back.
+    // Shape the shoulder to match the back: short-row and hold for set-in/drop (on a
+    // carriage-safe row, machine-holding-hole rule), or cast off in steps for a saddle
+    // (the sleeve strap seams to the cast-off edge — a row edge cannot join live stitches).
     for (const s of shoulderSteps) {
-      if (carriageForRow(index + 1) !== armEdge) push([], 'shoulder'); // wait for the safe row
-      push([{ kind: 'hold', count: s, side: armEdge }], 'shoulder');
+      if (shoulder === 'saddle') {
+        push([{ kind: 'bind_off', count: s, side: armEdge }], 'shoulder');
+        push([], 'shoulder'); // return row
+      } else {
+        if (carriageForRow(index + 1) !== armEdge) push([], 'shoulder'); // wait for the safe row
+        push([{ kind: 'hold', count: s, side: armEdge }], 'shoulder');
+      }
     }
   };
 

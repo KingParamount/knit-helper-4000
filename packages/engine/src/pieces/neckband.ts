@@ -16,10 +16,11 @@
  */
 
 import type { SizeRecord, EaseStyleId, NeckStyle, BackNeckStyle, ShoulderStyle, Technique } from '../data/types';
-import { type Gauge, ribRowsFor } from '../gauge';
+import { type Gauge, evenStitchesFor, ribRowsFor } from '../gauge';
 import { type Row, carriageForRow } from '../row';
 import { backPlan } from './back';
 import { frontNeckPlan } from './front';
+import { saddleStrapWidthIn } from './sleeve';
 
 /**
  * Stitches to pick up per ROW of a vertical/shaped neck edge, for THIS gauge.
@@ -50,6 +51,7 @@ export interface NeckbandPlan {
   backSidePickup: number; // each shaped back-neck side edge (the back is scooped)
   frontCentreSts: number; // 1:1 along the front centre cast-off (0 for a V)
   frontSidePickup: number; // each shaped front side edge
+  strapEndSts: number; // saddle only: each strap end at the neck (0 otherwise)
   pickupTotal: number; // stitches the neck opening needs = the band cast-on
   bandRows: number; // band depth in rows
   mitreRows: number; // V only: rows of end-mitre shaping (0 for a crew)
@@ -76,8 +78,13 @@ export function neckbandPlan(
   // edge to pick up along). A flat front has no shaped side edge, like a flat back.
   const frontCentreSts = fp.centreCastOff;
   const frontSidePickup = neck === 'flat' ? 0 : Math.round(fp.neckDepthRows * pickupPerRow(gauge));
+  // A saddle's two straps run up to the neck, so each strap end joins the neck at the
+  // shoulder. Only about half the strap width faces the neck arc (the rest turns into the
+  // shoulder line), which matches Knitware's pickup (6 of a 12-st strap).
+  const strapEndSts =
+    shoulder === 'saddle' ? Math.round(evenStitchesFor(saddleStrapWidthIn(size), gauge) / 2) : 0;
   // Cast on odd (extra on the right) so both selvedges are knit stitches.
-  const raw = backCentreSts + 2 * backSidePickup + frontCentreSts + 2 * frontSidePickup;
+  const raw = backCentreSts + 2 * backSidePickup + frontCentreSts + 2 * frontSidePickup + 2 * strapEndSts;
   const pickupTotal = raw % 2 === 0 ? raw + 1 : raw;
 
   const bandRows = ribRowsFor(size.rib_neck, gauge);
@@ -92,16 +99,21 @@ export function neckbandPlan(
   // one interior waypoint is the OTHER shoulder. A V's two ends sit at the centre front,
   // so both shoulders are interior. Positions are symmetric in from each end.
   const clamp = (n: number): number => Math.max(1, Math.min(finalSts - 1, n));
+  const backRun = 2 * backSidePickup + backCentreSts;
   const waypoints =
     neck === 'v'
       ? [clamp(frontSidePickup - mitreRows), clamp(finalSts - (frontSidePickup - mitreRows))]
-      : [clamp(2 * backSidePickup + backCentreSts)];
+      : shoulder === 'saddle'
+        ? // Both shoulders are seamed (a strap at each), so ease the band to both.
+          [clamp(backRun), clamp(finalSts - backRun)]
+        : [clamp(backRun)];
 
   return {
     backCentreSts,
     backSidePickup,
     frontCentreSts,
     frontSidePickup,
+    strapEndSts,
     pickupTotal,
     bandRows,
     mitreRows,

@@ -135,6 +135,17 @@ export function assemblyReport(
     join,
   ];
 
+  // A saddle's strap seams along the shoulder, so its length (rows) must match the shoulder
+  // width the shoulder edge spans (in rows) — otherwise the strap and shoulder don't meet.
+  if (shoulder === 'saddle') {
+    const shoulderWidthRows = Math.round((backShoulder * gauge.bodyRow) / gauge.bodySt);
+    invariants.push({
+      label: 'saddle strap spans the shoulder',
+      ok: Math.abs(sleeve.strapRows - shoulderWidthRows) <= 1,
+      detail: `strap ${sleeve.strapRows} rows ≈ shoulder ${shoulderWidthRows} rows`,
+    });
+  }
+
   return {
     size: `${size.category} ${size.chest}"`,
     invariants,

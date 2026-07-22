@@ -382,14 +382,21 @@ export function backRows(
       push([{ kind: 'decrease', count: 1, side: neckEdge }], 'neck');
       if (d < decs - 1) push([], 'neck');
     }
-    // Straight to the shoulder line, then short-row the shoulder — held only on a row
-    // whose carriage ends at this half's armhole edge, so it does not hole (see the
-    // machine-holding-hole rule). Slope rate matches the front.
+    // Straight to the shoulder line, then shape the shoulder. A set-in/drop shoulder is
+    // short-rowed and held live for a three-needle join (held only on a carriage-safe row
+    // so it does not hole — the machine-holding-hole rule). A saddle shoulder is CAST OFF
+    // in the same steps instead, because the sleeve's saddle strap seams to it (a row edge
+    // cannot join to live stitches). Slope rate matches the front.
     const straight = Math.max(0, depth - used - 2 * steps.length);
     for (let i = 0; i < straight; i++) push([], 'upper_back');
     for (const s of steps) {
-      if (carriageForRow(index + 1) !== armEdge) push([], 'shoulder'); // wait for the safe row
-      push([{ kind: 'hold', count: s, side: armEdge }], 'shoulder');
+      if (shoulder === 'saddle') {
+        push([{ kind: 'bind_off', count: s, side: armEdge }], 'shoulder');
+        push([], 'shoulder'); // return row
+      } else {
+        if (carriageForRow(index + 1) !== armEdge) push([], 'shoulder'); // wait for the safe row
+        push([{ kind: 'hold', count: s, side: armEdge }], 'shoulder');
+      }
     }
   };
 

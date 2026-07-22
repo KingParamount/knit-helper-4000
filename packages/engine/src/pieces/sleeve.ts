@@ -20,6 +20,24 @@ import { SEAM_ALLOWANCE_STS } from './seams';
 /** Cuff = wrist + this ease. ASSUMPTION (flag) — a ribbed cuff also stretches. */
 export const CUFF_EASE_IN = 1.0;
 
+/**
+ * A saddle strap's width (inches), scaling gently with size — Knitware's "Shldr Band
+ * Width" runs ~1.5" (baby) to ~3.0" (large adult). The strap is the flat band the sleeve
+ * cap narrows to and then works straight across the shoulder to the neck.
+ */
+export function saddleStrapWidthIn(size: SizeRecord): number {
+  return Math.min(3.0, Math.max(1.5, size.chest * 0.05 + 0.6));
+}
+
+/**
+ * A saddle strap's length in rows. The strap runs along the shoulder seam it sews to, so
+ * its length is the shoulder WIDTH expressed in rows (stitches × row/stitch gauge). Verified
+ * against Knitware at 20×26 (Baby shoulder 11 → 14 rows, Child 19 → 24, Man ~29 → 36).
+ */
+export function saddleStrapRows(shoulderSts: number, gauge: Gauge): number {
+  return Math.round((shoulderSts * gauge.bodyRow) / gauge.bodySt);
+}
+
 /** `count` increase rows spread as evenly as possible across `span` rows (interior). */
 export function evenRows(count: number, span: number): number[] {
   const out: number[] = [];
@@ -62,7 +80,8 @@ export interface SleevePlan {
   underarmCastOff: number; // matches the body armhole
   capHeightRows: number; // fills ≈ CAP_FILL of the armhole depth
   capDecPerSide: number;
-  capTopSts: number; // bound off at the top (the crown)
+  capTopSts: number; // bound off at the top (the crown; the strap base for a saddle)
+  strapRows: number; // saddle only: rows worked straight across the shoulder (0 otherwise)
 }
 
 export function sleevePlan(
@@ -112,16 +131,23 @@ export function sleevePlan(
       capHeightRows: 0,
       capDecPerSide: 0,
       capTopSts: sleeveTopSts,
+      strapRows: 0,
     };
   }
 
   const underarmCastOff = armholeShaping(body.bodySts, body.upperBackSts).castOffPerSide;
-  // Crown: a narrow flat top (CROWN_FRACTION of the sleeve top, floored), even so the
-  // symmetric decreases empty the base to it exactly. The per-side decrease count is
-  // whatever it takes to get from the (post-underarm) base down to the crown.
-  const capTopTarget = evenStitchesFor(Math.max(w.sleeveTop * CROWN_FRACTION, MIN_CROWN_IN), gauge);
+  // A saddle narrows the cap to the STRAP width (not the usual broad crown) and then works
+  // the strap straight across the shoulder; a set-in narrows to a broad flat crown that is
+  // bound off. The strap length is the shoulder width in rows (it seams to that shoulder).
+  const achieved = armholeShaping(body.bodySts, body.upperBackSts).achievedSts;
+  const shoulderSts = Math.round((achieved - body.backNeckSts) / 2);
+  const strapRows = shoulder === 'saddle' ? saddleStrapRows(shoulderSts, gauge) : 0;
+  const capTopTarget =
+    shoulder === 'saddle'
+      ? evenStitchesFor(saddleStrapWidthIn(size), gauge)
+      : evenStitchesFor(Math.max(w.sleeveTop * CROWN_FRACTION, MIN_CROWN_IN), gauge);
   const capDecPerSide = Math.round((sleeveTopSts - 2 * underarmCastOff - capTopTarget) / 2);
-  // The crown is whatever is left after the symmetric shaping — even, by construction.
+  // The crown/strap base is whatever is left after the symmetric shaping — even, by construction.
   const capTopSts = sleeveTopSts - 2 * underarmCastOff - 2 * capDecPerSide;
 
   // Cap height fills the armhole it sews into (row-for-row, not tape-length — see
@@ -143,6 +169,7 @@ export function sleevePlan(
     capHeightRows,
     capDecPerSide,
     capTopSts,
+    strapRows,
   };
 }
 
@@ -211,6 +238,15 @@ export function sleeveRows(
     push(decAt.has(r) ? [{ kind: 'decrease', count: 1, side: 'both' }] : [], 'cap'); // gentle middle
   }
   for (let i = 0; i < fast; i++) push([{ kind: 'decrease', count: 1, side: 'both' }], 'cap'); // fast top
+
+  // A saddle continues on the crown stitches as a flat strap across the shoulder, then
+  // casts off (the strap seams to the front and back shoulders; its end joins the neck).
+  // A set-in/drop cap takes its crown off on waste yarn.
+  if (shoulder === 'saddle') {
+    for (let i = 0; i < p.strapRows; i++) push([], 'saddle');
+    push([{ kind: 'bind_off', count: p.capTopSts, side: carriageForRow(index + 1) }], 'saddle');
+    return rows;
+  }
   push([{ kind: 'take_off', count: p.capTopSts }], 'cap'); // crown off on waste yarn
   return rows;
 }

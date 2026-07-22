@@ -1190,9 +1190,33 @@ export interface Pattern {
  * rest — the second shoulder, which closes the band's ends with it, then sleeves, sides
  * and ends — comes after.
  */
-function handBeforeBandProse(style: ProseStyle): PieceProse {
+function handBeforeBandProse(style: ProseStyle, shoulder: ShoulderStyle = 'set_in'): PieceProse {
   const verbose = style !== 'abbreviated';
   const lines: string[] = [];
+
+  // A saddle has cast-off shoulders and no three-needle join: the neckline exists once the
+  // straps are seamed to the shoulders, so that comes before the band is picked up.
+  if (shoulder === 'saddle') {
+    lines.push(
+      verbose
+        ? 'Block each piece to its schematic and let it dry before you go on. The shoulders are cast off; the neck stitches wait on their holders.'
+        : 'Block all pieces to the schematic; let dry. Neck stitches wait on holders.',
+    );
+    lines.push('');
+    lines.push(
+      verbose
+        ? 'Seam each sleeve strap to the front and back shoulders, easing it along the shoulder so the strap end sits at the neck. Leave the back edge of the right strap open so the band can be picked up and worked flat.'
+        : 'Seam each strap to the front and back shoulders (strap end at the neck). Leave the right strap’s back edge open.',
+    );
+    lines.push('');
+    lines.push(
+      verbose
+        ? 'The neckband is picked up from this neckline next; work it before closing the last strap.'
+        : 'Pick up the neckband next, before closing the last strap.',
+    );
+    return { title: 'Joining the Straps', lines };
+  }
+
   lines.push(
     verbose
       ? 'Block each piece to the measurements on its schematic and let it dry before you go on. Leave the shoulder and neck stitches on their holders until you come to them.'
@@ -1222,6 +1246,31 @@ function handMakingUpProse(neck: NeckStyle, shoulder: ShoulderStyle, style: Pros
   const verbose = style !== 'abbreviated';
   const lines: string[] = [];
   const stretchy = 'a stretchy seam such as mattress stitch';
+
+  // Saddle: the straps were seamed and the band picked up before this (see "Joining the
+  // Straps"); here the last strap is closed and the sleeves set in.
+  if (shoulder === 'saddle') {
+    lines.push(
+      verbose
+        ? 'Close the last strap: seam the back edge of the right strap to the back shoulder, taking the seam through the ends of the neckband so the band closes with it.'
+        : 'Close the right strap to the back shoulder, through the band ends.',
+    );
+    lines.push('');
+    lines.push(
+      verbose
+        ? `Set in the sleeves: ease each sleeve cap into its armhole below the strap, matching the underarm cast-offs, using ${stretchy}.`
+        : `Set in the sleeve caps below the straps, underarm cast-offs together.`,
+    );
+    lines.push('');
+    lines.push(
+      verbose
+        ? 'Join the sides: seam each side and its sleeve underarm in one line, from the cuff to the hem.'
+        : 'Join the sides: cuff to hem in one line each side.',
+    );
+    lines.push('');
+    lines.push(verbose ? 'Darn in the ends along a seam on the wrong side, and press if the yarn takes it.' : 'Darn in the ends; press if the yarn allows.');
+    return { title: 'Making Up', lines };
+  }
 
   if (neck === 'v') {
     lines.push(
@@ -1281,6 +1330,54 @@ export function makingUpProse(
   const verbose = style !== 'abbreviated';
   const lines: string[] = [];
   const stretchy = verbose ? 'a stretchy join (e.g. mattress stitch)' : 'stretchy join (e.g. mattress stitch)';
+
+  // A saddle has no shoulder-to-shoulder seam: each sleeve's strap bridges the shoulder,
+  // seaming to the front and back shoulder cast-offs, and its end meets the neck. One
+  // strap edge is left open so the band can be worked flat, then closed with it.
+  if (shoulder === 'saddle') {
+    lines.push(
+      verbose
+        ? 'Block each piece to its schematic and let it dry; take the pieces off their waste yarn as you seam them.'
+        : 'Block all pieces to the schematic; let dry.',
+    );
+    lines.push('');
+    lines.push(
+      verbose
+        ? `Seam the saddle straps to the shoulders. Sew each sleeve strap's two long edges to the front and back shoulder cast-offs, easing it along the shoulder so the strap end sits at the neck; use ${stretchy}. Leave the back edge of the right strap open for the band.`
+        : 'Seam each saddle strap to the front and back shoulders; strap end at the neck. Leave the right strap’s back edge open.',
+    );
+    if (neck === 'v') {
+      lines.push('');
+      lines.push(verbose ? 'The V point was shaped in the band, so there is nothing to seam at the centre front.' : 'V point is in the band.');
+    }
+    lines.push('');
+    lines.push(
+      verbose
+        ? `Sew the neckband on. Starting at the open right strap, ease the band's live edge round the neckline — back neck, each strap end and the front neck — and back to the start, matching each marker to its seam. Use ${stretchy} so the neck stretches over the head.`
+        : `Sew the band on from the open right strap, round and back, markers to seams. ${cap(stretchy)}.`,
+    );
+    lines.push('');
+    lines.push(
+      verbose
+        ? 'Close the right strap: seam its back edge to the back shoulder, closing the ends of the neckband with it.'
+        : 'Close the right strap to the back shoulder (shuts the band ends).',
+    );
+    lines.push('');
+    lines.push(
+      verbose
+        ? `Set in the sleeves. Ease each sleeve cap into its armhole below the strap, matching the underarm cast-offs to each other, using ${stretchy}.`
+        : `Set in the sleeve caps below the straps, underarm cast-offs together. ${cap(stretchy)}.`,
+    );
+    lines.push('');
+    lines.push(
+      verbose
+        ? 'Join the sides: seam each side and its sleeve underarm in one line, from the cuff to the hem.'
+        : 'Join the sides: cuff to hem in one line each side.',
+    );
+    lines.push('');
+    lines.push(verbose ? 'Darn in the ends along a seam on the wrong side, and press the seams if the yarn takes it.' : 'Darn in the ends; press if the yarn allows.');
+    return { title: 'Making Up', lines };
+  }
 
   // Block first — everything goes together flatter and truer to size off the machine.
   lines.push(
@@ -1482,7 +1579,7 @@ export function renderPattern(
   // order. A machine band is a separate strip, so all of its making-up waits to the end.
   const pieces =
     technique === 'hand'
-      ? [...body, handBeforeBandProse(style), band, makingUp]
+      ? [...body, handBeforeBandProse(style, garment.shoulder), band, makingUp]
       : [...body, band, makingUp];
   // Built from the finished prose, so it can only ever list what is really there.
   const key = abbreviationsProse(pieces, style);
