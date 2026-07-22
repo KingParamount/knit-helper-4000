@@ -95,6 +95,12 @@ export type BackNeckStyle = 'scoop' | 'flat';
  * Shoulder / sleeve-join style. 'set_in' has a shaped armhole and a fitted cap;
  * 'drop' knits the body straight (no armhole shaping) and the sleeve to a straight
  * wide top (no cap) that sews to the armhole edge. Distinct from EaseStyleId.
+ *
+ * 'saddle' and 'raglan' are the agreed next additions (each a CAST-OFF-AND-SEW shoulder,
+ * not the hold-live/3-needle join set_in/drop use — see the coverage-map memory for the
+ * build recipe). They are a substantial rewrite of the above-armhole construction, so
+ * they are NOT in the union yet: adding the value without the construction would silently
+ * emit a set-in garment. Add each value here as its construction lands.
  */
 export type ShoulderStyle = 'set_in' | 'drop';
 
