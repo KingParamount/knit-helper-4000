@@ -20,6 +20,7 @@ import {
 import { type Row, type Piece, carriageForRow } from '../row';
 import { SEAM_ALLOWANCE_STS, seamEdgeLength, ARMHOLE_SECTIONS } from './seams';
 import { backNeckDepthRows, NECK_CURVE_IN } from '../neckopening';
+import { raglanBackRows } from './raglan';
 
 export interface PlanSection {
   name: string;
@@ -324,6 +325,9 @@ export function backRows(
   shoulder: ShoulderStyle = 'set_in',
   backNeck: BackNeckStyle = 'scoop',
 ): Row[] {
+  // A raglan back is a different construction (a straight diagonal to the neck, no shoulder);
+  // it is built in its own module. (Runtime-only import cycle — both are called, not loaded.)
+  if (shoulder === 'raglan') return raglanBackRows(size, style, gauge);
   const plan = backPlan(size, style, gauge, shoulder, backNeck);
   const rows = backThroughArmhole(size, style, gauge, shoulder);
   const achieved = rows[rows.length - 1].stitches;

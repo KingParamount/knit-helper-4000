@@ -505,7 +505,7 @@ export function App(): JSX.Element {
             <div className="btn-row">
               <Btn icon={<IconShoulder />} label="Set-in" state={shoulder === 'set_in' ? 'selected' : 'normal'} onClick={() => setShoulder('set_in')} />
               <Btn icon={<IconShoulder />} label="Drop" state={shoulder === 'drop' ? 'selected' : 'normal'} onClick={() => setShoulder('drop')} />
-              <Btn icon={<IconShoulder />} label="Raglan" state="soon" />
+              <Btn icon={<IconShoulder />} label="Raglan" state={shoulder === 'raglan' ? 'selected' : 'normal'} onClick={() => setShoulder('raglan')} />
               <Btn icon={<IconShoulder />} label="Saddle" state={shoulder === 'saddle' ? 'selected' : 'normal'} onClick={() => setShoulder('saddle')} />
 
               <Btn icon={<IconShoulder />} label="Modified drop" state="soon" />

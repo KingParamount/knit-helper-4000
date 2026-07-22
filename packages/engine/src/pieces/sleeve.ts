@@ -15,6 +15,7 @@ import { garmentWidths } from '../dimensions';
 import { type Gauge, evenStitchesFor, rowsFor, ribRowsFor } from '../gauge';
 import { type Row, type Piece, carriageForRow } from '../row';
 import { backPlan, armholeShaping } from './back';
+import { raglanPlan } from './raglan';
 import { SEAM_ALLOWANCE_STS } from './seams';
 
 /** Cuff = wrist + this ease. ASSUMPTION (flag) — a ribbed cuff also stretches. */
@@ -135,6 +136,29 @@ export function sleevePlan(
     };
   }
 
+  // A raglan sleeve has no cap: after the underarm it decreases both edges steadily to a
+  // small crown over the SAME rows as the body raglan (raglanPlan.ragRows), so the seams
+  // match row-for-row. The crown joins the neckline.
+  if (shoulder === 'raglan') {
+    const rp = raglanPlan(size, style, gauge);
+    const crown = Math.max(2, evenStitchesFor(0.75, gauge));
+    const slvUA = sleeveTopSts - 2 * rp.underarmCastOff;
+    const capDecPerSide = Math.round((slvUA - crown) / 2);
+    return {
+      ribCastOnSts,
+      bodyCuffSts,
+      ribRows,
+      taperRows,
+      incPerSide,
+      sleeveTopSts,
+      underarmCastOff: rp.underarmCastOff,
+      capHeightRows: rp.ragRows, // the raglan span (row-for-row with the body)
+      capDecPerSide,
+      capTopSts: slvUA - 2 * capDecPerSide, // the small crown, into the neck
+      strapRows: 0,
+    };
+  }
+
   const underarmCastOff = armholeShaping(body.bodySts, body.upperBackSts).castOffPerSide;
   // A saddle narrows the cap to the STRAP width (not the usual broad crown) and then works
   // the strap straight across the shoulder; a set-in narrows to a broad flat crown that is
@@ -213,6 +237,19 @@ export function sleeveRows(
   // to the armhole edge in making up, so it stays live, not cast off).
   if (shoulder === 'drop') {
     push([{ kind: 'take_off', count: p.sleeveTopSts }], 'cap');
+    return rows;
+  }
+
+  // Raglan: underarm cast-off, then dec 1 st each end steadily over the raglan span (the
+  // same rows as the body edge it seams to), and cast off the small crown into the neck.
+  if (shoulder === 'raglan') {
+    push([{ kind: 'bind_off', count: p.underarmCastOff, side: carriageForRow(index + 1) }], 'cap');
+    push([{ kind: 'bind_off', count: p.underarmCastOff, side: carriageForRow(index + 1) }], 'cap');
+    const decRows = p.capHeightRows - 2;
+    const decAt = evenRows(p.capDecPerSide, decRows);
+    const decSet = new Set(decAt);
+    for (let r = 1; r <= decRows; r++) push(decSet.has(r) ? [{ kind: 'decrease', count: 1, side: 'both' }] : [], 'cap');
+    push([{ kind: 'bind_off', count: p.capTopSts, side: carriageForRow(index + 1) }], 'cap');
     return rows;
   }
 

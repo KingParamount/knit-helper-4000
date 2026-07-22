@@ -1217,6 +1217,29 @@ function handBeforeBandProse(style: ProseStyle, shoulder: ShoulderStyle = 'set_i
     return { title: 'Joining the Straps', lines };
   }
 
+  // Raglan: the neckline exists once the raglan seams are joined, so that comes before the
+  // band; the last seam is left open so the band can be picked up and worked flat.
+  if (shoulder === 'raglan') {
+    lines.push(
+      verbose
+        ? 'Block each piece to its schematic and let it dry before you go on. The raglan tops are cast off; the front and back neck stitches wait on their holders.'
+        : 'Block all pieces to the schematic; let dry. Neck stitches wait on holders.',
+    );
+    lines.push('');
+    lines.push(
+      verbose
+        ? 'Join the raglan seams — each sleeve’s diagonal edges to the matching front and back edges (the same length, row for row). Leave the back edge of the right sleeve open so the band can be picked up and worked flat.'
+        : 'Seam the raglan edges (row for row), sleeves to front and back. Leave the right sleeve’s back edge open.',
+    );
+    lines.push('');
+    lines.push(
+      verbose
+        ? 'The neckband is picked up from this neckline next; work it before closing the last raglan seam.'
+        : 'Pick up the neckband next, before closing the last raglan seam.',
+    );
+    return { title: 'Joining the Raglan Seams', lines };
+  }
+
   lines.push(
     verbose
       ? 'Block each piece to the measurements on its schematic and let it dry before you go on. Leave the shoulder and neck stitches on their holders until you come to them.'
@@ -1260,6 +1283,25 @@ function handMakingUpProse(neck: NeckStyle, shoulder: ShoulderStyle, style: Pros
       verbose
         ? `Set in the sleeves: ease each sleeve cap into its armhole below the strap, matching the underarm cast-offs, using ${stretchy}.`
         : `Set in the sleeve caps below the straps, underarm cast-offs together.`,
+    );
+    lines.push('');
+    lines.push(
+      verbose
+        ? 'Join the sides: seam each side and its sleeve underarm in one line, from the cuff to the hem.'
+        : 'Join the sides: cuff to hem in one line each side.',
+    );
+    lines.push('');
+    lines.push(verbose ? 'Darn in the ends along a seam on the wrong side, and press if the yarn takes it.' : 'Darn in the ends; press if the yarn allows.');
+    return { title: 'Making Up', lines };
+  }
+
+  // Raglan: the seams were joined and the band picked up before this (see "Joining the
+  // Raglan Seams"); here the last raglan seam is closed and the sides seamed.
+  if (shoulder === 'raglan') {
+    lines.push(
+      verbose
+        ? 'Close the last raglan seam — the back edge of the right sleeve to the back — taking the seam through the ends of the neckband so the band closes with it.'
+        : 'Close the last raglan seam (right sleeve to back), through the band ends.',
     );
     lines.push('');
     lines.push(
@@ -1367,6 +1409,43 @@ export function makingUpProse(
       verbose
         ? `Set in the sleeves. Ease each sleeve cap into its armhole below the strap, matching the underarm cast-offs to each other, using ${stretchy}.`
         : `Set in the sleeve caps below the straps, underarm cast-offs together. ${cap(stretchy)}.`,
+    );
+    lines.push('');
+    lines.push(
+      verbose
+        ? 'Join the sides: seam each side and its sleeve underarm in one line, from the cuff to the hem.'
+        : 'Join the sides: cuff to hem in one line each side.',
+    );
+    lines.push('');
+    lines.push(verbose ? 'Darn in the ends along a seam on the wrong side, and press the seams if the yarn takes it.' : 'Darn in the ends; press if the yarn allows.');
+    return { title: 'Making Up', lines };
+  }
+
+  // A raglan has four diagonal seams and no shoulder or set-in step: each sleeve's two
+  // raglan edges seam to the front and back raglan edges. One is left open for the band.
+  if (shoulder === 'raglan') {
+    lines.push(
+      verbose
+        ? 'Block each piece to its schematic and let it dry; take the pieces off their waste yarn as you seam them.'
+        : 'Block all pieces to the schematic; let dry.',
+    );
+    lines.push('');
+    lines.push(
+      verbose
+        ? `Join the raglan seams. Sew each sleeve's diagonal raglan edges to the matching front and back edges — they are the same length, row for row — using ${stretchy}. Join every seam but the back edge of the right sleeve, left open for the band.`
+        : 'Seam the raglan edges (row for row): each sleeve to front and back. Leave the right sleeve’s back edge open.',
+    );
+    lines.push('');
+    lines.push(
+      verbose
+        ? `Sew the neckband on. Starting at the open raglan seam, ease the band's live edge round the neckline — back neck, each sleeve top and the front neck — and back to the start, matching each marker to its raglan seam. Use ${stretchy} so the neck stretches over the head.`
+        : `Sew the band on from the open seam, round and back, markers to the raglan seams. ${cap(stretchy)}.`,
+    );
+    lines.push('');
+    lines.push(
+      verbose
+        ? 'Close the last raglan seam (the right sleeve to the back), taking the seam through the ends of the neckband so the band closes with it.'
+        : 'Close the last raglan seam (right sleeve to back), through the band ends.',
     );
     lines.push('');
     lines.push(

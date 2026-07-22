@@ -14,6 +14,7 @@ import { type Gauge, rowsFor, stitchesFor } from '../gauge';
 import { type Row, carriageForRow } from '../row';
 import { backPlan, panelThroughArmhole, armholeShaping, splitIntoSteps, SHOULDER_STEP_STS } from './back';
 import { vNeckDepthIn, scoopDepthIn, NECK_CURVE_IN } from '../neckopening';
+import { raglanFrontRows } from './raglan';
 
 /** Rows the crew neck occupies below the shoulder line. */
 export function frontNeckDepthRows(size: SizeRecord, gauge: Gauge): number {
@@ -151,6 +152,7 @@ export function frontRows(
   neck: NeckStyle = 'round',
   shoulder: ShoulderStyle = 'set_in',
 ): Row[] {
+  if (shoulder === 'raglan') return raglanFrontRows(size, style, gauge, neck);
   const rows = frontToNeck(size, style, gauge, neck, shoulder);
   const fp = frontNeckPlan(size, style, gauge, neck, shoulder);
   const shoulderSteps = splitIntoSteps(fp.shoulderSts, SHOULDER_STEP_STS);

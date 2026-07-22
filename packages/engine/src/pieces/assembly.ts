@@ -20,6 +20,7 @@ import { garmentWidths } from '../dimensions';
 import { backPlan, armholeShaping, lowerPanelRows, armholeOpening } from './back';
 import { frontNeckPlan } from './front';
 import { sleevePlan, sleeveRows } from './sleeve';
+import { raglanPlan, raglanBackRows, raglanFrontRows } from './raglan';
 import { seamEdgeLength, CAP_SECTIONS } from './seams';
 
 // Re-exported so callers have one import for the whole assembly surface.
@@ -71,6 +72,10 @@ export function assemblyReport(
   shoulder: ShoulderStyle = 'set_in',
   backNeck: BackNeckStyle = 'scoop',
 ): AssemblyReport {
+  // Raglan has no cap or shoulder graft — its invariants are different (the four raglan
+  // seams match row-for-row and the pieces meet at the neck), so it is reported separately.
+  if (shoulder === 'raglan') return raglanAssemblyReport(size, style, gauge, neck);
+
   const bp = backPlan(size, style, gauge, shoulder, backNeck);
   const shaping = armholeShaping(bp.bodySts, bp.upperBackSts);
   const achieved = shaping.achievedSts;
@@ -151,4 +156,57 @@ export function assemblyReport(
     invariants,
     allOk: invariants.every((i) => i.ok),
   };
+}
+
+/**
+ * Raglan assembly: no cap, no shoulder graft. The four raglan seams (2 body edges + 2
+ * sleeve edges) match ROW-FOR-ROW because body and sleeve share the raglan span; the back
+ * neck comes off held for the band, and the front decreases close to almost nothing at the
+ * top (that remainder is part of the raglan seam, not the neck).
+ */
+function raglanAssemblyReport(size: SizeRecord, style: EaseStyleId, gauge: Gauge, neck: NeckStyle): AssemblyReport {
+  const rp = raglanPlan(size, style, gauge);
+  const sleeve = sleevePlan(size, style, gauge, 'raglan');
+  const back = raglanBackRows(size, style, gauge);
+  const front = raglanFrontRows(size, style, gauge, neck);
+  const backLower = lowerPanelRows('back', size, style, gauge, 'raglan').length;
+  const frontLower = lowerPanelRows('front', size, style, gauge, 'raglan').length;
+  const backNeck = back[back.length - 1].ops.find((o) => o.kind === 'take_off')?.count ?? 0;
+  // The half-end remainders are the neck-section cast-offs (NOT the underarm cast-offs,
+  // which are in the armhole section, nor the centre-front cast-off).
+  const halfEnds = front
+    .filter((r) => r.section === 'neck' && r.ops.some((o) => o.kind === 'bind_off' && o.side !== 'center'))
+    .map((r) => (r.ops.find((o) => o.kind === 'bind_off') as { count: number }).count);
+  const maxHalfEnd = halfEnds.length ? Math.max(...halfEnds) : 0;
+
+  const invariants: Invariant[] = [
+    {
+      label: 'side seam',
+      ok: backLower === frontLower,
+      detail: `back ${backLower} = front ${frontLower} rows`,
+    },
+    {
+      label: 'underarm meet',
+      ok: sleeve.underarmCastOff === rp.underarmCastOff,
+      detail: `sleeve ${sleeve.underarmCastOff} = body ${rp.underarmCastOff}`,
+    },
+    {
+      // Body and sleeve raglan edges span the same rows, so they seam row-for-row.
+      label: 'raglan seams match',
+      ok: Math.abs(rp.ragRows - sleeve.capHeightRows) <= 1,
+      detail: `body ${rp.ragRows} ≈ sleeve ${sleeve.capHeightRows} rows`,
+    },
+    {
+      // The front raglan + neck decreases consume each half to about the sleeve crown.
+      label: 'front neck closes',
+      ok: maxHalfEnd <= sleeve.capTopSts + 1,
+      detail: `front halves finish at ≤ ${maxHalfEnd} st (crown ${sleeve.capTopSts})`,
+    },
+    {
+      label: 'back neck held',
+      ok: backNeck > 0 && Math.abs(backNeck - rp.backNeckSts) <= 1,
+      detail: `${backNeck} sts held for the band`,
+    },
+  ];
+  return { size: `${size.category} ${size.chest}"`, invariants, allOk: invariants.every((i) => i.ok) };
 }

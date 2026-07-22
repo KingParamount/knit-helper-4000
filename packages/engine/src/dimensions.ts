@@ -44,6 +44,13 @@ export const MAX_UPPER_ARM_EASE_IN = 2.5;
 export const DROP_ARMHOLE_ALLOWANCE_IN = 0.5;
 
 /**
+ * A raglan's armhole is deeper than a set-in scye — the diagonal seam runs all the way to
+ * the neck, so it needs the extra depth to clear the arm and reach the neckline at a sane
+ * slope. Knitware's raglan armholes sit ~2" above the arm depth across the range.
+ */
+export const RAGLAN_ALLOWANCE_IN = 2.0;
+
+/**
  * Ease around the upper arm, scaled to the fit style. A snug (skintight/tight) fit is
  * snug over the bicep; a standard fit is comfortable; a loose fit is roomy — clamped
  * so the sleeve always clears the arm and never asks more cap than the armhole can take.
@@ -88,6 +95,11 @@ export function garmentWidths(
     // (never narrower than the arm needs).
     armholeDepth = size.arm_depth + DROP_ARMHOLE_ALLOWANCE_IN;
     sleeveTop = Math.max(2 * armholeDepth, size.upper_arm + upperArmEase(size, style));
+  } else if (shoulder === 'raglan') {
+    // Raglan runs the diagonal from underarm to neck, so it wants a deeper armhole than a
+    // set-in scye; the sleeve stays fitted (its top tapers away up the raglan line).
+    armholeDepth = size.arm_depth + RAGLAN_ALLOWANCE_IN;
+    sleeveTop = size.upper_arm + upperArmEase(size, style);
   } else {
     // Set-in: a shaped-scye depth from the arm; a fitted, style-scaled sleeve.
     armholeDepth = size.arm_depth + SETIN_ALLOWANCE_IN.armholeDepth;

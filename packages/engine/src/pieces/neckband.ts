@@ -20,7 +20,8 @@ import { type Gauge, evenStitchesFor, ribRowsFor } from '../gauge';
 import { type Row, carriageForRow } from '../row';
 import { backPlan } from './back';
 import { frontNeckPlan } from './front';
-import { saddleStrapWidthIn } from './sleeve';
+import { saddleStrapWidthIn, sleevePlan } from './sleeve';
+import { raglanPlan } from './raglan';
 
 /**
  * Stitches to pick up per ROW of a vertical/shaped neck edge, for THIS gauge.
@@ -67,6 +68,11 @@ export function neckbandPlan(
   shoulder: ShoulderStyle = 'set_in',
   backNeck: BackNeckStyle = 'scoop',
 ): NeckbandPlan {
+  // A raglan neckline is different: the back neck (held) + each sleeve top (its little
+  // crown) + the front neck. The sleeve crowns sit between the back and front at the
+  // raglan seams, so both count in the band. There is no scooped side on the held back.
+  if (shoulder === 'raglan') return raglanNeckbandPlan(size, style, gauge);
+
   const bp = backPlan(size, style, gauge, shoulder, backNeck);
   const backCentreSts = bp.backNeckCentreSts; // centre cast-off (full width for a flat back)
   // A flat back is a straight cast-off with no shaped side edge to pick up along; a scoop
@@ -119,6 +125,42 @@ export function neckbandPlan(
     mitreRows,
     finalSts,
     waypoints,
+  };
+}
+
+/**
+ * The raglan neckline: the held back neck, each sleeve's little crown, and the front neck
+ * (centre held + a shaped side each way). The sleeve crowns sit at the raglan seams between
+ * the back and the front, so both count. The band eases to the four raglan seams.
+ */
+function raglanNeckbandPlan(size: SizeRecord, style: EaseStyleId, gauge: Gauge): NeckbandPlan {
+  const rp = raglanPlan(size, style, gauge);
+  const sleeve = sleevePlan(size, style, gauge, 'raglan');
+  const backCentreSts = rp.backNeckSts; // held flat, picked up 1:1
+  const frontCentreSts = rp.frontNeckCentreSts;
+  const frontSidePickup = Math.round(rp.frontNeckDepthRows * pickupPerRow(gauge));
+  const sleeveTopPickup = Math.max(1, Math.round(sleeve.capTopSts / 2)); // each crown, into the neck
+  const raw = backCentreSts + frontCentreSts + 2 * frontSidePickup + 2 * sleeveTopPickup;
+  const pickupTotal = raw % 2 === 0 ? raw + 1 : raw;
+  const bandRows = ribRowsFor(size.rib_neck, gauge);
+  const finalSts = pickupTotal;
+  const clamp = (n: number): number => Math.max(1, Math.min(finalSts - 1, n));
+  // Waypoints at the four raglan seams, in pickup order: back, L sleeve, front, R sleeve.
+  const p1 = backCentreSts;
+  const p2 = p1 + sleeveTopPickup;
+  const p3 = p2 + frontSidePickup + frontCentreSts + frontSidePickup;
+  const p4 = p3 + sleeveTopPickup;
+  return {
+    backCentreSts,
+    backSidePickup: 0,
+    frontCentreSts,
+    frontSidePickup,
+    strapEndSts: 0,
+    pickupTotal,
+    bandRows,
+    mitreRows: 0,
+    finalSts,
+    waypoints: [clamp(p1), clamp(p2), clamp(p3), clamp(p4)],
   };
 }
 

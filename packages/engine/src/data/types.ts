@@ -102,10 +102,12 @@ export type BackNeckStyle = 'scoop' | 'flat';
  * cast-off (or waste-yarn) edge can seam to the strap's row edge; a live-held shoulder
  * cannot, which is why saddle drops the hold/3-needle join (King, 2026-07-22).
  *
- * 'raglan' is the remaining planned addition (also cast-off-and-sew) — not in the union
- * yet; see the coverage-map memory for its recipe.
+ * 'raglan' has no separate shoulder or cap: the body armhole and the sleeve top both
+ * decrease steadily from the underarm to the neck over the SAME number of rows, so the
+ * four raglan seams match row-for-row. Shoulders are cast off (there are none to hold),
+ * and the sleeve tops join the neckline. Also cast-off-and-sew.
  */
-export type ShoulderStyle = 'set_in' | 'drop' | 'saddle';
+export type ShoulderStyle = 'set_in' | 'drop' | 'saddle' | 'raglan';
 
 /**
  * How the garment is made. Matches the `method` option vocabulary in options.json,
