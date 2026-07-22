@@ -14,7 +14,7 @@
  * Prose is ours; the geometric fact is not authored, so we check it.
  */
 
-import type { SizeRecord, EaseStyleId, NeckStyle, ShoulderStyle } from '../data/types';
+import type { SizeRecord, EaseStyleId, NeckStyle, BackNeckStyle, ShoulderStyle } from '../data/types';
 import type { Gauge } from '../gauge';
 import { garmentWidths } from '../dimensions';
 import { backPlan, armholeShaping, lowerPanelRows, armholeOpening } from './back';
@@ -69,8 +69,9 @@ export function assemblyReport(
   gauge: Gauge,
   neck: NeckStyle = 'round',
   shoulder: ShoulderStyle = 'set_in',
+  backNeck: BackNeckStyle = 'scoop',
 ): AssemblyReport {
-  const bp = backPlan(size, style, gauge, shoulder);
+  const bp = backPlan(size, style, gauge, shoulder, backNeck);
   const shaping = armholeShaping(bp.bodySts, bp.upperBackSts);
   const achieved = shaping.achievedSts;
   const backShoulder = Math.round((achieved - bp.backNeckSts) / 2);

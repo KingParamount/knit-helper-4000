@@ -8,7 +8,7 @@
  * (they need the sourced shaping method — see dimensions_model.md, next step).
  */
 
-import type { SizeRecord, EaseStyleId, ShoulderStyle } from '../data/types';
+import type { SizeRecord, EaseStyleId, ShoulderStyle, BackNeckStyle } from '../data/types';
 import { garmentWidths } from '../dimensions';
 import {
   type Gauge,
@@ -19,7 +19,7 @@ import {
 } from '../gauge';
 import { type Row, type Piece, carriageForRow } from '../row';
 import { SEAM_ALLOWANCE_STS, seamEdgeLength, ARMHOLE_SECTIONS } from './seams';
-import { backNeckDepthRows } from '../neckopening';
+import { backNeckDepthRows, NECK_CURVE_IN } from '../neckopening';
 
 export interface PlanSection {
   name: string;
@@ -72,6 +72,7 @@ export function backPlan(
   style: EaseStyleId,
   gauge: Gauge,
   shoulder: ShoulderStyle = 'set_in',
+  backNeck: BackNeckStyle = 'scoop',
 ): BackPlan {
   const w = garmentWidths(size, style, shoulder);
 
@@ -88,22 +89,27 @@ export function backPlan(
   const ribRows = ribRowsFor(size.rib_body, gauge);
   const armholeRows = rowsFor(w.armholeDepth, gauge);
   const bodyRows = totalRows - armholeRows - ribRows;
-  const backNeckRows = backNeckDepthRows(size, gauge);
+  const backNeckRows = backNeckDepthRows(size, gauge, backNeck);
 
-  // Back-neck scoop shaping (single source for backRows and the neckband). The curve
-  // is capped so its cast-offs + decreases fit in the scoop depth alongside the
-  // short-row shoulders, and so the flat centre stays positive.
+  // Back-neck shaping (single source for backRows and the neckband). A 'flat' back casts
+  // the whole neck off straight across — no side curve (perSide 0, centre = full width),
+  // which is Knitware's default crew back. A 'scoop' curves each side: the curve is
+  // capped so its cast-offs + decreases fit in the scoop depth alongside the short-row
+  // shoulders, and so the flat centre stays positive.
   const achieved = armholeShaping(bodySts, upperBackSts).achievedSts;
   const backShoulderSts = Math.round((achieved - backNeckSts) / 2);
   const backSteps = splitIntoSteps(backShoulderSts, SHOULDER_STEP_STS);
-  const backNeckPerSide = Math.max(
-    1,
-    Math.min(
-      stitchesFor(1.5, gauge),
-      Math.floor((backNeckRows - 2 * backSteps.length) / 2),
-      Math.floor((backNeckSts - 2) / 2),
-    ),
-  );
+  const backNeckPerSide =
+    backNeck === 'flat'
+      ? 0
+      : Math.max(
+          1,
+          Math.min(
+            stitchesFor(NECK_CURVE_IN, gauge),
+            Math.floor((backNeckRows - 2 * backSteps.length) / 2),
+            Math.floor((backNeckSts - 2) / 2),
+          ),
+        );
   const backNeckCentreSts = backNeckSts - 2 * backNeckPerSide;
 
   const sections: PlanSection[] = [
@@ -316,12 +322,13 @@ export function backRows(
   style: EaseStyleId,
   gauge: Gauge,
   shoulder: ShoulderStyle = 'set_in',
+  backNeck: BackNeckStyle = 'scoop',
 ): Row[] {
-  const plan = backPlan(size, style, gauge, shoulder);
+  const plan = backPlan(size, style, gauge, shoulder, backNeck);
   const rows = backThroughArmhole(size, style, gauge, shoulder);
   const achieved = rows[rows.length - 1].stitches;
-  const backNeck = plan.backNeckSts;
-  const shoulderSts = Math.round((achieved - backNeck) / 2);
+  const backNeckSts = plan.backNeckSts;
+  const shoulderSts = Math.round((achieved - backNeckSts) / 2);
   const steps = splitIntoSteps(shoulderSts, SHOULDER_STEP_STS);
   const depth = plan.backNeckRows;
   const perSide = plan.backNeckPerSide;

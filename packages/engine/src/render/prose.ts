@@ -1084,16 +1084,22 @@ function renderHolds(
 ): number {
   const holds: { count: number; side: Carriage; c: number; carriage: Carriage }[] = [];
   let i = start;
+  // A split piece works one half's shoulder then the other; the halves carry a `side`
+  // and must not be merged. Normally the second half opens with its own neck shaping,
+  // which stops this run — but a flat neck has no neck shaping, so the two shoulders run
+  // straight into each other. Stop at the change of half so each is rendered on its own.
+  const half = evs[start].row.side;
   for (;;) {
     if (i >= evs.length) break;
     if (evs[i].kind === 'hold') {
+      if (evs[i].row.side !== half) break;
       const op = evs[i].op as { count: number; side: Carriage };
       holds.push({ count: op.count, side: op.side, c: counter(evs[i].row.index), carriage: evs[i].row.carriage });
       i += 1;
     } else if (evs[i].kind === 'plain') {
       let k = i;
       while (k < evs.length && evs[k].kind === 'plain') k += 1;
-      if (k < evs.length && evs[k].kind === 'hold') i = k;
+      if (k < evs.length && evs[k].kind === 'hold' && evs[k].row.side === half) i = k;
       else break;
     } else break;
   }

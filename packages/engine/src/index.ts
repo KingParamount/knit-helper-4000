@@ -16,6 +16,7 @@ export type {
   EaseOption,
   EaseStyleId,
   NeckStyle,
+  BackNeckStyle,
   ShoulderStyle,
   Technique,
 } from './data/types';
@@ -82,6 +83,7 @@ export {
   backNeckDepthIn,
   neckHeadFit,
   neckFitVerdict,
+  flatBackAllowed,
   fitReport,
   HIP_STRETCH,
   MIN_SHOULDER_IN,

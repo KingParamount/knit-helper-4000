@@ -13,7 +13,7 @@ import type { SizeRecord, EaseStyleId, NeckStyle, ShoulderStyle } from '../data/
 import { type Gauge, rowsFor, stitchesFor } from '../gauge';
 import { type Row, carriageForRow } from '../row';
 import { backPlan, panelThroughArmhole, armholeShaping, splitIntoSteps, SHOULDER_STEP_STS } from './back';
-import { vNeckDepthIn } from '../neckopening';
+import { vNeckDepthIn, NECK_CURVE_IN } from '../neckopening';
 
 /** Rows the crew neck occupies below the shoulder line. */
 export function frontNeckDepthRows(size: SizeRecord, gauge: Gauge): number {
@@ -108,7 +108,7 @@ export function frontRows(
   const rows = frontToNeck(size, style, gauge, neck, shoulder);
   const fp = frontNeckPlan(size, style, gauge, neck, shoulder);
   const shoulderSteps = splitIntoSteps(fp.shoulderSts, SHOULDER_STEP_STS);
-  const perSide = stitchesFor(1.5, gauge); // crew: ~1.5" curve each neck edge
+  const perSide = stitchesFor(NECK_CURVE_IN, gauge); // crew: ~1.5" curve each neck edge
   // Crew removes a centre chunk; a V divides at a single point (no centre cast-off).
   const centreCastOff = neck === 'v' ? 0 : fp.frontNeckSts - 2 * perSide;
 

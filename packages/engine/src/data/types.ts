@@ -79,6 +79,16 @@ export type EaseStyleId =
 export type NeckStyle = 'round' | 'v';
 
 /**
+ * Back neck style, from the `neckline_back` option vocabulary. 'scoop' is a shallow
+ * curved drop (our default — it opens the crew enough to pass the head, solved per
+ * size in neckopening.ts); 'flat' casts the whole back neck off straight across (no
+ * scoop), which is Knitware's default crew back. A flat back is snugger over the head,
+ * so it is only offered where the head still clears (see fit.ts). The front is 'round'
+ * or 'v' (NeckStyle); the back never takes a V.
+ */
+export type BackNeckStyle = 'scoop' | 'flat';
+
+/**
  * Shoulder / sleeve-join style. 'set_in' has a shaped armhole and a fitted cap;
  * 'drop' knits the body straight (no armhole shaping) and the sleeve to a straight
  * wide top (no cap) that sews to the armhole edge. Distinct from EaseStyleId.

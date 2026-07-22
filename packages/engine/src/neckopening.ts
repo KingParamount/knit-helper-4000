@@ -8,8 +8,16 @@
  * flat back (depth 0) makes it too snug on every size; scooping the back opens it.
  */
 
-import type { SizeRecord } from './data/types';
+import type { SizeRecord, BackNeckStyle } from './data/types';
 import { type Gauge, rowsFor } from './gauge';
+
+/**
+ * The neck-edge curve worked each side of a shaped (crew/scoop) neck — cast off a
+ * little, then decrease the rest. Sourced here so the front piece (front.ts), the back
+ * scoop (back.ts) and the neckband pickup (neckband.ts) can never drift apart: the band
+ * covers exactly the edge the piece shaped.
+ */
+export const NECK_CURVE_IN = 1.5;
 
 /**
  * Comfort dial: the neck opening must reach the head within this factor of stretch.
@@ -75,13 +83,16 @@ export function neckOpeningPerimeter(widthIn: number, depthIn: number): number {
 const MIN_BACK_NECK_DROP_IN = 1.25;
 
 /**
- * Back-neck scoop depth (inches), solved so the opening admits the head at
- * NECK_OPENING_STRETCH. Floored at a standard drop, capped at the front depth (a back
- * neck is never deeper than the front). Non-crew sizes just get the floor.
+ * Back-neck depth (inches). A 'flat' back has no scoop — it sits at the floor, which is
+ * the shoulder-slope minimum the short-rows need (it is not literally zero). A 'scoop'
+ * back is solved so the opening admits the head at NECK_OPENING_STRETCH, floored at that
+ * same drop and capped at the front depth (a back neck is never deeper than the front).
+ * Non-crew sizes just get the floor.
  */
-export function backNeckDepthIn(size: SizeRecord): number {
+export function backNeckDepthIn(size: SizeRecord, back: BackNeckStyle = 'scoop'): number {
   const front = size.neck_depth;
   const floor = MIN_BACK_NECK_DROP_IN;
+  if (back === 'flat') return floor;
   if (!crewSuitable(size)) return floor;
   const target = size.head_circ / NECK_OPENING_STRETCH;
   // Opening grows monotonically with back depth; find the shallowest that reaches target.
@@ -91,7 +102,7 @@ export function backNeckDepthIn(size: SizeRecord): number {
   return front; // capped: as deep as the front, the most a back neck should scoop
 }
 
-/** Back-neck scoop depth in rows. */
-export function backNeckDepthRows(size: SizeRecord, gauge: Gauge): number {
-  return rowsFor(backNeckDepthIn(size), gauge);
+/** Back-neck depth in rows. */
+export function backNeckDepthRows(size: SizeRecord, gauge: Gauge, back: BackNeckStyle = 'scoop'): number {
+  return rowsFor(backNeckDepthIn(size, back), gauge);
 }

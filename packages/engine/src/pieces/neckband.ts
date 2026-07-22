@@ -15,8 +15,9 @@
  * front centre), ~3 sts per 4 rows along the shaped side edges. Depth from the neck rib.
  */
 
-import type { SizeRecord, EaseStyleId, NeckStyle, ShoulderStyle, Technique } from '../data/types';
+import type { SizeRecord, EaseStyleId, NeckStyle, BackNeckStyle, ShoulderStyle, Technique } from '../data/types';
 import { type Gauge, stitchesFor, ribRowsFor } from '../gauge';
+import { NECK_CURVE_IN } from '../neckopening';
 import { type Row, carriageForRow } from '../row';
 import { backPlan } from './back';
 import { frontNeckPlan } from './front';
@@ -63,14 +64,17 @@ export function neckbandPlan(
   gauge: Gauge,
   neck: NeckStyle = 'round',
   shoulder: ShoulderStyle = 'set_in',
+  backNeck: BackNeckStyle = 'scoop',
 ): NeckbandPlan {
-  const bp = backPlan(size, style, gauge, shoulder);
-  const backCentreSts = bp.backNeckCentreSts; // centre cast-off of the back scoop
-  const backSidePickup = Math.round(bp.backNeckRows * pickupPerRow(gauge));
+  const bp = backPlan(size, style, gauge, shoulder, backNeck);
+  const backCentreSts = bp.backNeckCentreSts; // centre cast-off (full width for a flat back)
+  // A flat back is a straight cast-off with no shaped side edge to pick up along; a scoop
+  // curves each side over its depth (bp.backNeckPerSide is 0 exactly when the back is flat).
+  const backSidePickup = bp.backNeckPerSide === 0 ? 0 : Math.round(bp.backNeckRows * pickupPerRow(gauge));
   const fp = frontNeckPlan(size, style, gauge, neck, shoulder);
   // A crew has a front centre cast-off to follow; a V has none (frontCentre = 0) — the
   // two long V edges run down to the point, which is the band's two ends.
-  const frontCentreSts = neck === 'v' ? 0 : fp.frontNeckSts - 2 * stitchesFor(1.5, gauge);
+  const frontCentreSts = neck === 'v' ? 0 : fp.frontNeckSts - 2 * stitchesFor(NECK_CURVE_IN, gauge);
   const frontSidePickup = Math.round(fp.neckDepthRows * pickupPerRow(gauge));
   // Cast on odd (extra on the right) so both selvedges are knit stitches.
   const raw = backCentreSts + 2 * backSidePickup + frontCentreSts + 2 * frontSidePickup;
@@ -113,8 +117,9 @@ export function neckbandRows(
   neck: NeckStyle = 'round',
   shoulder: ShoulderStyle = 'set_in',
   technique: Technique = 'machine',
+  backNeck: BackNeckStyle = 'scoop',
 ): Row[] {
-  const p = neckbandPlan(size, style, gauge, neck, shoulder);
+  const p = neckbandPlan(size, style, gauge, neck, shoulder, backNeck);
   const rows: Row[] = [];
   let index = 0;
   let stitches = 0;

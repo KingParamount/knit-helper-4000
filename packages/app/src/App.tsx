@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
-import { availableChests, schematicMetrics } from '@knit-helper-4000/engine';
-import type { Category, Units, NeckStyle, ShoulderStyle } from '@knit-helper-4000/engine';
+import { availableChests, schematicMetrics, flatBackAllowed } from '@knit-helper-4000/engine';
+import type { Category, Units, NeckStyle, BackNeckStyle, ShoulderStyle } from '@knit-helper-4000/engine';
 import {
   DEFAULT_SWATCH,
   buildPattern,
@@ -175,6 +175,7 @@ export function App(): JSX.Element {
   const [chest, setChest] = useState(36);
   const [ease, setEase] = useState<EaseId>('moderate');
   const [neck, setNeck] = useState<NeckStyle>('round');
+  const [backNeck, setBackNeck] = useState<BackNeckStyle>('scoop');
   const [shoulder, setShoulder] = useState<ShoulderStyle>('set_in');
   const [swatch, setSwatch] = useState<Swatch>(DEFAULT_SWATCH);
   const [output, setOutput] = useState<OutputId>('full');
@@ -207,9 +208,16 @@ export function App(): JSX.Element {
       : chest;
   const sizeUnit = isBaby ? (units === 'cm' ? 'kg' : 'lb') : units === 'cm' ? 'cm chest' : 'in chest';
 
+  // A flat back neck loses the scoop depth that opens a crew over the head, so it is
+  // only offered where the head still clears (a V front is open, so it always may). If
+  // flat is selected but the current size can't take it, fall back to a scoop so the
+  // generated pattern is always wearable.
+  const flatBackOk = sizeRec ? flatBackAllowed(sizeRec, neck) : true;
+  const effBackNeck: BackNeckStyle = backNeck === 'flat' && !flatBackOk ? 'scoop' : backNeck;
+
   // Method maps straight onto the engine's Technique (machine | hand).
   const technique = method === 'hand' ? ('hand' as const) : ('machine' as const);
-  const input = { category, chest, units, ease, neck, shoulder, swatch, technique };
+  const input = { category, chest, units, ease, neck, backNeck: effBackNeck, shoulder, swatch, technique };
   const gauge = gaugeReadout(gaugeFromSwatch(swatch), units);
 
   // Live outputs — the engine is pure and fast, so this runs every render.
@@ -466,9 +474,9 @@ export function App(): JSX.Element {
               <Btn icon={<IconCrew />} label="Round" state="soon" />
               <Btn icon={<IconCrew />} label="High round" state="soon" />
               <Btn icon={<IconVneck />} label="V" state="soon" />
-              <Btn icon={<IconCrew />} label="Scoop" state="soon" />
+              <Btn icon={<IconCrew />} label="Scoop" state={effBackNeck === 'scoop' ? 'selected' : 'normal'} onClick={() => setBackNeck('scoop')} />
               <Btn icon={<IconCrew />} label="Shallow" state="soon" />
-              <Btn icon={<IconCrew />} label="Flat" state="soon" />
+              <Btn icon={<IconCrew />} label="Flat" state={!flatBackOk ? 'blocked' : effBackNeck === 'flat' ? 'selected' : 'normal'} onClick={() => setBackNeck('flat')} />
               <Btn icon={<IconCrew />} label="Square" state="soon" />
               <Btn icon={<IconCrew />} label="Boat" state="soon" />
               <Btn icon={<IconCrew />} label="Ballet" state="soon" />
