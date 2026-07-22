@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
-import { availableChests, schematicMetrics, flatBackAllowed, flatFrontAllowed } from '@knit-helper-4000/engine';
+import { availableChests, schematicMetrics, flatBackAllowed } from '@knit-helper-4000/engine';
 import type { Category, Units, NeckStyle, BackNeckStyle, ShoulderStyle } from '@knit-helper-4000/engine';
 import {
   DEFAULT_SWATCH,
@@ -208,19 +208,17 @@ export function App(): JSX.Element {
       : chest;
   const sizeUnit = isBaby ? (units === 'cm' ? 'kg' : 'lb') : units === 'cm' ? 'cm chest' : 'in chest';
 
-  // A flat neck loses the depth that opens a crew over the head, so flat front/back are
-  // only offered where the head still clears (agreed policy: block, don't warn). Each is
-  // checked against the other axis's non-flat baseline (flat+flat is never looser), and
-  // if a selected flat can't be worn at this size it falls back so the pattern is always
-  // wearable. A flat front is a narrow slash neck and clears only the widest sizes.
-  const flatBackOk = sizeRec ? flatBackAllowed(sizeRec, neck === 'flat' ? 'round' : neck) : true;
-  const flatFrontOk = sizeRec ? flatFrontAllowed(sizeRec, backNeck === 'flat' ? 'scoop' : backNeck) : true;
-  const effNeck: NeckStyle = neck === 'flat' && !flatFrontOk ? 'round' : neck;
+  // A flat BACK neck loses the scoop depth that opens a crew over the head, so it is only
+  // offered where the head still clears (agreed policy: block, don't warn); if a flat back
+  // is selected but can't be worn at this size it falls back to a scoop so the pattern is
+  // always wearable. (The flat FRONT is built in the engine but parked out of the UI — it
+  // is a narrow slash neck that clears only the widest sizes; see the coverage-map memory.)
+  const flatBackOk = sizeRec ? flatBackAllowed(sizeRec, neck) : true;
   const effBackNeck: BackNeckStyle = backNeck === 'flat' && !flatBackOk ? 'scoop' : backNeck;
 
   // Method maps straight onto the engine's Technique (machine | hand).
   const technique = method === 'hand' ? ('hand' as const) : ('machine' as const);
-  const input = { category, chest, units, ease, neck: effNeck, backNeck: effBackNeck, shoulder, swatch, technique };
+  const input = { category, chest, units, ease, neck, backNeck: effBackNeck, shoulder, swatch, technique };
   const gauge = gaugeReadout(gaugeFromSwatch(swatch), units);
 
   // Live outputs — the engine is pure and fast, so this runs every render.
@@ -460,12 +458,11 @@ export function App(): JSX.Element {
         <Section label="Neckline &amp; collar">
           <Tile title="Front neckline">
             <div className="btn-row">
-              <Btn icon={<IconCrew />} label="Crew" state={effNeck === 'round' ? 'selected' : 'normal'} onClick={() => setNeck('round')} />
-              <Btn icon={<IconVneck />} label="V-neck" state={effNeck === 'v' ? 'selected' : 'normal'} onClick={() => setNeck('v')} />
-              <Btn icon={<IconCrew />} label="Scoop" state={effNeck === 'scoop' ? 'selected' : 'normal'} onClick={() => setNeck('scoop')} />
+              <Btn icon={<IconCrew />} label="Crew" state={neck === 'round' ? 'selected' : 'normal'} onClick={() => setNeck('round')} />
+              <Btn icon={<IconVneck />} label="V-neck" state={neck === 'v' ? 'selected' : 'normal'} onClick={() => setNeck('v')} />
+              <Btn icon={<IconCrew />} label="Scoop" state={neck === 'scoop' ? 'selected' : 'normal'} onClick={() => setNeck('scoop')} />
               <Btn icon={<IconCrew />} label="High round" state="soon" />
               <Btn icon={<IconCrew />} label="Shallow" state="soon" />
-              <Btn icon={<IconCrew />} label="Flat" state={!flatFrontOk ? 'blocked' : effNeck === 'flat' ? 'selected' : 'normal'} onClick={() => setNeck('flat')} />
               <Btn icon={<IconCrew />} label="Square" state="soon" />
               <Btn icon={<IconCrew />} label="Boat" state="soon" />
               <Btn icon={<IconCrew />} label="Ballet" state="soon" />
