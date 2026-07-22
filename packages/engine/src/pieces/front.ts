@@ -43,7 +43,7 @@ export function frontNeckPlan(
   shoulder: ShoulderStyle = 'set_in',
 ): FrontNeckPlan {
   const plan = backPlan(size, style, gauge, shoulder);
-  const bodySts = armholeShaping(plan.bodySts, plan.upperBackSts, gauge).achievedSts;
+  const bodySts = armholeShaping(plan.bodySts, plan.upperBackSts).achievedSts;
   const shoulderSts = Math.round((bodySts - plan.backNeckSts) / 2); // match the back
   // A V's depth is ~a fraction of the armhole, floored to read as a V and capped for
   // modesty on adults (vNeckDepthIn); a crew is a shallow scoop.

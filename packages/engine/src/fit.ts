@@ -11,7 +11,6 @@
 import type { SizeRecord, EaseStyleId, NeckStyle, ShoulderStyle } from './data/types';
 import { garmentWidths, MIN_UPPER_ARM_EASE_IN } from './dimensions';
 import {
-  NECK_OPENING_STRETCH,
   NECK_STRETCH_MAX,
   crewSuitable,
   neckOpeningPerimeter,

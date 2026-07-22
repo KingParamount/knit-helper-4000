@@ -27,10 +27,10 @@ describe('sleeve plan (Woman 36", moderate, default gauge)', () => {
   it('lays out rib, taper and cap counts', () => {
     expect(p.ribRows).toBe(25); // 2.5"
     expect(p.taperRows).toBe(158); // (arm length 16.75" + ease_arml 1.5") − rib
-    expect(p.underarmCastOff).toBe(8); // matches the body armhole underarm
+    expect(p.underarmCastOff).toBe(7); // ~5% of the half-chest, matches the body armhole
     expect(p.capHeightRows).toBe(73); // fills CAP_FILL (0.86) of the 85-row armhole
-    expect(p.capTopSts).toBe(14); // narrow crown ≈ 0.14 × sleeve top (even)
-    expect(p.capDecPerSide).toBe(32); // (94 − 16 − crown target) / 2
+    expect(p.capTopSts).toBe(26); // broad crown ≈ 0.28 × sleeve top (even) — Knitware-matched
+    expect(p.capDecPerSide).toBe(27); // (94 − 2×7 underarm − 26 crown) / 2
   });
 
   it('fills the armhole depth row-for-row (a real set-in cap ≈ 0.85×)', () => {

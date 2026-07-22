@@ -57,10 +57,12 @@ or documentation beyond the historical references in `reference/`.
   We're free to add what it couldn't (top-down set-in, short-row bust darts, etc).
 - **No backend.** No server, no accounts, no database, no API. Static site only.
   Everything client-side. This is not a temporary constraint — it's the design.
-- **No waist / hip / A-line body shaping.** The body is a straight tube to the
-  armholes, which is what the overwhelming majority of patterns do. The Tier-B
-  hip-clearance check stays (it flags where a deliberately-snug fit runs tight at
-  the hem), but there is no waist/hip shaping feature to build. Decided, not deferred.
+- **No waist / hip / A-line body shaping — for now.** The body is a straight tube to
+  the armholes, which is what the overwhelming majority of patterns do, and it's the only
+  body shape we build. Fitted-waist and A-line are **parked, not killed**: they stay in the
+  option vocabulary as "maybe one day", but there is no shaping feature to build yet — revisit
+  only on clear demand, and do not surface them in the UI until then. The Tier-B hip-clearance
+  check stays (it flags where a deliberately-snug fit runs tight at the hem).
 
 ## Architecture rules
 

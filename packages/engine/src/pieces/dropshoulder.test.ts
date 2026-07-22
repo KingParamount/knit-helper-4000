@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { sizes } from '../data/sizes';
 import { easeStyles } from '../data/options';
 import type { EaseStyleId } from '../data/types';
-import { DEFAULT_GAUGE, stitchesFor } from '../gauge';
+import { DEFAULT_GAUGE } from '../gauge';
 import { garmentWidths } from '../dimensions';
 import { assemblyReport } from './assembly';
 import { backPlan, backRows } from './back';

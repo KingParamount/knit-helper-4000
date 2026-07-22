@@ -17,7 +17,7 @@ describe('front neck plan (Woman 36", moderate)', () => {
   });
 
   it('starts the neck a crew depth below the shoulder line', () => {
-    expect(p.neckLineRow).toBe(210); // 246 − 36 (neck_depth 3.6" × 40/4)
+    expect(p.neckLineRow).toBe(194); // 230 − 36 (neck_depth 3.6" × 40/4)
   });
 });
 
@@ -25,7 +25,7 @@ describe('front to the neck line', () => {
   const rows = frontToNeck(W36, 'moderate', DEFAULT_GAUGE);
 
   it('matches the back below the neck and stops at the neck line', () => {
-    expect(rows).toHaveLength(210);
+    expect(rows).toHaveLength(194);
     expect(rows.every((r) => r.piece === 'front')).toBe(true);
     expect(rows[rows.length - 1].stitches).toBe(98); // full body width, pre-split
     expect(rows[rows.length - 1].section).toBe('upper_front');
@@ -43,7 +43,7 @@ describe('complete front piece (crew neck, two-sided)', () => {
 
   it('casts off the centre neck at the split', () => {
     const split = rows.find((r) => r.section === 'neck_split')!;
-    expect(split.index).toBe(211);
+    expect(split.index).toBe(195);
     expect(split.ops).toEqual([{ kind: 'bind_off', count: 24, side: 'center' }]); // 46 − 2×11
     expect(split.stitches).toBe(74); // 98 − 24
   });

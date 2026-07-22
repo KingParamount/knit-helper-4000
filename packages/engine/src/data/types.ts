@@ -15,6 +15,12 @@ export interface SizeRecord {
   size_id: number;
   category: Category;
   age: string;
+  /**
+   * Babies are sized by weight, not chest — Knitware's own axis for the category.
+   * Native units per row: pounds on the `in` rows, kilograms on the `cm` rows (as
+   * `chest` is). Absent for every other category, which is sized by chest.
+   */
+  weight?: number;
   units: Units;
   chest: number;
   waist: number;

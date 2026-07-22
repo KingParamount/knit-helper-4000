@@ -38,19 +38,19 @@ describe('plain stretches read the dial', () => {
     }
   });
   it('states the body end and carriage', () => {
-    expect(has(back, 'Knit until the row counter reads 136. The carriage should be on the left.')).toBe(true);
+    expect(has(back, 'Knit until the row counter reads 120. The carriage should be on the left.')).toBe(true);
   });
 });
 
 describe('armhole shaping (verbose)', () => {
   it('leads each cast-off with the counter and states the edge', () => {
-    expect(has(back, 'Knit 1 row to row counter 137, then cast off 8 stitches at the right hand edge.')).toBe(true);
-    expect(has(back, 'Knit 1 row to row counter 138, then cast off 8 stitches at the left hand edge.')).toBe(true);
+    expect(has(back, 'Knit 1 row to row counter 121, then cast off 7 stitches at the right hand edge.')).toBe(true);
+    expect(has(back, 'Knit 1 row to row counter 122, then cast off 7 stitches at the left hand edge.')).toBe(true);
   });
   it('states a decrease once then repeats it, per phase', () => {
-    expect(has(back, 'Knit 1 row to row counter 139, then decrease 1 stitch at either end of the row.')).toBe(true);
-    expect(has(back, 'Repeat the last instruction for row counts 140 to 143 (making a total of 5 times). The carriage should be on the right.')).toBe(true);
-    expect(has(back, 'on every 2nd row, at row counts 147, 149, 151, 153, 155, 157 and 159 (making a total of 8 times)')).toBe(true);
+    expect(has(back, 'Knit 1 row to row counter 123, then decrease 1 stitch at either end of the row.')).toBe(true);
+    expect(has(back, 'Repeat the last instruction for row counts 124 to 127 (making a total of 5 times). The carriage should be on the right.')).toBe(true);
+    expect(has(back, 'on every 2nd row, at row counts 131, 133, 135, 137, 139, 141, 143 and 145 (making a total of 9 times)')).toBe(true);
   });
 });
 
@@ -78,9 +78,9 @@ describe('abbreviated mode', () => {
   it('abbreviates the transition, shaping and carriage', () => {
     expect(has(backT, 'RC to 000, change to st st, set to MT, dec 1 st at RH. COL.')).toBe(true);
     expect(has(backT, '146 st (73L, 73R).')).toBe(true);
-    expect(has(backT, 'Kn to RC 137, then BO 8 st at RH.')).toBe(true);
-    expect(has(backT, 'Kn to RC 139, then dec 1 st at either end.')).toBe(true);
-    expect(has(backT, 'Rpt instruction for RC 140 to 143 (total 5 times). COR.')).toBe(true);
+    expect(has(backT, 'Kn to RC 121, then BO 7 st at RH.')).toBe(true);
+    expect(has(backT, 'Kn to RC 123, then dec 1 st at either end.')).toBe(true);
+    expect(has(backT, 'Rpt instruction for RC 124 to 127 (total 5 times). COR.')).toBe(true);
   });
   it('divides for the back neck and short-rows the shoulders; never CO for a cast-off', () => {
     expect(has(backT, 'BO centre 42 st loosely to divide for neck.')).toBe(true);
@@ -110,23 +110,24 @@ describe('v-neck band mitre (edge decreases) + crossed-over alternative', () => 
     expect(vBand.lines.some((l) => l.includes('contrast-yarn marker at stitch'))).toBe(true);
   });
 
-  it('presents the crossed-over point and mock-rib/folded band as alternatives', () => {
+  it('presents the crossed-over point as an alternative to the mitre', () => {
     expect(has(vBand, 'Alternative front point — crossed over.')).toBe(true);
     expect(vBand.lines.some((l) => l.includes('lap one end over the other at the centre front'))).toBe(true);
-    expect(has(vBand, 'Alternative band — mock rib or a folded band.')).toBe(true);
+    // The mock-rib/folded-band aside was stripped: band treatment is a style choice now, not inline prose.
+    expect(has(vBand, 'mock rib or a folded band')).toBe(false);
   });
 
-  it('a crew band mitres nothing but still offers the folded alternative', () => {
+  it('a crew band mitres nothing and offers no band alternative', () => {
     expect(has(crew, 'Mitre the two ends.')).toBe(false);
     expect(has(crew, 'crossed over')).toBe(false);
-    expect(has(crew, 'Alternative band — mock rib or a folded band.')).toBe(true);
+    expect(has(crew, 'mock rib or a folded band')).toBe(false);
   });
 
-  it('abbreviates the mitre and the alternatives', () => {
+  it('abbreviates the mitre and the crossed-over alternative', () => {
     expect(has(vBandT, 'Mitre the two ends.')).toBe(true);
     expect(vBandT.lines.some((l) => l.includes('dec 1 st at each end every row'))).toBe(true);
     expect(has(vBandT, 'Alt point — crossed over.')).toBe(true);
-    expect(has(vBandT, 'Alt band — mock rib / folded.')).toBe(true);
+    expect(has(vBandT, 'mock rib / folded')).toBe(false);
   });
 });
 

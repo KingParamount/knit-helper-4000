@@ -29,8 +29,8 @@ import {
 import './theme.css';
 
 type OutputId = 'full' | 'concise' | 'chart' | 'knitleader' | 'knitradar';
-/** How the garment is made. Only 'machine' is built; the others are on the way. */
-type Method = 'machine' | 'hand' | 'crochet';
+/** How the garment is made. Machine and hand are both built; crochet is out of scope. */
+type Method = 'machine' | 'hand';
 
 // ---- small building blocks --------------------------------------------------
 
@@ -162,7 +162,6 @@ const EASES: { id: EaseId; label: string }[] = [
   { id: 'comfortable', label: 'Comfortable' },
   { id: 'oversized', label: 'Oversized' },
 ];
-const CATEGORIES: Category[] = ['Baby', 'Child', 'Woman', 'Man'];
 const PIECES: { id: PieceId; label: string }[] = [
   { id: 'back', label: 'Back' },
   { id: 'front', label: 'Front' },
@@ -193,20 +192,22 @@ export function App(): JSX.Element {
     if (!list.includes(chest)) setChest(list[Math.floor(list.length / 2)]);
   };
   const chestCm = Math.round(chest * 2.54);
-  // Babies and children are sized by age, adults by chest.
-  const young = category === 'Baby' || category === 'Child';
+  // Babies are sized by weight (Knitware's axis for the category); everyone else by
+  // chest. The slider always steps through chest inches internally — for a baby it is
+  // only the label that reads as a weight. Weight converts at the boundary like any
+  // other unit (lb with inches, kg with cm), same as chest inches → cm.
   const sizeRec = resolveSize(category, chest);
-  const sizeVal = young
-    ? category === 'Baby'
-      ? (sizeRec?.age ?? '').replace('m', '')
-      : sizeRec?.age ?? ''
+  const isBaby = category === 'Baby';
+  const weightLb = sizeRec?.weight;
+  const weightKg = weightLb != null ? Math.round(weightLb * 0.453592 * 10) / 10 : undefined;
+  const sizeVal = isBaby
+    ? (units === 'cm' ? weightKg : weightLb) ?? ''
     : units === 'cm'
       ? chestCm
       : chest;
-  const sizeUnit = young ? (category === 'Baby' ? 'months' : 'years') : units === 'cm' ? 'cm chest' : 'in chest';
+  const sizeUnit = isBaby ? (units === 'cm' ? 'kg' : 'lb') : units === 'cm' ? 'cm chest' : 'in chest';
 
-  // Crochet is not built, so it can never be the selected method; the cast keeps the
-  // engine's narrower Technique honest rather than widening it to a value it cannot serve.
+  // Method maps straight onto the engine's Technique (machine | hand).
   const technique = method === 'hand' ? ('hand' as const) : ('machine' as const);
   const input = { category, chest, units, ease, neck, shoulder, swatch, technique };
   const gauge = gaugeReadout(gaugeFromSwatch(swatch), units);
@@ -410,8 +411,8 @@ export function App(): JSX.Element {
           </Tile>
         </Section>
 
-        {/* 3 — shape */}
-        <Section label="Shape">
+        {/* 3 — body */}
+        <Section label="Body">
           <Tile title="Ease (how roomy)">
             <div className="btn-row">
               {EASES.map((e, i) => (
@@ -419,20 +420,87 @@ export function App(): JSX.Element {
               ))}
             </div>
           </Tile>
-          <Tile title="Neckline">
+          <Tile title="Length">
+            <div className="btn-row">
+              <Btn label="Crop" state="soon" />
+              <Btn label="Waist" state="soon" />
+              <Btn label="Regular" state="soon" />
+              <Btn label="Hip" state="selected" />
+              <Btn label="Thigh" state="soon" />
+              <Btn label="Above knee" state="soon" />
+              <Btn label="Knee" state="soon" />
+              <Btn label="Calf" state="soon" />
+              <Btn label="Ankle" state="soon" />
+            </div>
+          </Tile>
+          <Tile title="Hem">
+            <div className="btn-row">
+              <Btn label="Ribbing" state="selected" />
+              <Btn label="Moss band" state="soon" />
+              <Btn label="Garter band" state="soon" />
+              <Btn label="Folded band" state="soon" />
+              <Btn label="Frill" state="soon" />
+              <Btn label="No hem" state="soon" />
+            </div>
+          </Tile>
+        </Section>
+
+        {/* 4 — neckline & collar */}
+        <Section label="Neckline &amp; collar">
+          <Tile title="Front neckline">
             <div className="btn-row">
               <Btn icon={<IconCrew />} label="Crew" state={neck === 'round' ? 'selected' : 'normal'} onClick={() => setNeck('round')} />
               <Btn icon={<IconVneck />} label="V-neck" state={neck === 'v' ? 'selected' : 'normal'} onClick={() => setNeck('v')} />
               <Btn icon={<IconCrew />} label="Scoop" state="soon" />
+              <Btn icon={<IconCrew />} label="High round" state="soon" />
+              <Btn icon={<IconCrew />} label="Shallow" state="soon" />
+              <Btn icon={<IconCrew />} label="Flat" state="soon" />
+              <Btn icon={<IconCrew />} label="Square" state="soon" />
               <Btn icon={<IconCrew />} label="Boat" state="soon" />
+              <Btn icon={<IconCrew />} label="Ballet" state="soon" />
+              <Btn icon={<IconCrew />} label="Keyhole" state="soon" />
             </div>
           </Tile>
+          <Tile title="Back neckline">
+            <div className="btn-row">
+              <Btn icon={<IconCrew />} label="Round" state="soon" />
+              <Btn icon={<IconCrew />} label="High round" state="soon" />
+              <Btn icon={<IconVneck />} label="V" state="soon" />
+              <Btn icon={<IconCrew />} label="Scoop" state="soon" />
+              <Btn icon={<IconCrew />} label="Shallow" state="soon" />
+              <Btn icon={<IconCrew />} label="Flat" state="soon" />
+              <Btn icon={<IconCrew />} label="Square" state="soon" />
+              <Btn icon={<IconCrew />} label="Boat" state="soon" />
+              <Btn icon={<IconCrew />} label="Ballet" state="soon" />
+              <Btn icon={<IconCrew />} label="Backless" state="soon" />
+            </div>
+          </Tile>
+          <Tile title="Collar">
+            <div className="btn-row">
+              <Btn label="Single band" state="selected" />
+              <Btn label="Double band" state="soon" />
+              <Btn label="Turtleneck" state="soon" />
+              <Btn label="Cowl" state="soon" />
+              <Btn label="Funnel" state="soon" />
+              <Btn label="Rolled edge" state="soon" />
+              <Btn label="Shirt" state="soon" />
+              <Btn label="Shawl" state="soon" />
+              <Btn label="Hood" state="soon" />
+              <Btn label="No collar" state="soon" />
+            </div>
+          </Tile>
+        </Section>
+
+        {/* 5 — shoulders & sleeves */}
+        <Section label="Shoulders &amp; sleeves">
           <Tile title="Shoulder">
             <div className="btn-row">
               <Btn icon={<IconShoulder />} label="Set-in" state={shoulder === 'set_in' ? 'selected' : 'normal'} onClick={() => setShoulder('set_in')} />
               <Btn icon={<IconShoulder />} label="Drop" state={shoulder === 'drop' ? 'selected' : 'normal'} onClick={() => setShoulder('drop')} />
               <Btn icon={<IconShoulder />} label="Raglan" state="soon" />
               <Btn icon={<IconShoulder />} label="Saddle" state="soon" />
+              <Btn icon={<IconShoulder />} label="Modified drop" state="soon" />
+              <Btn icon={<IconShoulder />} label="Drop grafted" state="soon" />
               <Btn icon={<IconShoulder />} label="Round yoke" state="soon" />
             </div>
           </Tile>
@@ -444,6 +512,17 @@ export function App(): JSX.Element {
               <Btn icon={<IconSleeve />} label="Short" state="soon" />
               <Btn icon={<IconSleeve />} label="Cap" state="soon" />
               <Btn icon={<IconSleeve />} label="Sleeveless" state="soon" />
+            </div>
+          </Tile>
+          <Tile title="Sleeve style">
+            <div className="btn-row">
+              <Btn icon={<IconSleeve />} label="Taper" state="selected" />
+              <Btn icon={<IconSleeve />} label="Narrow taper" state="soon" />
+              <Btn icon={<IconSleeve />} label="Lantern" state="soon" />
+              <Btn icon={<IconSleeve />} label="Modified lantern" state="soon" />
+              <Btn icon={<IconSleeve />} label="Bishop" state="soon" />
+              <Btn icon={<IconSleeve />} label="Bell" state="soon" />
+              <Btn icon={<IconSleeve />} label="Dolman" state="soon" />
             </div>
           </Tile>
         </Section>
@@ -473,7 +552,6 @@ export function App(): JSX.Element {
                 // The roller templates vanish for hand; don't leave one selected.
                 if (output === 'knitleader' || output === 'knitradar') setOutput('full');
               }} />
-              <Btn label="Crochet" state="soon" />
             </div>
           </Tile>
           {/* Construction is a hand-knitting choice. A domestic machine knits flat and

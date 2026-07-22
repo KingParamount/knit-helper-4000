@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-declare const console: { log: (...args: unknown[]) => void };
 import { sizes } from '../data/sizes';
 import { easeStyles } from '../data/options';
 import type { EaseStyleId } from '../data/types';
@@ -33,7 +32,7 @@ describe('v-neck: it is a deep V that grafts and bands', () => {
     for (const size of inSizes) {
       const bp = backPlan(size, 'moderate', G);
       const backShoulder = Math.round(
-        (armholeShaping(bp.bodySts, bp.upperBackSts, G).achievedSts - bp.backNeckSts) / 2,
+        (armholeShaping(bp.bodySts, bp.upperBackSts).achievedSts - bp.backNeckSts) / 2,
       );
       const fp = frontNeckPlan(size, 'moderate', G, 'v');
       expect(fp.shoulderSts, `${size.category} ${size.chest}"`).toBe(backShoulder);

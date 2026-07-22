@@ -74,7 +74,7 @@ describe('Tier-C anchor: men’s set-in cap vs Berroco Anthony', () => {
   for (const size of MAN) {
     it(`cap underarm cast-off matches the body armhole (Man ${size.chest}")`, () => {
       const body = backPlan(size, 'comfortable', G, 'set_in');
-      const bodyBO = armholeShaping(body.bodySts, body.upperBackSts, G).castOffPerSide;
+      const bodyBO = armholeShaping(body.bodySts, body.upperBackSts).castOffPerSide;
       const p = sleevePlan(size, 'comfortable', G, 'set_in');
       expect(p.underarmCastOff).toBe(bodyBO);
     });

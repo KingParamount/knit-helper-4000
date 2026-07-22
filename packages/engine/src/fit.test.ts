@@ -32,7 +32,11 @@ it('CHECKPOINT: Tier-B fit sweep (moderate) — greens and open reds', () => {
   for (const label of labels) {
     let pass = 0;
     let fail = 0;
-    for (const style of styles) for (const s of inSizes) (fitReport(s, style).checks.find((c) => c.label === label)!.ok ? pass++ : fail++);
+    for (const style of styles)
+      for (const s of inSizes) {
+        if (fitReport(s, style).checks.find((c) => c.label === label)!.ok) pass++;
+        else fail++;
+      }
     lines.push(`  ${fail === 0 ? '✓' : '✗'} ${label.padEnd(28)} ${pass} pass / ${fail} fail`);
   }
   lines.push('');
@@ -125,7 +129,10 @@ it('CHECKPOINT: Tier-B style sweep — v-neck & drop findings (open, pending Tie
     for (const label of labels) {
       let pass = 0;
       let fail = 0;
-      for (const s of inSizes) (fitReport(s, 'moderate', cfg.neck, cfg.shoulder).checks.find((c) => c.label === label)!.ok ? pass++ : fail++);
+      for (const s of inSizes) {
+        if (fitReport(s, 'moderate', cfg.neck, cfg.shoulder).checks.find((c) => c.label === label)!.ok) pass++;
+        else fail++;
+      }
       lines.push(`    ${fail === 0 ? '✓' : '✗'} ${label.padEnd(24)} ${pass}/${pass + fail}`);
     }
   }

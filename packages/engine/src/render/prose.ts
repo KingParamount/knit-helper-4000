@@ -85,6 +85,16 @@ function andList(items: string[]): string {
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
 
+/** "1 stitch" | "3 stitches" — the one count word that does not just take an -s. */
+function sts(n: number): string {
+  return `${n} ${n === 1 ? 'stitch' : 'stitches'}`;
+}
+
+/** "1 row" | "2 rows", "1 time" | "5 times", "1 needle" | "6 needles". */
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
 // ---------------------------------------------------------------------------
 // The vocabulary — every user-facing phrase, in two registers.
 // ---------------------------------------------------------------------------
@@ -108,6 +118,8 @@ interface Vocab {
   stitchCount(n: number, split: boolean): string;
   knitUntil(rc: number, lengthIn: number, carriage?: Carriage): string;
   marker(): string;
+  /** Hand only: a one-time note that WS shaping rows are written as purl decreases. */
+  wsShapingNote(): string;
   shapeLead(gap: number, rc: number, action: string): string;
   actDecBoth(facing: Facing): string;
   actIncBoth(facing: Facing): string;
@@ -140,8 +152,6 @@ interface Vocab {
   /** Finishing a band that was worked in place (hand only; machine sews its band on). */
   bandCastOff(n: number): string;
   markWaypoints(positions: number[]): string;
-  foldedTitle(): string;
-  foldedBody(): string;
 }
 
 function splitV(n: number): string {
@@ -160,7 +170,7 @@ function corT(side: Carriage): string {
 const VERBOSE: Vocab = {
   carr: (side) => ` The carriage should be on the ${sideWord(side)}.`,
   castOn: (n, ce) =>
-    `Cast on ${n} stitches ${splitV(n)}, ending with the carriage on the ${sideWord(ce)}.`,
+    `Cast on ${sts(n)} ${splitV(n)}, ending with the carriage on the ${sideWord(ce)}.`,
   ribTension: () => 'Set the tension to main tension, minus 2 whole numbers.',
   setCounter: () => 'Set the row counter to 000.',
   ribUntil: (rc, _lengthIn) =>
@@ -174,70 +184,69 @@ const VERBOSE: Vocab = {
   resetPlain: (carriage) => `Reset the row counter to 000.${VERBOSE.carr(carriage)}`,
   rejoinRight: () => 'Return the right side of the work to the needles and rejoin the yarn.',
   stitchCount: (n, split) =>
-    split ? `There should be ${n} stitches ${splitV(n)}.` : `There should be ${n} stitches.`,
+    split ? `There should be ${sts(n)} ${splitV(n)}.` : `There should be ${sts(n)}.`,
   knitUntil: (rc, _lengthIn, carriage) =>
     `Knit until the row counter reads ${pad(rc)}.` + (carriage ? VERBOSE.carr(carriage) : ''),
   marker: () =>
     'Hang a marker of contrast yarn on the right and left edge stitches; the markers line up when you set the sleeve into the armhole.',
+  // The machine bed never turns over, so facing is not the knitter's concern here.
+  wsShapingNote: () => '',
   shapeLead: (gap, rc, action) =>
     `Knit ${gap === 1 ? '1 row' : `${gap} rows`} to row counter ${pad(rc)}, then ${action}.`,
   actDecBoth: (_rs) => 'decrease 1 stitch at either end of the row',
   actIncBoth: (_rs) => 'increase 1 stitch at either end of the row',
   actDecNeck: (_rs) => 'decrease 1 stitch at the neck edge',
-  actBindOffEdge: (n, side) => `cast off ${n} stitches at the ${sideWord(side)} hand edge`,
-  actBindOffNeck: (n) => `cast off ${n} stitches at the neck edge`,
+  actBindOffEdge: (n, side) => `cast off ${sts(n)} at the ${sideWord(side)} hand edge`,
+  actBindOffNeck: (n) => `cast off ${sts(n)} at the neck edge`,
   repeatOnce: (end, count) =>
-    `Repeat the last instruction once more, at row counter ${pad(end)} (making a total of ${count} times).`,
+    `Repeat the last instruction once more, at row counter ${pad(end)} (making a total of ${plural(count, 'time')}).`,
   repeatRange: (a, b, count) =>
-    `Repeat the last instruction for row counts ${pad(a)} to ${pad(b)} (making a total of ${count} times).`,
+    `Repeat the last instruction for row counts ${pad(a)} to ${pad(b)} (making a total of ${plural(count, 'time')}).`,
   repeatEvery: (step, list, count) =>
     `Repeat the last instruction on every ${ordinal(step)} row, at row counts ${andList(
       list,
-    )} (making a total of ${count} times).`,
+    )} (making a total of ${plural(count, 'time')}).`,
   repeatAt: (list, count) =>
-    `Repeat the last instruction at row counts ${andList(list)} (making a total of ${count} times).`,
+    `Repeat the last instruction at row counts ${andList(list)} (making a total of ${plural(count, 'time')}).`,
   divideNeck: (gap, rc, n) =>
     `Knit ${gap === 1 ? '1 row' : `${gap} rows`} to row counter ${pad(
       rc,
-    )}, then cast off the centre ${n} stitches loosely to divide for the neck.`,
+    )}, then cast off the centre ${sts(n)} loosely to divide for the neck.`,
   parkRight: () => 'Put the right side of the work into hold; you will shape the left side first.',
   castingOff: () => 'Casting off.',
   breakYarnGraft: () => 'Break the yarn, leaving plenty of tail for grafting.',
-  bindOffCentre: (n) => `Cast off the centre ${n} stitches loosely.`,
-  bindOffRemainingCap: (n) => `Cast off the remaining ${n} stitches loosely to close the cap.`,
-  bindOffAll: (n) => `Cast off all ${n} stitches loosely.`,
+  bindOffCentre: (n) => `Cast off the centre ${sts(n)} loosely.`,
+  bindOffRemainingCap: (n) => `Cast off the remaining ${sts(n)} loosely to close the cap.`,
+  bindOffAll: (n) => `Cast off all ${sts(n)} loosely.`,
   takeShouldersEach: (n) =>
-    `Take each shoulder off separately onto 5-6 rows of waste yarn. There should be ${n} stitches on each shoulder.`,
+    `Take each shoulder off separately onto 5-6 rows of waste yarn. There should be ${sts(n)} on each shoulder.`,
   takeShoulderThis: (n) =>
-    `Take this shoulder off onto 5-6 rows of waste yarn. There should be ${n} stitches on this shoulder.`,
-  pickUp: (n) => `Pick up and knit ${n} stitches evenly around the neck edge ${splitV(n)}.`,
+    `Take this shoulder off onto 5-6 rows of waste yarn. There should be ${sts(n)} on this shoulder.`,
+  pickUp: (n) => `Pick up and knit ${sts(n)} evenly around the neck edge ${splitV(n)}.`,
   setHold: () => 'Set the carriage to hold.',
   holdGroup: (count, side, rc) =>
-    `Bring ${count} needles at the ${sideWord(side)} into hold, then knit to row counter ${pad(rc)}.`,
+    `Bring ${plural(count, 'needle')} at the ${sideWord(side)} into hold, then knit to row counter ${pad(rc)}.`,
   holdRepeatBack: (count, rc, carriage) =>
-    `Repeat the last two instructions, holding ${count} needles each time, until the row counter reads ${pad(
+    `Repeat the last two instructions, holding ${plural(count, 'needle')} each time, until the row counter reads ${pad(
       rc,
     )}.${VERBOSE.carr(carriage)}`,
   mitreHeading: () => 'Mitre the two ends.',
   mitreWork: (rc, count) =>
     `Working in the rib pattern of your choice, decrease 1 stitch at each end of every row until the row counter reads ${pad(
       rc,
-    )} (${count} rows), tapering both ends to a diagonal.`,
+    )} (${plural(count, 'row')}), tapering both ends to a diagonal.`,
   mitreMeetNote: () =>
     'These two mitred ends meet at the centre front; you seam them there when you make up, forming the point of the V.',
   crossoverTitle: () => 'Alternative front point — crossed over.',
   crossoverBody: () =>
     'For a crossed-over point instead of the mitre, work the band straight (no end shaping), then lap one end over the other at the centre front and stitch both down neatly on the inside. It is the more casual finish.',
   takeOff: (n) =>
-    `Take all ${n} stitches off onto 5–6 rows of waste yarn — they stay live, ready to block and seam.`,
-  bandCastOff: (n) => `Cast off all ${n} stitches loosely in rib.`,
+    `Take all ${sts(n)} off onto 5–6 rows of waste yarn — they stay live, ready to block and seam.`,
+  bandCastOff: (n) => `Cast off all ${sts(n)} loosely in rib.`,
   markWaypoints: (positions) =>
     `Hang a contrast-yarn marker at ${andList(positions.map((p) => `stitch ${p}`))} — this is where the band will meet the shoulder ${
       positions.length > 1 ? 'seams' : 'seam'
     }. Matching the markers to the seams keeps the band eased in evenly.`,
-  foldedTitle: () => 'Alternative band — mock rib or a folded band.',
-  foldedBody: () =>
-    'To work the band in mock rib, or as a doubled band, knit twice as many rows in plain knitting (or mock rib). Then pick the first (cast-on) row up — onto spare needles, or, for a plain band, onto the needles holding the last row — so the band folds in half, and take both layers off together on the waste yarn. Sew on as before; the fold gives a neat, doubled edge.',
 };
 
 const TERSE: Vocab = {
@@ -255,18 +264,19 @@ const TERSE: Vocab = {
   stitchCount: (n, split) => (split ? `${n} st ${splitT(n)}.` : `${n} st.`),
   knitUntil: (rc, _lengthIn, carriage) => `Kn to RC ${pad(rc)}.` + (carriage ? TERSE.carr(carriage) : ''),
   marker: () => 'Hang marker on R and L edge sts (line up when setting in the sleeve).',
+  wsShapingNote: () => '',
   shapeLead: (_gap, rc, action) => `Kn to RC ${pad(rc)}, then ${action}.`,
   actDecBoth: (_rs) => 'dec 1 st at either end',
   actIncBoth: (_rs) => 'inc 1 st at either end',
   actDecNeck: (_rs) => 'dec 1 st at neck edge',
   actBindOffEdge: (n, side) => `BO ${n} st at ${edgeT(side)}`,
   actBindOffNeck: (n) => `BO ${n} st at neck edge`,
-  repeatOnce: (end, count) => `Rpt instruction once more, at RC ${pad(end)} (total ${count} times).`,
+  repeatOnce: (end, count) => `Rpt instruction once more, at RC ${pad(end)} (total ${plural(count, 'time')}).`,
   repeatRange: (a, b, count) =>
-    `Rpt instruction for RC ${pad(a)} to ${pad(b)} (total ${count} times).`,
+    `Rpt instruction for RC ${pad(a)} to ${pad(b)} (total ${plural(count, 'time')}).`,
   repeatEvery: (step, list, count) =>
-    `Rpt instruction every ${ordinal(step)} row, at RC ${andList(list)} (total ${count} times).`,
-  repeatAt: (list, count) => `Rpt instruction at RC ${andList(list)} (total ${count} times).`,
+    `Rpt instruction every ${ordinal(step)} row, at RC ${andList(list)} (total ${plural(count, 'time')}).`,
+  repeatAt: (list, count) => `Rpt instruction at RC ${andList(list)} (total ${plural(count, 'time')}).`,
   divideNeck: (_gap, rc, n) =>
     `Kn to RC ${pad(rc)}, then BO centre ${n} st loosely to divide for neck.`,
   parkRight: () => 'Put R side into hold; shape L side first.',
@@ -284,7 +294,7 @@ const TERSE: Vocab = {
     `Rpt last 2 instructions, holding ${count} N each time, to RC ${pad(rc)}.${TERSE.carr(carriage)}`,
   mitreHeading: () => 'Mitre the two ends.',
   mitreWork: (rc, count) =>
-    `In your chosen rib, dec 1 st at each end every row to RC ${pad(rc)} (${count} rows), tapering both ends.`,
+    `In your chosen rib, dec 1 st at each end every row to RC ${pad(rc)} (${plural(count, 'row')}), tapering both ends.`,
   mitreMeetNote: () => 'The two mitred ends seam at centre front in making up (the V point).',
   crossoverTitle: () => 'Alt point — crossed over.',
   crossoverBody: () =>
@@ -295,9 +305,6 @@ const TERSE: Vocab = {
     `Hang a contrast marker at ${andList(positions.map((p) => `st ${p}`))} (band meets the shoulder ${
       positions.length > 1 ? 'seams' : 'seam'
     }; match markers to seams to ease in).`,
-  foldedTitle: () => 'Alt band — mock rib / folded.',
-  foldedBody: () =>
-    'Mock rib or doubled band: knit twice the rows plain (or mock rib), pick the first row up (spare needles, or the last row for a plain band) to fold in half, take both off together on waste yarn. Sew on as before.',
 };
 
 
@@ -360,7 +367,7 @@ function handVocab(style: ProseStyle, units: Units): Vocab {
     // A hand knitter has no carriage; the facing is carried in the row instructions.
     carr: () => '',
     castOn: (n) =>
-      terse ? `CO ${n} st.` : `Cast on ${n} stitches.`,
+      terse ? `CO ${n} st.` : `Cast on ${sts(n)}.`,
     // Rib is worked on smaller needles, but there is no way to measure how much
     // smaller: it depends on the yarn and the knitter, and they have not swatched it.
     // So this is advice, and the rib's DEPTH is given as a measurement instead of a
@@ -384,13 +391,21 @@ function handVocab(style: ProseStyle, units: Units): Vocab {
       terse
         ? 'Rejoin yarn to the held stitches.'
         : 'Return the held stitches to a needle and rejoin the yarn, ready to work the second side.',
-    stitchCount: (n) => (terse ? `${n} st.` : `There should be ${n} stitches.`),
+    stitchCount: (n) => (terse ? `${n} st.` : `There should be ${sts(n)}.`),
     knitUntil: (_rc, lengthIn) =>
       terse ? `Work ${measure(lengthIn)}.` : `Continue in pattern ${measure(lengthIn)}.`,
     marker: () =>
       terse
         ? 'Mark each end of this row.'
         : 'Mark each end of this row with a contrast thread; the marks line up when you set the sleeve into the armhole.',
+    // Surfaced to the knitter what the shared row array leaves implicit: some shaping
+    // rows fall on the wrong side. We write those as leaning purl decreases by default,
+    // but a plain decrease is a perfectly good substitute — which is all the original
+    // ever asked for. See the note by actDecBoth on why the rows are not re-cadenced.
+    wsShapingNote: () =>
+      terse
+        ? 'Some shaping rows fall on the wrong side; these are given as purl decreases (p2tog/ssp) to lean the same way. A plain decrease is fine instead.'
+        : 'Some of these shaping rows fall on a wrong-side (purl) row. They are written as purl decreases — p2tog at the start of the row and ssp at the end — so they lean the same way as the ones worked on the right side. If you would rather keep it simple, work an ordinary decrease on those rows instead; the lean shows a little less but the fit is the same.',
     // Shaping is counted, not measured — you cannot measure your way to a decrease row.
     shapeLead: (gap, _rc, action) =>
       terse
@@ -451,27 +466,29 @@ function handVocab(style: ProseStyle, units: Units): Vocab {
     // a cast-off at each edge always costs a pair of rows. Naming the edge rather than a
     // side keeps it true whichever way the work is facing.
     actBindOffEdge: (n) =>
-      terse ? `cast off ${n} st at the start of the row` : `cast off ${n} stitches at the beginning of the row`,
+      terse ? `cast off ${n} st at the start of the row` : `cast off ${sts(n)} at the beginning of the row`,
     actBindOffNeck: (n) =>
-      terse ? `cast off ${n} st at the neck edge` : `cast off ${n} stitches at the neck edge`,
+      terse ? `cast off ${n} st at the neck edge` : `cast off ${sts(n)} at the neck edge`,
     repeatOnce: (_end, count) =>
-      terse ? `Rpt once more (${count} times in all).` : `Repeat the last instruction once more (${count} times in all).`,
+      terse
+        ? `Rpt once more (${plural(count, 'time')} in all).`
+        : `Repeat the last instruction once more (${plural(count, 'time')} in all).`,
     repeatRange: (_a, _b, count) =>
       terse
-        ? `Rpt on the next ${count - 1} rows (${count} times in all).`
-        : `Repeat the last instruction on each of the next ${count - 1} rows (${count} times in all).`,
+        ? `Rpt on the next ${plural(count - 1, 'row')} (${plural(count, 'time')} in all).`
+        : `Repeat the last instruction on each of the next ${plural(count - 1, 'row')} (${plural(count, 'time')} in all).`,
     repeatEvery: (step, _list, count) =>
       terse
-        ? `Rpt every ${ordinal(step)} row, ${count} times in all.`
-        : `Repeat the last instruction on every ${ordinal(step)} row until you have worked it ${count} times in all.`,
+        ? `Rpt every ${ordinal(step)} row, ${plural(count, 'time')} in all.`
+        : `Repeat the last instruction on every ${ordinal(step)} row until you have worked it ${plural(count, 'time')} in all.`,
     repeatAt: (list, count) =>
       terse
-        ? `Rpt ${count - 1} more times.`
-        : `Repeat the last instruction ${count - 1} more times (${count} times in all).`,
+        ? `Rpt ${count - 1} more ${count - 1 === 1 ? 'time' : 'times'}.`
+        : `Repeat the last instruction ${count - 1} more ${count - 1 === 1 ? 'time' : 'times'} (${plural(count, 'time')} in all).`,
     divideNeck: (gap, _rc, n) =>
       terse
         ? `Work ${gap === 1 ? '1 row' : `${gap} rows`}, then cast off the centre ${n} st to divide for the neck.`
-        : `Work ${gap === 1 ? '1 row' : `${gap} rows`}, then cast off the centre ${n} stitches loosely to divide for the neck. Work each side separately from here.`,
+        : `Work ${gap === 1 ? '1 row' : `${gap} rows`}, then cast off the centre ${sts(n)} loosely to divide for the neck. Work each side separately from here.`,
     // Machine parks half the bed; by hand you slip the waiting stitches onto a holder.
     parkRight: () =>
       terse
@@ -480,39 +497,39 @@ function handVocab(style: ProseStyle, units: Units): Vocab {
     castingOff: () => (terse ? 'Shaping the shoulder.' : 'Shaping the shoulder.'),
     breakYarnGraft: () =>
       terse ? 'Break the yarn, leaving a long tail.' : 'Break the yarn, leaving a tail long enough to join the shoulder.',
-    bindOffCentre: (n) => (terse ? `Cast off the centre ${n} st loosely.` : `Cast off the centre ${n} stitches loosely.`),
+    bindOffCentre: (n) => (terse ? `Cast off the centre ${n} st loosely.` : `Cast off the centre ${sts(n)} loosely.`),
     bindOffRemainingCap: (n) =>
-      terse ? `Cast off the remaining ${n} st loosely.` : `Cast off the remaining ${n} stitches loosely to close the cap.`,
-    bindOffAll: (n) => (terse ? `Cast off all ${n} st loosely.` : `Cast off all ${n} stitches loosely.`),
+      terse ? `Cast off the remaining ${n} st loosely.` : `Cast off the remaining ${sts(n)} loosely to close the cap.`,
+    bindOffAll: (n) => (terse ? `Cast off all ${n} st loosely.` : `Cast off all ${sts(n)} loosely.`),
     // Shoulders are short-rowed, then left LIVE on a holder so the two can be joined
     // with a three-needle cast off. Grafting is not used here: it makes a soft join, and
     // a shoulder carries the weight of the garment.
     takeShouldersEach: (n) =>
       terse
         ? `Slip each shoulder onto its own holder — ${n} st each.`
-        : `Slip each shoulder onto its own holder, leaving the stitches live. There should be ${n} stitches on each shoulder.`,
+        : `Slip each shoulder onto its own holder, leaving the stitches live. There should be ${sts(n)} on each shoulder.`,
     takeShoulderThis: (n) =>
       terse
         ? `Slip this shoulder onto a holder — ${n} st.`
-        : `Slip this shoulder onto a holder, leaving the stitches live. There should be ${n} stitches on this shoulder.`,
+        : `Slip this shoulder onto a holder, leaving the stitches live. There should be ${sts(n)} on this shoulder.`,
     // The starting point is not decoration: the chart sites the V mitre by counting
     // along from here, so a knitter who began somewhere else would decrease in the
     // wrong place. Prose and chart have to agree about where stitch 1 is.
     pickUp: (n) =>
       terse
         ? `From the open shoulder, pick up and knit ${n} st evenly round the neck, back neck first.`
-        : `With the right side facing and beginning at the open shoulder, pick up and knit ${n} stitches evenly around the neck edge — across the back neck first, then down and around the front — knitting across the held stitches as you reach them.`,
+        : `With the right side facing and beginning at the open shoulder, pick up and knit ${sts(n)} evenly around the neck edge — across the back neck first, then down and around the front — knitting across the held stitches as you reach them.`,
     setHold: () => '',
     // Short rows by hand: leave the stitches unworked and turn. Working the wrap in on
     // the following row is what closes the hole at the turn.
     holdGroup: (count) =>
       terse
         ? `Leave ${count} st unworked, turn.`
-        : `Leave the last ${count} stitches of the row unworked and turn, ready to work back.`,
+        : `Leave the last ${sts(count)} of the row unworked and turn, ready to work back.`,
     holdRepeatBack: (count) =>
       terse
         ? `Rpt, leaving ${count} st each time, to the end of the shoulder.`
-        : `Repeat the last two instructions, leaving ${count} stitches unworked each time, until every shoulder stitch has been left unworked.`,
+        : `Repeat the last two instructions, leaving ${sts(count)} unworked each time, until every shoulder stitch has been left unworked.`,
     mitreHeading: () =>
       terse
         ? 'Shaping the V point. Mark the centre stitch.'
@@ -523,22 +540,20 @@ function handVocab(style: ProseStyle, units: Units): Vocab {
       // separate decreases flanking the centre leave the centre stitch unconsumed and
       // give two shaping lines instead of the single unbroken one a mitre wants.
       terse
-        ? `Work a centred double decrease at the marked centre st every other row, ${count} times.`
-        : `Work a centred double decrease at the marked centre stitch on every other row, ${count} times in all, so the centre stitch rides over the top as an unbroken line down the point of the V.`,
+        ? `Work a centred double decrease at the marked centre st every other row, ${plural(count, 'time')}.`
+        : `Work a centred double decrease at the marked centre stitch on every other row, ${plural(count, 'time')} in all, so the centre stitch rides over the top as an unbroken line down the point of the V.`,
     mitreMeetNote: () => '',
     crossoverTitle: () => '',
     crossoverBody: () => '',
     takeOff: (n) =>
-      terse ? `Slip all ${n} st onto a holder.` : `Slip all ${n} stitches onto a holder, leaving them live.`,
+      terse ? `Slip all ${n} st onto a holder.` : `Slip all ${sts(n)} onto a holder, leaving them live.`,
     bandCastOff: (n) =>
       terse
         ? `Cast off all ${n} st loosely in rib.`
-        : `Cast off all ${n} stitches loosely in rib — a tight cast-off here will stop the neck going over the head.`,
+        : `Cast off all ${sts(n)} loosely in rib — a tight cast-off here will stop the neck going over the head.`,
     // A picked-up band is worked straight onto the neckline, so there is nothing to
     // ease on and no seam for a marker to line up with.
     markWaypoints: () => '',
-    foldedTitle: () => '',
-    foldedBody: () => '',
   };
 }
 
@@ -780,11 +795,13 @@ export function renderPiece(
         announced.add(key);
         heading('Shape the armholes.');
         say(v.marker());
+        say(v.wsShapingNote());
         break;
       case 'cap':
         announced.add(key);
         heading('Shape the cap.');
         say(v.marker());
+        say(v.wsShapingNote());
         break;
       case 'shoulder':
         announced.add(key);
@@ -995,7 +1012,6 @@ export function renderPiece(
     const carriageAt = new Map(shapeRows.map((r) => [counter(r.index), r.carriage]));
     // Right side is the odd row, working flat from a cast-on. A phase whose rows are
     // all one parity is worked wholly on that face; an every-row phase alternates.
-    const indexAt = new Map(shapeRows.map((r) => [counter(r.index), r.index]));
     const facingOf = (p: Phase): Facing => {
       const covered = shapeRows.filter((r) => {
         const c = counter(r.index);
@@ -1023,18 +1039,12 @@ export function renderPiece(
     i = j;
   }
 
-  // The neckband (it ends by coming off on waste yarn) carries its alternatives as
-  // extra info: a mock-rib / folded band for any band, and — for a V — the crossed-over
-  // point instead of the mitre. Neither is a construction fork (see the memory notes).
-  if (rows.some((r) => r.section === 'take_off')) {
+  // For a V-neckband, the prose adds the crossed-over point as an alternative to the
+  // mitre (see the memory notes). Extra info, not a construction fork.
+  if (rows.some((r) => r.section === 'mitre')) {
     lines.push('');
-    say(v.foldedTitle());
-    say(v.foldedBody());
-    if (rows.some((r) => r.section === 'mitre')) {
-      lines.push('');
-      say(v.crossoverTitle());
-      say(v.crossoverBody());
-    }
+    say(v.crossoverTitle());
+    say(v.crossoverBody());
   }
 
   // Members with no equivalent in this register return an empty string (a hand knitter

@@ -39,12 +39,15 @@ export function evenRows(count: number, span: number): number[] {
  */
 const CAP_FILL = 0.86;
 /**
- * Crown width as a fraction of the sleeve top: the flat top the cap binds off. Real
- * caps taper to a narrow crown (Anthony: 9–17 sts over a 69–99 st top, ~0.12–0.17),
- * which is what lets the cap climb tall instead of spreading flat. Floored at
- * MIN_CROWN_IN so a small sleeve's cap does not taper to a spike.
+ * Crown width as a fraction of the sleeve top: the flat top the cap binds off. A set-in
+ * cap keeps a broad flat crown that sits along the top of the armhole; too narrow a crown
+ * and the sleeve pulls to a peak at the shoulder instead of lying flat. Calibrated to
+ * Knitware's ground truth, whose crown is a steady ~0.28 of the sleeve top across the whole
+ * size range (baby ~9 → large adult ~25 sts; 26–33% measured). This supersedes an earlier
+ * 0.14 taken from one modern pattern (Berroco Anthony) that made adult caps spike to a
+ * ~2" point. Floored at MIN_CROWN_IN so a small sleeve's cap does not taper to a spike.
  */
-const CROWN_FRACTION = 0.14;
+const CROWN_FRACTION = 0.28;
 const MIN_CROWN_IN = 1.5;
 /** Decreases worked every row at each end of the cap (the fast bell ends). */
 const CAP_FAST_EACH_END = 3;
@@ -112,7 +115,7 @@ export function sleevePlan(
     };
   }
 
-  const underarmCastOff = armholeShaping(body.bodySts, body.upperBackSts, gauge).castOffPerSide;
+  const underarmCastOff = armholeShaping(body.bodySts, body.upperBackSts).castOffPerSide;
   // Crown: a narrow flat top (CROWN_FRACTION of the sleeve top, floored), even so the
   // symmetric decreases empty the base to it exactly. The per-side decrease count is
   // whatever it takes to get from the (post-underarm) base down to the crown.

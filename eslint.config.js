@@ -8,6 +8,22 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    // An underscore prefix marks a binding that is deliberately unused: a parameter kept
+    // to satisfy a shared interface (the prose Vocab members that a given register
+    // ignores), a positional argument before one that is used, or a caught error we do
+    // not inspect. This is the convention already used throughout the code.
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
+    },
+  },
+  {
     // Architecture rule #1 (CLAUDE.md): the engine is pure — zero I/O, no DOM,
     // no React, and it must not depend on the app. Enforced here so a stray
     // import fails lint rather than being caught in review.

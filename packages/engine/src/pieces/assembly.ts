@@ -71,7 +71,7 @@ export function assemblyReport(
   shoulder: ShoulderStyle = 'set_in',
 ): AssemblyReport {
   const bp = backPlan(size, style, gauge, shoulder);
-  const shaping = armholeShaping(bp.bodySts, bp.upperBackSts, gauge);
+  const shaping = armholeShaping(bp.bodySts, bp.upperBackSts);
   const achieved = shaping.achievedSts;
   const backShoulder = Math.round((achieved - bp.backNeckSts) / 2);
   const front = frontNeckPlan(size, style, gauge, neck, shoulder);

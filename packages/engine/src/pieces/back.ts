@@ -50,9 +50,21 @@ export interface BackPlan {
   };
 }
 
-/** Hip-length body length from the size table (L1: passthrough, no ease-style ease). */
+/**
+ * The nape-to-shoulder rise. The raw body length (neck_to_waist + waist_to_hip) is measured
+ * to the NAPE; a garment hangs from the shoulder seam, which sits below the nape by the
+ * neck/shoulder rise, so that rise comes off the length. It saturates — a baby's shoulders
+ * sit at the nape (~0"), an adult's neck rises ~1.5" above the shoulder — and tracks
+ * neck_depth. Calibrated to Knitware's finished Body Length across all 14 harvested sizes
+ * (baby → man), residual ≤ ~0.4" (2–3 rows). See knitware-shaping-diff-batch1.
+ */
+function neckRiseInches(size: SizeRecord): number {
+  return Math.min(1.6, Math.max(0, (size.neck_depth - 1.7) * 2.3));
+}
+
+/** Hip-length body length to the SHOULDER line (nape-to-hip, less the neck/shoulder rise). */
 function bodyLengthInches(size: SizeRecord): number {
-  return size.neck_to_waist + size.waist_to_hip;
+  return size.neck_to_waist + size.waist_to_hip - neckRiseInches(size);
 }
 
 export function backPlan(
@@ -81,7 +93,7 @@ export function backPlan(
   // Back-neck scoop shaping (single source for backRows and the neckband). The curve
   // is capped so its cast-offs + decreases fit in the scoop depth alongside the
   // short-row shoulders, and so the flat centre stays positive.
-  const achieved = armholeShaping(bodySts, upperBackSts, gauge).achievedSts;
+  const achieved = armholeShaping(bodySts, upperBackSts).achievedSts;
   const backShoulderSts = Math.round((achieved - backNeckSts) / 2);
   const backSteps = splitIntoSteps(backShoulderSts, SHOULDER_STEP_STS);
   const backNeckPerSide = Math.max(
@@ -201,10 +213,14 @@ export interface ArmholeShaping {
 export function armholeShaping(
   castOnSts: number,
   targetSts: number,
-  gauge: Gauge,
 ): ArmholeShaping {
   const perSide = Math.round((castOnSts - targetSts) / 2);
-  const castOffPerSide = Math.min(stitchesFor(1.0, gauge), perSide); // ~1" underarm
+  // The underarm cast-off scales with garment WIDTH, not a fixed inch. Knitware casts
+  // off ~5% of the half-chest panel across the whole range (baby ~2 → large adult ~8);
+  // matched to the stitch on 12 of 13 harvested sizes. A fixed 1" over-cuts small sizes
+  // (a baby lost 5 where Knitware takes 2) and under-cuts large ones. Capped at perSide
+  // (never more than the whole armhole decrease — a tiny armhole is all cast-off, no taper).
+  const castOffPerSide = Math.min(perSide, Math.round(0.05 * castOnSts));
   const d = Math.max(0, perSide - castOffPerSide);
   const fast = Math.round(d * 0.3); // every row
   const gentle = Math.round(d * 0.2); // every 4th row
@@ -234,7 +250,7 @@ export function panelThroughArmhole(
   // A drop shoulder has no armhole shaping — the body runs straight; the armhole
   // region is just the upper part of the straight side, added above by the piece.
   if (shoulder === 'drop') return rows;
-  const shaping = armholeShaping(plan.bodySts, plan.upperBackSts, gauge);
+  const shaping = armholeShaping(plan.bodySts, plan.upperBackSts);
 
   let index = rows.length; // last body row (underarm)
   let stitches = plan.bodySts;
