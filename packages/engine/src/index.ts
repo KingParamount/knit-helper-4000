@@ -33,7 +33,13 @@ export type { RawRule, EngineLimit } from './data/constraints';
 export { validate } from './validate';
 export type { Selection, Violation, ValidationResult } from './validate';
 
-export { garmentWidths, chestEase, SETIN_ALLOWANCE_IN } from './dimensions';
+export {
+  garmentWidths,
+  chestEase,
+  SETIN_ALLOWANCE_IN,
+  SLEEVELESS_ARMHOLE_DEEPEN_IN,
+  SLEEVELESS_BACK_NARROW_IN,
+} from './dimensions';
 export type { GarmentWidths } from './dimensions';
 
 export {
@@ -81,6 +87,9 @@ export type { HemPlan } from './pieces/hem';
 export { PICKUP_PER_ROW, pickupPerRow, neckbandPlan, neckbandRows } from './pieces/neckband';
 export type { NeckbandPlan } from './pieces/neckband';
 
+export { armholeBandPlan, armholeBandRows } from './pieces/armhole-band';
+export type { ArmholeBandPlan } from './pieces/armhole-band';
+
 export { assembleGarment } from './pieces/garment';
 export type { Garment } from './pieces/garment';
 
@@ -125,6 +134,7 @@ export {
   frontSchematic,
   sleeveSchematic,
   neckbandSchematic,
+  armholeBandSchematic,
   schematicSvg,
   schematicMetrics,
 } from './render/schematic';

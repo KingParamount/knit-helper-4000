@@ -254,7 +254,9 @@ export function PrintDoc({
         // Identity comes from the piece itself, not its position. The hand pattern
         // slots a making-up block in front of the neckband so it can be worked in
         // order, which shifts every index after it.
-        const id = piece.piece;
+        // The sleeveless armhole band occupies the 'sleeve' schematic slot, so its prose
+        // piece ('armband') looks its chart up there.
+        const id = piece.piece === 'armband' ? 'sleeve' : piece.piece;
         // Landscape charts fit the page WIDTH and run down it in full-width bands,
         // one per sheet. Splitting only one way means no sheet is ever a corner
         // sliver, and a chart is read row by row anyway, so a horizontal strip is

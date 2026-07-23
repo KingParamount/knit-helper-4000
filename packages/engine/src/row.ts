@@ -5,7 +5,7 @@
 
 export type Carriage = 'L' | 'R';
 
-export type Piece = 'back' | 'front' | 'sleeve_l' | 'sleeve_r' | 'collar';
+export type Piece = 'back' | 'front' | 'sleeve_l' | 'sleeve_r' | 'collar' | 'armband';
 
 /**
  * A shaping event on a row. `both` = the same at each end of the row; `center`

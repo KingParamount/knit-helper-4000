@@ -37,7 +37,7 @@ export interface PieceProse {
    * by position in the pieces array, which broke the moment hand knitting split its
    * making-up in two and moved a block in front of the neckband.
    */
-  piece?: 'back' | 'front' | 'sleeve' | 'neckband';
+  piece?: 'back' | 'front' | 'sleeve' | 'neckband' | 'armband';
 }
 
 export type ProseStyle = 'verbose' | 'abbreviated';
@@ -154,6 +154,8 @@ interface Vocab {
   takeShouldersEach(n: number): string;
   takeShoulderThis(n: number): string;
   pickUp(n: number): string;
+  /** Hand only: pick a band up around an armhole (the sleeveless armhole band). */
+  pickUpArmhole(n: number): string;
   setHold(): string;
   holdGroup(count: number, side: Carriage, rc: number): string;
   holdRepeatBack(count: number, rc: number, carriage: Carriage): string;
@@ -275,6 +277,7 @@ const VERBOSE: Vocab = {
   takeShoulderThis: (n) =>
     `Take this shoulder off onto 5-6 rows of waste yarn. There should be ${sts(n)} on this shoulder.`,
   pickUp: (n) => `Pick up and knit ${sts(n)} evenly around the neck edge ${splitV(n)}.`,
+  pickUpArmhole: (n) => `Pick up and knit ${sts(n)} evenly around the armhole edge ${splitV(n)}.`,
   setHold: () => 'Set the carriage to hold.',
   holdGroup: (count, side, rc) =>
     `Bring ${plural(count, 'needle')} at the ${sideWord(side)} into hold, then knit to row counter ${pad(rc)}.`,
@@ -376,6 +379,7 @@ const TERSE: Vocab = {
   takeShouldersEach: (n) => `Take shoulders off to waste yarn. ${n} st per shoulder.`,
   takeShoulderThis: (n) => `Take shoulder off to waste yarn. ${n} st per shoulder.`,
   pickUp: (n) => `PU ${n} st around neck edge ${splitT(n)}.`,
+  pickUpArmhole: (n) => `PU ${n} st around armhole edge ${splitT(n)}.`,
   setHold: () => 'Set carriage to hold.',
   holdGroup: (count, side, rc) => `${count} N at ${side} into hold, then Kn to RC ${pad(rc)}.`,
   holdRepeatBack: (count, rc, carriage) =>
@@ -672,6 +676,10 @@ function handVocab(style: ProseStyle, units: Units): Vocab {
       terse
         ? `From the open shoulder, pick up and knit ${n} st evenly round the neck, back neck first.`
         : `With the right side facing and beginning at the open shoulder, pick up and knit ${sts(n)} evenly around the neck edge — across the back neck first, then down and around the front — knitting across the held stitches as you reach them.`,
+    pickUpArmhole: (n) =>
+      terse
+        ? `From the underarm, pick up and knit ${n} st evenly round the armhole.`
+        : `With the right side facing and beginning at the underarm seam, pick up and knit ${sts(n)} evenly around the armhole edge.`,
     setHold: () => '',
     // Short rows by hand: leave the stitches unworked and turn. Working the wrap in on
     // the following row is what closes the hole at the turn.
@@ -1054,6 +1062,7 @@ export function renderPiece(
       // a hand knitter picks the stitches up straight off the neckline and carries on,
       // which is why the hand version needs no easing markers and no seam for the band.
       if (technique === 'hand' && row.piece === 'collar') say(v.pickUp(n));
+      else if (technique === 'hand' && row.piece === 'armband') say(v.pickUpArmhole(n));
       else say(v.castOn(n, otherSide(row.carriage)));
       // The tension line follows the hem: rib (and the neckband, whose cast-on row is
       // its own section) keeps the historical rib-tension line; the other hem styles
@@ -1109,7 +1118,12 @@ export function renderPiece(
       // the band is sewn on later. A hand knitter's band was picked up and worked in
       // place, so it is finished here — cast off, not held. Body pieces still hold
       // live, for the three-needle join at the shoulder.
-      if (technique === 'hand' && row.piece === 'collar') say(v.bandCastOff((ev.op as { count: number }).count));
+      // Hand: a picked-up band is finished here — cast off, not held. The neckband's
+      // cast-off warns about clearing the head; an armhole band takes a plainer note.
+      if (technique === 'hand' && row.piece === 'collar')
+        say(v.bandCastOff((ev.op as { count: number }).count));
+      else if (technique === 'hand' && row.piece === 'armband')
+        say(v.bindOffAll((ev.op as { count: number }).count));
       else say(v.takeOff((ev.op as { count: number }).count));
       i += 1;
       continue;
@@ -1260,6 +1274,7 @@ export function renderPiece(
     p0 === 'back' ? 'back'
     : p0 === 'front' ? 'front'
     : p0 === 'collar' ? 'neckband'
+    : p0 === 'armband' ? 'armband'
     : p0 === 'sleeve_l' || p0 === 'sleeve_r' ? 'sleeve'
     : undefined;
   return { title, lines: tidied, piece };
@@ -1464,7 +1479,12 @@ function handBeforeBandProse(style: ProseStyle, shoulder: ShoulderStyle = 'set_i
   return { title: 'Joining the First Shoulder', lines };
 }
 
-function handMakingUpProse(neck: NeckStyle, shoulder: ShoulderStyle, style: ProseStyle): PieceProse {
+function handMakingUpProse(
+  neck: NeckStyle,
+  shoulder: ShoulderStyle,
+  style: ProseStyle,
+  sleeveless = false,
+): PieceProse {
   const verbose = style !== 'abbreviated';
   const lines: string[] = [];
   const stretchy = 'a stretchy seam such as mattress stitch';
@@ -1529,28 +1549,44 @@ function handMakingUpProse(neck: NeckStyle, shoulder: ShoulderStyle, style: Pros
       : 'Join the second shoulder, through the band ends.',
   );
 
-  // 4 — sleeves.
-  lines.push('');
-  if (shoulder === 'drop') {
-    lines.push(
-      verbose
-        ? `Sew in the sleeves. Centre each sleeve's straight top edge on the shoulder seam and sew it to the straight armhole edge down each side, using ${stretchy}.`
-        : `Sew in the sleeves: straight top to the armhole edge, centred on the shoulder seam.`,
-    );
-  } else {
-    lines.push(
-      verbose
-        ? `Set in the sleeves. Ease each sleeve cap into its armhole, matching the top of the cap to the shoulder seam and the underarm cast-offs to each other, using ${stretchy}.`
-        : `Set in the sleeves: ease each cap into its armhole, cap top to shoulder seam.`,
-    );
+  // 4 — sleeves (skipped for sleeveless; the bands are picked up after the sides close).
+  if (!sleeveless) {
+    lines.push('');
+    if (shoulder === 'drop') {
+      lines.push(
+        verbose
+          ? `Sew in the sleeves. Centre each sleeve's straight top edge on the shoulder seam and sew it to the straight armhole edge down each side, using ${stretchy}.`
+          : `Sew in the sleeves: straight top to the armhole edge, centred on the shoulder seam.`,
+      );
+    } else {
+      lines.push(
+        verbose
+          ? `Set in the sleeves. Ease each sleeve cap into its armhole, matching the top of the cap to the shoulder seam and the underarm cast-offs to each other, using ${stretchy}.`
+          : `Set in the sleeves: ease each cap into its armhole, cap top to shoulder seam.`,
+      );
+    }
   }
 
   lines.push('');
   lines.push(
-    verbose
-      ? 'Join the sides: seam each side and its sleeve underarm in one line, from the cuff to the hem.'
-      : 'Join the sides: cuff to hem in one line each side.',
+    sleeveless
+      ? verbose
+        ? 'Join the sides: seam each side from the base of the armhole down to the hem.'
+        : 'Join the sides: armhole to hem each side.'
+      : verbose
+        ? 'Join the sides: seam each side and its sleeve underarm in one line, from the cuff to the hem.'
+        : 'Join the sides: cuff to hem in one line each side.',
   );
+
+  // Sleeveless: work each armhole band in place, now the armhole is a closed loop.
+  if (sleeveless) {
+    lines.push('');
+    lines.push(
+      verbose
+        ? 'Work the two armhole bands (above): with each armhole now a closed loop, pick up around it from the underarm seam, work the band, and cast off loosely.'
+        : 'Work the two armhole bands (above): pick up round each closed armhole, work, cast off loosely.',
+    );
+  }
 
   lines.push('');
   lines.push(
@@ -1566,8 +1602,9 @@ export function makingUpProse(
   shoulder: ShoulderStyle,
   style: ProseStyle = 'verbose',
   technique: Technique = 'machine',
+  sleeveless = false,
 ): PieceProse {
-  if (technique === 'hand') return handMakingUpProse(neck, shoulder, style);
+  if (technique === 'hand') return handMakingUpProse(neck, shoulder, style, sleeveless);
   const verbose = style !== 'abbreviated';
   const lines: string[] = [];
   const stretchy = verbose ? 'a stretchy join (e.g. mattress stitch)' : 'stretchy join (e.g. mattress stitch)';
@@ -1702,29 +1739,47 @@ export function makingUpProse(
       : 'Join right shoulder (front-right to back-right); closes the band ends.',
   );
 
-  // 4 — the sleeves into the armholes (the set-in vs drop difference lives here).
-  lines.push('');
-  if (shoulder === 'drop') {
-    lines.push(
-      verbose
-        ? `Sew in the sleeves. Centre each sleeve’s straight top edge on the shoulder seam and sew it to the straight armhole edge down each side. Use ${stretchy}.`
-        : `Sew in the sleeves: straight top to the armhole edge, centred on the shoulder seam. ${cap(stretchy)}.`,
-    );
-  } else {
-    lines.push(
-      verbose
-        ? `Set in the sleeves. Ease each sleeve cap into its armhole, lining the top of the cap up with the shoulder seam and the underarm cast-offs together. Use ${stretchy}.`
-        : `Set in the sleeves: ease each cap into its armhole, cap top to shoulder seam. ${cap(stretchy)}.`,
-    );
+  // 4 — the sleeves into the armholes (the set-in vs drop difference lives here). A
+  // sleeveless garment has no sleeve; its bands go on after the sides are closed (step 5).
+  if (!sleeveless) {
+    lines.push('');
+    if (shoulder === 'drop') {
+      lines.push(
+        verbose
+          ? `Sew in the sleeves. Centre each sleeve’s straight top edge on the shoulder seam and sew it to the straight armhole edge down each side. Use ${stretchy}.`
+          : `Sew in the sleeves: straight top to the armhole edge, centred on the shoulder seam. ${cap(stretchy)}.`,
+      );
+    } else {
+      lines.push(
+        verbose
+          ? `Set in the sleeves. Ease each sleeve cap into its armhole, lining the top of the cap up with the shoulder seam and the underarm cast-offs together. Use ${stretchy}.`
+          : `Set in the sleeves: ease each cap into its armhole, cap top to shoulder seam. ${cap(stretchy)}.`,
+      );
+    }
   }
 
-  // 5 — sides + underarms in one line.
+  // 5 — sides. A sleeved garment runs the side and the sleeve underarm in one line; a
+  // sleeveless one seams the side alone, armhole to hem.
   lines.push('');
   lines.push(
-    verbose
-      ? 'Join the sides: seam each side and its sleeve underarm in one line, from the cuff to the hem.'
-      : 'Join the sides: cuff to hem in one line each side.',
+    sleeveless
+      ? verbose
+        ? 'Join the sides: seam each side from the base of the armhole down to the hem.'
+        : 'Join the sides: armhole to hem each side.'
+      : verbose
+        ? 'Join the sides: seam each side and its sleeve underarm in one line, from the cuff to the hem.'
+        : 'Join the sides: cuff to hem in one line each side.',
   );
+
+  // 5b — sleeveless: the armhole bands, once each armhole is a closed loop.
+  if (sleeveless) {
+    lines.push('');
+    lines.push(
+      verbose
+        ? `Sew the armhole bands on. Starting at the underarm seam, ease each band’s live edge round its armhole and back to the start. Use ${stretchy} so the armhole still stretches.`
+        : `Sew each armhole band on from the underarm, round and back. ${cap(stretchy)}.`,
+    );
+  }
 
   // 6 — finish.
   lines.push('');
@@ -1836,6 +1891,7 @@ export function renderPattern(
     back: Row[];
     front: Row[];
     sleeveLeft: Row[];
+    armholeBand?: Row[];
     neckband: Row[];
     neck: NeckStyle;
     shoulder: ShoulderStyle;
@@ -1845,13 +1901,17 @@ export function renderPattern(
   const o: PieceOpts = typeof styleOrOpts === 'string' ? { style: styleOrOpts } : styleOrOpts;
   const style = o.style ?? 'verbose';
   const technique = o.technique ?? 'machine';
+  const sleeveless = !!garment.armholeBand && garment.sleeveLeft.length === 0;
   const body = [
     renderPiece(garment.back, 'The Back', o),
     renderPiece(garment.front, 'The Front', o),
-    renderPiece(garment.sleeveLeft, 'The Sleeves (make 2)', o),
+    // Sleeveless swaps the sleeve piece for an armhole band, worked twice.
+    sleeveless
+      ? renderPiece(garment.armholeBand!, 'The Armhole Bands (make 2)', o)
+      : renderPiece(garment.sleeveLeft, 'The Sleeves (make 2)', o),
   ];
   const band = renderPiece(garment.neckband, 'Neckband', o);
-  const makingUp = makingUpProse(garment.neck, garment.shoulder, style, technique);
+  const makingUp = makingUpProse(garment.neck, garment.shoulder, style, technique, sleeveless);
   // A hand knitter picks the band up off a neckline that only exists once a shoulder is
   // joined, so that join has to precede the band for the pattern to be workable in
   // order. A machine band is a separate strip, so all of its making-up waits to the end.

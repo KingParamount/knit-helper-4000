@@ -163,7 +163,7 @@ export function backPlan(
   backNeck: BackNeckStyle = 'scoop',
   opts: GarmentOptions = {},
 ): BackPlan {
-  const w = garmentWidths(size, style, shoulder);
+  const w = garmentWidths(size, style, shoulder, opts.sleeveLength === 'sleeveless');
 
   // Two side seams, each eating a stitch from this panel's edges — cut it wider so
   // the sewn-up garment measures what the pattern says. Adding two keeps it even.

@@ -659,6 +659,38 @@ export function neckbandSchematic(
   };
 }
 
+/**
+ * The armhole band — a plain rib rectangle (no mitre), the length of one armhole edge
+ * and the band depth. Worked twice; sewn round each armhole (sleeveless).
+ */
+export function armholeBandSchematic(
+  plan: { pickupTotal: number; bandRows: number },
+  gauge: Gauge,
+): PieceSchematic {
+  const half = plan.pickupTotal / 2;
+  const h = plan.bandRows;
+  const outline: Pt[] = [
+    { x: half, y: 0 },
+    { x: half, y: h },
+    { x: -half, y: h },
+    { x: -half, y: 0 },
+  ];
+  return {
+    piece: 'armband',
+    title: 'The Armhole Bands (make 2)',
+    outline,
+    widthSts: plan.pickupTotal,
+    heightRows: h,
+    ribRows: h, // all rib
+    gauge,
+    measures: [
+      { kind: 'width', label: 'cast on', sts: plan.pickupTotal, at: 0, from: -half, to: half },
+      { kind: 'height', label: 'band', rows: h, at: 0, from: 0, to: h },
+    ],
+    marks: [],
+  };
+}
+
 // ---------------------------------------------------------------------------
 // SVG rendering.
 // ---------------------------------------------------------------------------

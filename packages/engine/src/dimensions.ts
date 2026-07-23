@@ -51,6 +51,17 @@ export const DROP_ARMHOLE_ALLOWANCE_IN = 0.5;
 export const RAGLAN_ALLOWANCE_IN = 2.0;
 
 /**
+ * A sleeveless armhole is cut differently from a sleeved one: with no sleeve cap to ease
+ * in, it sits closer to the body so it does not gape. It runs a touch DEEPER (the underarm
+ * drops a little) and NARROWER across the back (the shoulder line comes in), which is what
+ * a fitted vest/tank wants. Grounded in the Knitware harvest (Woman 56 sleeveless vs
+ * sleeved: armhole ~4 rows deeper, across-back ~6 sts / ~1" narrower, shoulder narrower).
+ * The narrowing is clamped so the shoulder never drops below MIN_SHOULDER_IN (see fit.ts).
+ */
+export const SLEEVELESS_ARMHOLE_DEEPEN_IN = 0.5;
+export const SLEEVELESS_BACK_NARROW_IN = 0.75;
+
+/**
  * Ease around the upper arm, scaled to the fit style. A snug (skintight/tight) fit is
  * snug over the bicep; a standard fit is comfortable; a loose fit is roomy — clamped
  * so the sleeve always clears the arm and never asks more cap than the armhole can take.
@@ -81,11 +92,16 @@ export function chestEase(size: SizeRecord, style: EaseStyleId): number {
   return easeBase(style) * size.ease_factor;
 }
 
-/** The finished widths for a straight-body garment, for the given shoulder style. */
+/**
+ * The finished widths for a straight-body garment, for the given shoulder style. When
+ * `sleeveless`, the armhole is cut deeper and the across-back narrower (no sleeve to ease
+ * in) — see SLEEVELESS_* above.
+ */
 export function garmentWidths(
   size: SizeRecord,
   style: EaseStyleId,
   shoulder: ShoulderStyle = 'set_in',
+  sleeveless = false,
 ): GarmentWidths {
   const ease = chestEase(size, style);
   let armholeDepth: number;
@@ -105,11 +121,18 @@ export function garmentWidths(
     armholeDepth = size.arm_depth + SETIN_ALLOWANCE_IN.armholeDepth;
     sleeveTop = size.upper_arm + upperArmEase(size, style);
   }
+  // Sleeveless closes the armhole toward the body: deeper, and narrower across the back.
+  if (sleeveless) armholeDepth += SLEEVELESS_ARMHOLE_DEEPEN_IN;
+  const backWidth =
+    size.back_width +
+    SETIN_ALLOWANCE_IN.backWidth -
+    (sleeveless ? SLEEVELESS_BACK_NARROW_IN : 0);
+
   return {
     unit: 'in',
     chestEase: ease,
     chest: size.chest + ease, // bust-only; hip clearance handled later by length model
-    backWidth: size.back_width + SETIN_ALLOWANCE_IN.backWidth,
+    backWidth,
     armholeDepth,
     armhole: 2 * armholeDepth, // manual.txt:257,506 — around = twice the depth
     sleeveTop,

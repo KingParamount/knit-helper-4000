@@ -204,11 +204,14 @@ export function fitReport(
   backNeck: BackNeckStyle = 'scoop',
   opts: GarmentOptions = {},
 ): FitReport {
-  const w = garmentWidths(size, style, shoulder);
+  const sleeveless = opts.sleeveLength === 'sleeveless';
+  const w = garmentWidths(size, style, shoulder, sleeveless);
   const bodyLength = opts.bodyLength ?? 'hip';
   const neckFit = neckFitVerdict(size, neck, backNeck);
   const upperArmEase = w.sleeveTop - size.upper_arm;
-  const shoulderWidth = (size.back_width - size.back_neck) / 2;
+  // Read the shoulder off the FINISHED back width, so a sleeveless narrowing is checked
+  // against MIN_SHOULDER_IN (a sleeved garment's w.backWidth == back_width, unchanged).
+  const shoulderWidth = (w.backWidth - size.back_neck) / 2;
   const chestEase = w.chest - size.chest;
 
   const checks: FitCheck[] = [
@@ -230,11 +233,13 @@ export function fitReport(
       ok: style === 'skintight' || chestEase > 0,
       detail: `${chestEase >= 0 ? '+' : ''}${chestEase.toFixed(1)}"`,
     },
-    {
-      label: 'sleeve clears the arm',
-      ok: upperArmEase >= MIN_UPPER_ARM_EASE_IN,
-      detail: `bicep ease +${upperArmEase.toFixed(1)}" (scales with fit style)`,
-    },
+    sleeveless
+      ? { label: 'sleeve clears the arm', ok: true, detail: 'n/a (sleeveless)' }
+      : {
+          label: 'sleeve clears the arm',
+          ok: upperArmEase >= MIN_UPPER_ARM_EASE_IN,
+          detail: `bicep ease +${upperArmEase.toFixed(1)}" (scales with fit style)`,
+        },
     {
       // Straight body to the armholes is the standard construction (agreed), so a
       // hip wider than the chest is only tight at deliberately-snug styles. Informational.

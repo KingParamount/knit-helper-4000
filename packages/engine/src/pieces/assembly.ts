@@ -21,6 +21,8 @@ import { backPlan, armholeShaping, lowerPanelRows, armholeOpening } from './back
 import { frontNeckPlan } from './front';
 import { sleevePlan, sleeveRows } from './sleeve';
 import { raglanPlan, raglanBackRows, raglanFrontRows } from './raglan';
+import { armholeBandPlan } from './armhole-band';
+import { pickupPerRow } from './neckband';
 import { seamEdgeLength, CAP_SECTIONS } from './seams';
 
 // Re-exported so callers have one import for the whole assembly surface.
@@ -76,6 +78,8 @@ export function assemblyReport(
   // Raglan has no cap or shoulder graft — its invariants are different (the four raglan
   // seams match row-for-row and the pieces meet at the neck), so it is reported separately.
   if (shoulder === 'raglan') return raglanAssemblyReport(size, style, gauge, neck, opts);
+  // Sleeveless has no sleeve join at all — an armhole band round each armhole instead.
+  if (opts.sleeveLength === 'sleeveless') return sleevelessAssemblyReport(size, style, gauge, neck, shoulder, backNeck, opts);
 
   const bp = backPlan(size, style, gauge, shoulder, backNeck, opts);
   const shaping = armholeShaping(bp.bodySts, bp.upperBackSts);
@@ -213,6 +217,61 @@ function raglanAssemblyReport(
       label: 'back neck held',
       ok: backNeck > 0 && Math.abs(backNeck - rp.backNeckSts) <= 1,
       detail: `${backNeck} sts held for the band`,
+    },
+  ];
+  return { size: `${size.category} ${size.chest}"`, invariants, allOk: invariants.every((i) => i.ok) };
+}
+
+/**
+ * Sleeveless assembly: no sleeve, no cap, no underarm-meet. The body still grafts at the
+ * shoulders, seams at the sides and closes the back neck; in place of the sleeve join,
+ * each armhole gets a band whose pickup must match the armhole edge it sews round.
+ */
+function sleevelessAssemblyReport(
+  size: SizeRecord,
+  style: EaseStyleId,
+  gauge: Gauge,
+  neck: NeckStyle,
+  shoulder: ShoulderStyle,
+  backNeck: BackNeckStyle,
+  opts: GarmentOptions,
+): AssemblyReport {
+  const bp = backPlan(size, style, gauge, shoulder, backNeck, opts);
+  const shaping = armholeShaping(bp.bodySts, bp.upperBackSts);
+  const achieved = shaping.achievedSts;
+  const backShoulder = Math.round((achieved - bp.backNeckSts) / 2);
+  const front = frontNeckPlan(size, style, gauge, neck, shoulder, opts);
+  const band = armholeBandPlan(size, style, gauge, shoulder);
+
+  const backSide = lowerPanelRows('back', size, style, gauge, shoulder, opts).length;
+  const frontSide = lowerPanelRows('front', size, style, gauge, shoulder, opts).length;
+
+  // The armhole the band sews round: two curved/straight edges (front + back) plus the
+  // two flat underarm bases, in stitch-equivalents at this gauge — the same figure the
+  // band derived its pickup from, checked here as an independent reconciliation.
+  const edgeRows = 2 * bp.armholeRows + 2 * band.underarmCastOff;
+  const expected = Math.round(edgeRows * pickupPerRow(gauge));
+
+  const invariants: Invariant[] = [
+    {
+      label: 'shoulder graft',
+      ok: Math.abs(backShoulder - front.shoulderSts) <= 1,
+      detail: `back ${backShoulder} = front ${front.shoulderSts}`,
+    },
+    {
+      label: 'side seam',
+      ok: backSide === frontSide,
+      detail: `back ${backSide} = front ${frontSide} rows`,
+    },
+    {
+      label: 'back neck closes',
+      ok: Math.abs(achieved - (2 * backShoulder + bp.backNeckSts)) <= 1,
+      detail: `2×${backShoulder} + ${bp.backNeckSts} ≈ ${achieved}`,
+    },
+    {
+      label: 'armhole band fits the armhole',
+      ok: Math.abs(band.pickupTotal - expected) <= 1,
+      detail: `band ${band.pickupTotal} ≈ armhole ${expected} sts`,
     },
   ];
   return { size: `${size.category} ${size.chest}"`, invariants, allOk: invariants.every((i) => i.ok) };

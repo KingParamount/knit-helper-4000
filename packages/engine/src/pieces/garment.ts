@@ -23,12 +23,16 @@ import { backRows } from './back';
 import { frontRows } from './front';
 import { sleeves } from './sleeve';
 import { neckbandRows } from './neckband';
+import { armholeBandRows } from './armhole-band';
 
 export interface Garment {
   back: Row[];
   front: Row[];
+  /** The two sleeves — empty for a sleeveless garment (which gains `armholeBand`). */
   sleeveLeft: Row[];
   sleeveRight: Row[];
+  /** One armhole band, worked twice — present only for a sleeveless garment. */
+  armholeBand?: Row[];
   neckband: Row[];
   neck: NeckStyle;
   backNeck: BackNeckStyle;
@@ -48,12 +52,15 @@ export function assembleGarment(
   backNeck: BackNeckStyle = 'scoop',
   opts: GarmentOptions = {},
 ): Garment {
-  const s = sleeves(size, style, gauge, shoulder, opts);
+  // Sleeveless has no sleeve pieces — each armhole gets a picked-up band instead.
+  const sleeveless = opts.sleeveLength === 'sleeveless';
+  const s = sleeveless ? { left: [], right: [] } : sleeves(size, style, gauge, shoulder, opts);
   return {
     back: backRows(size, style, gauge, shoulder, backNeck, opts),
     front: frontRows(size, style, gauge, neck, shoulder, opts),
     sleeveLeft: s.left,
     sleeveRight: s.right,
+    ...(sleeveless ? { armholeBand: armholeBandRows(size, style, gauge, shoulder) } : {}),
     // The neckband is length- and hem-independent: it picks up from the neck opening
     // only, and its depth is the separate rib_neck measurement.
     neckband: neckbandRows(size, style, gauge, neck, shoulder, 'machine', backNeck),

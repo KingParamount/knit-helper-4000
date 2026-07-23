@@ -16,6 +16,8 @@ import {
   frontSchematic,
   sleeveSchematic,
   neckbandSchematic,
+  armholeBandPlan,
+  armholeBandSchematic,
   schematicSvg,
 } from '@knit-helper-4000/engine';
 import type {
@@ -149,10 +151,15 @@ export function buildSchematics(input: BuildInput): Record<PieceId, PieceSchemat
   // Only the band's rows differ by technique — a hand V mitres at a centred double
   // decrease, a machine one at its two ends — and the chart has to show which.
   const technique = input.technique ?? 'machine';
+  // Sleeveless has no sleeve — the 'sleeve' slot shows the armhole band instead.
+  const sleeveOrBand =
+    opts.sleeveLength === 'sleeveless'
+      ? armholeBandSchematic(armholeBandPlan(size, input.ease, g, shoulder), g)
+      : sleeveSchematic(sleeveRows('sleeve_l', size, input.ease, g, shoulder, opts), sp, g);
   return {
     back: backSchematic(backRows(size, input.ease, g, shoulder, backNeck, opts), bp, g),
     front: frontSchematic(frontRows(size, input.ease, g, neck, shoulder, opts), bp, fnp, g),
-    sleeve: sleeveSchematic(sleeveRows('sleeve_l', size, input.ease, g, shoulder, opts), sp, g),
+    sleeve: sleeveOrBand,
     neckband: neckbandSchematic(neckbandRows(size, input.ease, g, neck, shoulder, technique, backNeck), np, g),
   };
 }

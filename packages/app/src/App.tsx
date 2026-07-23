@@ -187,6 +187,7 @@ const SLEEVE_LENGTHS: { id: SleeveLength; label: string }[] = [
   { id: 'half', label: 'Half' },
   { id: 'short', label: 'Short' },
   { id: 'cap', label: 'Cap' },
+  { id: 'sleeveless', label: 'Sleeveless' },
 ];
 const PIECES: { id: PieceId; label: string }[] = [
   { id: 'back', label: 'Back' },
@@ -576,7 +577,6 @@ export function App(): JSX.Element {
                   onClick={() => setSleeveLength(l.id)}
                 />
               ))}
-              <Btn icon={<IconSleeve />} label="Sleeveless" state="soon" />
             </div>
           </Tile>
           <Tile title="Sleeve style">
