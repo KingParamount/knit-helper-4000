@@ -14,6 +14,7 @@ import type {
   ShoulderStyle,
   BackNeckStyle,
   BodyLength,
+  HemStyle,
   GarmentOptions,
 } from '../data/types';
 import { garmentWidths } from '../dimensions';
@@ -28,6 +29,7 @@ import { type Row, type Piece, carriageForRow } from '../row';
 import { SEAM_ALLOWANCE_STS, seamEdgeLength, ARMHOLE_SECTIONS } from './seams';
 import { backNeckDepthRows, NECK_CURVE_IN } from '../neckopening';
 import { raglanBackRows } from './raglan';
+import { hemPlan } from './hem';
 
 export interface PlanSection {
   name: string;
@@ -39,13 +41,21 @@ export interface PlanSection {
 }
 
 export interface BackPlan {
-  ribCastOnSts: number; // rib is cast on odd (body + 1, extra on the right)
-  bodySts: number; // even body panel = half the finished chest (after the rib drop)
+  hem: HemStyle;
+  ribCastOnSts: number; // hem cast-on: odd (body + 1) for rib, 2× body for a frill, body otherwise
+  bodySts: number; // even body panel = half the finished chest (after the rib drop / frill gather)
   upperBackSts: number; // between the armholes
   backNeckSts: number;
-  totalRows: number;
-  ribRows: number;
-  bodyRows: number; // plain body, top of rib to underarm
+  totalRows: number; // garment length in rows, shoulder line to hem edge
+  /**
+   * Rows the knitted piece is TALLER than totalRows: a folded band's facing turns
+   * up inside, so the piece carries those rows without adding hanging length.
+   * pieceTotalRows = totalRows + facing; zero for every other hem.
+   */
+  pieceTotalRows: number;
+  ribRows: number; // rows in the hem section of the piece (whatever the hem style)
+  hemLengthRows: number; // rows the hem contributes to hanging length (≤ ribRows)
+  bodyRows: number; // plain body, top of hem to underarm
   armholeRows: number; // underarm to shoulder
   backNeckRows: number; // scoop depth: rows from the back neck line to the shoulder
   backNeckPerSide: number; // stitches shaped away each side of the scoop
@@ -138,16 +148,18 @@ export function backPlan(
   // Two side seams, each eating a stitch from this panel's edges — cut it wider so
   // the sewn-up garment measures what the pattern says. Adding two keeps it even.
   const bodySts = evenStitchesFor(w.chest / 2, gauge) + 2 * SEAM_ALLOWANCE_STS; // even plain panel
-  const ribCastOnSts = bodySts + 1; // rib cast on odd, extra stitch on the right
+  const hp = hemPlan(size, gauge, opts.hem ?? 'ribbing', bodySts);
+  const ribCastOnSts = hp.castOnSts;
   // A drop shoulder knits the body straight — no armhole narrowing — so the "upper
   // back" is the full body width; a set-in narrows to the across-back measurement.
   const upperBackSts = shoulder === 'drop' ? bodySts : stitchesFor(size.back_width, gauge);
   const backNeckSts = stitchesFor(size.back_neck, gauge);
 
   const totalRows = rowsFor(bodyLengthInches(size, opts.bodyLength), gauge);
-  const ribRows = ribRowsFor(size.rib_body, gauge);
+  const ribRows = hp.pieceRows;
   const armholeRows = rowsFor(w.armholeDepth, gauge);
-  const bodyRows = totalRows - armholeRows - ribRows;
+  const bodyRows = totalRows - armholeRows - hp.lengthRows;
+  const pieceTotalRows = totalRows + (hp.pieceRows - hp.lengthRows);
   const backNeckRows = backNeckDepthRows(size, gauge, backNeck);
 
   // Back-neck shaping (single source for backRows and the neckband). A 'flat' back casts
@@ -172,7 +184,17 @@ export function backPlan(
   const backNeckCentreSts = backNeckSts - 2 * backNeckPerSide;
 
   const sections: PlanSection[] = [
-    { name: 'rib', startRow: 1, endRow: ribRows, rows: ribRows, stitches: ribCastOnSts },
+    ...(ribRows > 0
+      ? [
+          {
+            name: hp.hem === 'ribbing' ? 'rib' : hp.hem,
+            startRow: 1,
+            endRow: ribRows,
+            rows: ribRows,
+            stitches: ribCastOnSts,
+          },
+        ]
+      : []),
     {
       name: 'body',
       startRow: ribRows + 1,
@@ -183,7 +205,7 @@ export function backPlan(
     {
       name: 'armhole+shoulder',
       startRow: ribRows + bodyRows + 1,
-      endRow: totalRows,
+      endRow: pieceTotalRows,
       rows: armholeRows,
       stitches: upperBackSts,
       note: 'shaping — not generated yet',
@@ -191,12 +213,15 @@ export function backPlan(
   ];
 
   return {
+    hem: hp.hem,
     ribCastOnSts,
     bodySts,
     upperBackSts,
     backNeckSts,
     totalRows,
+    pieceTotalRows,
     ribRows,
+    hemLengthRows: hp.lengthRows,
     bodyRows,
     armholeRows,
     backNeckRows,
@@ -224,23 +249,27 @@ export function lowerPanelRows(
   opts: GarmentOptions = {},
 ): Row[] {
   const plan = backPlan(size, style, gauge, shoulder, 'scoop', opts);
+  const hp = hemPlan(size, gauge, plan.hem, plan.bodySts);
   const lastPlainRow = plan.ribRows + plan.bodyRows; // underarm
   const firstBodyRow = plan.ribRows + 1;
   const rows: Row[] = [];
   for (let index = 1; index <= lastPlainRow; index++) {
-    const inRib = index <= plan.ribRows;
-    // The rib is cast on odd (bodySts + 1); at the change to stocking the extra
-    // stitch is dropped on the right, so both rib selvedges are knit stitches.
+    const inHem = index <= plan.ribRows;
+    // The hem sets the cast-on and the change-row ops: rib is cast on odd (bodySts + 1)
+    // and drops the extra stitch at the change to stocking, so both rib selvedges are
+    // knit stitches; a frill casts on double and gathers across on the first body row;
+    // a folded band picks its cast-on edge up and knits the hem closed on its last row.
     let ops: Row['ops'] = [];
-    if (index === 1) ops = [{ kind: 'cast_on', count: plan.ribCastOnSts }];
-    else if (index === firstBodyRow) ops = [{ kind: 'decrease', count: 1, side: 'R' }];
+    if (index === 1) ops = [{ kind: 'cast_on', count: plan.ribCastOnSts }, ...hp.opsAt(index)];
+    else if (inHem) ops = hp.opsAt(index);
+    else if (index === firstBodyRow) ops = hp.firstBodyOps;
     rows.push({
       index,
       piece,
-      stitches: inRib ? plan.ribCastOnSts : plan.bodySts,
+      stitches: inHem ? plan.ribCastOnSts : plan.bodySts,
       carriage: carriageForRow(index),
       ops,
-      section: inRib ? 'rib' : 'body',
+      section: inHem ? hp.sectionAt(index) : 'body',
     });
   }
   return rows;
@@ -408,7 +437,9 @@ export function backRows(
   let index = rows.length;
 
   // Straight to the back neck line (leaving `depth` rows for the scoop + shoulders).
-  const straightToSplit = Math.max(0, plan.totalRows - depth - rows.length);
+  // Heights are in piece rows (a folded hem's facing makes the piece taller than the
+  // garment), so the piece total is the right register here.
+  const straightToSplit = Math.max(0, plan.pieceTotalRows - depth - rows.length);
   for (let i = 0; i < straightToSplit; i++) {
     index += 1;
     rows.push({ index, piece: 'back', stitches: achieved, carriage: carriageForRow(index), ops: [], section: 'upper_back' });

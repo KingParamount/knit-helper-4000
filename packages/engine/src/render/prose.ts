@@ -27,6 +27,7 @@
 import type { Row, Op, Carriage } from '../row';
 import type { NeckStyle, ShoulderStyle, Technique, Units } from '../data/types';
 import type { Gauge } from '../gauge';
+import { HEM_SECTIONS, HEM_END_SECTIONS } from '../pieces/hem';
 
 export interface PieceProse {
   title: string;
@@ -112,6 +113,19 @@ interface Vocab {
   ribTension(): string;
   setCounter(): string;
   ribUntil(rc: number, lengthIn: number): string;
+  /** Hem-section variants of ribTension/ribUntil (moss, garter, frill, folded halves). */
+  hemTension(section: string): string;
+  hemUntil(section: string, rc: number, lengthIn: number): string;
+  /** The change to the body after a non-rib hem (counter reset, tension back). */
+  hemChange(section: string, carriage: Carriage): string;
+  /** A folded band's turn row (plain fold in the numbers; picot as the aside). */
+  foldedTurn(rc: number): string;
+  /** A folded band's closing row: the cast-on edge knits together with the work. */
+  foldedJoin(n: number): string;
+  /** A frill's gather: knit two together all the way across. */
+  frillGather(removed: number, remaining: number): string;
+  /** Hem 'none': the cast-on edge will roll, and the pattern should say so once. */
+  noHemNote(): string;
   resetToStocking(drop: Carriage | undefined, carriage: Carriage): string;
   resetPlain(carriage: Carriage): string;
   rejoinRight(): string;
@@ -177,6 +191,44 @@ const VERBOSE: Vocab = {
     `Work in the rib pattern of your choice until the row counter reads ${pad(
       rc,
     )}. If you are knitting mock rib, follow your machine manual for how to work it.`,
+  hemTension: (section) => {
+    switch (section) {
+      case 'moss_band':
+        return 'Set the tension to main tension, minus 2 whole numbers. Moss stitch on a single bed is hand-tooled; a garter carriage can also work it.';
+      case 'garter_band':
+        return 'Keep the tension at main tension. Garter stitch on a machine means turning the work with a garter bar every row, or using a garter carriage.';
+      case 'folded_facing':
+        return 'Set the tension one or two whole numbers below main tension — the facing folds inside, and knitting the band tighter stops the doubled hem flaring.';
+      default:
+        return '';
+    }
+  },
+  hemUntil: (section, rc, _lengthIn) => {
+    switch (section) {
+      case 'moss_band':
+        return `Work in moss stitch until the row counter reads ${pad(rc)}.`;
+      case 'garter_band':
+        return `Work in garter stitch until the row counter reads ${pad(rc)}.`;
+      case 'frill':
+        return `Knit the frill until the row counter reads ${pad(rc)}, working the first 2 rows in garter stitch so the edge does not curl.`;
+      case 'folded_facing':
+        return `Knit the facing until the row counter reads ${pad(rc)}.`;
+      default:
+        return `Knit until the row counter reads ${pad(rc)}.`;
+    }
+  },
+  hemChange: (section, carriage) =>
+    'Reset the row counter to 000, change to stocking stitch' +
+    (section === 'garter_band' ? '.' : ', and set the tension back to main tension.') +
+    VERBOSE.carr(carriage),
+  foldedTurn: (rc) =>
+    `Row ${pad(rc)} is the fold line: knit it at a slightly looser tension. For a picot edge instead, transfer every other stitch to its neighbour for this one row — the eyelets fold into a row of points.`,
+  foldedJoin: (n) =>
+    `Pick the cast-on edge up onto the needles — one loop onto each of the ${n} needles — and knit 1 row through loop and stitch together, closing the hem.`,
+  frillGather: (removed, remaining) =>
+    `Transfer every second stitch onto its neighbour and knit 1 row: ${sts(removed + remaining)} become ${remaining}.`,
+  noHemNote: () =>
+    'There is no hem band; the stocking stitch edge will roll. Steam it flat when you block, or keep the roll as the finish.',
   resetToStocking: (drop, carriage) =>
     'Reset the row counter to 000, change to stocking stitch, set the tension back to main tension' +
     (drop ? `, and decrease 1 stitch at the ${sideWord(drop)} hand edge.` : '.') +
@@ -255,6 +307,42 @@ const TERSE: Vocab = {
   ribTension: () => 'Set to MT-2.',
   setCounter: () => 'RC to 000.',
   ribUntil: (rc, _lengthIn) => `Work your rib to RC ${pad(rc)}. Mock rib: see machine manual.`,
+  hemTension: (section) => {
+    switch (section) {
+      case 'moss_band':
+        return 'Set to MT-2. Moss st: hand-tool (or garter carriage).';
+      case 'garter_band':
+        return 'Keep MT. Garter st: garter bar every row (or garter carriage).';
+      case 'folded_facing':
+        return 'Set to MT-1 or MT-2 (tight facing stops the hem flaring).';
+      default:
+        return '';
+    }
+  },
+  hemUntil: (section, rc, _lengthIn) => {
+    switch (section) {
+      case 'moss_band':
+        return `Moss st to RC ${pad(rc)}.`;
+      case 'garter_band':
+        return `Garter st to RC ${pad(rc)}.`;
+      case 'frill':
+        return `Frill to RC ${pad(rc)} (first 2 rows garter, to stop curl).`;
+      case 'folded_facing':
+        return `Kn facing to RC ${pad(rc)}.`;
+      default:
+        return `Kn to RC ${pad(rc)}.`;
+    }
+  },
+  hemChange: (section, carriage) =>
+    'RC to 000, change to st st' +
+    (section === 'garter_band' ? '.' : ', set to MT.') +
+    TERSE.carr(carriage),
+  foldedTurn: (rc) =>
+    `RC ${pad(rc)} = fold line: knit loose (picot alt: transfer every other st to neighbour this row).`,
+  foldedJoin: (n) => `PU cast-on edge, 1 loop per needle (${n} N), kn 1 row through both — hem closed.`,
+  frillGather: (removed, remaining) =>
+    `Transfer every 2nd st to neighbour, kn 1 row: ${removed + remaining} st → ${remaining} st.`,
+  noHemNote: () => 'No hem band; st st edge rolls. Steam flat at blocking, or keep the roll.',
   resetToStocking: (drop, carriage) =>
     'RC to 000, change to st st, set to MT' +
     (drop ? `, dec 1 st at ${edgeT(drop)}.` : '.') +
@@ -381,6 +469,71 @@ function handVocab(style: ProseStyle, units: Units): Vocab {
       terse
         ? `Rib to ${len(lengthIn)}.`
         : `Work in the rib of your choice until it measures ${len(lengthIn)}.`,
+    hemTension: (section) => {
+      switch (section) {
+        case 'folded_facing':
+          return terse
+            ? 'Use needles a size or two smaller for the hem.'
+            : 'Work the hem on needles a size or two smaller than your tension-swatch needles — the doubled band sits flatter knitted tight.';
+        default:
+          // Moss, garter and a frill lie flat at the swatch tension — no needle change.
+          return '';
+      }
+    },
+    hemUntil: (section, _rc, lengthIn) => {
+      switch (section) {
+        case 'moss_band':
+          return terse
+            ? `Moss st to ${len(lengthIn)}.`
+            : `Work in moss stitch until it measures ${len(lengthIn)}.`;
+        case 'garter_band':
+          return terse
+            ? `Garter st to ${len(lengthIn)}.`
+            : `Work in garter stitch (knit every row) until it measures ${len(lengthIn)}.`;
+        case 'frill':
+          return terse
+            ? `Frill to ${len(lengthIn)} (first 2 rows knit, to stop curl).`
+            : `Work the frill in stocking stitch until it measures ${len(lengthIn)}, knitting the first 2 rows plain so the edge does not curl.`;
+        case 'folded_facing':
+          return terse
+            ? `St st to ${len(lengthIn)} (facing).`
+            : `Work in stocking stitch until it measures ${len(lengthIn)} — this half is the facing, which folds inside.`;
+        default:
+          return terse
+            ? `Work to ${len(lengthIn)} from cast-on.`
+            : `Continue in stocking stitch until the piece measures ${len(lengthIn)} from the cast-on edge.`;
+      }
+    },
+    hemChange: (section) => {
+      // A frill is already stocking stitch and already on the swatch needles — the
+      // gather row is the whole change, so there is nothing to announce.
+      if (section === 'frill') return '';
+      const needles =
+        section === 'folded_join'
+          ? terse
+            ? 'Change back to your swatch needles'
+            : 'Change back to the needles you used for your tension swatch'
+          : terse
+            ? 'Change to the stitch you swatched in'
+            : 'Change to the stitch your tension swatch was knitted in';
+      return `${needles}.`;
+    },
+    foldedTurn: () =>
+      terse
+        ? 'Purl 1 RS row = fold line (picot alt: *k2tog, yo* across).'
+        : 'Purl 1 row on the right side to mark the fold line. For a picot edge instead, work *knit 2 together, yarn over* to the end — the eyelets fold into a row of points.',
+    foldedJoin: (n) =>
+      terse
+        ? `Fold at turn row; knit each st tog with its cast-on loop (${n} st). Or sew hem down at making up.`
+        : `Fold the hem at the turn row and knit each stitch together with its matching cast-on loop (${sts(n)}), closing the hem. If you prefer, work straight on and slip-stitch the hem down when you make up.`,
+    frillGather: (removed, remaining) =>
+      terse
+        ? `K2tog across: ${removed + remaining} st → ${remaining} st.`
+        : `Knit 2 together all the way across the row: ${sts(removed + remaining)} become ${sts(remaining)}.`,
+    noHemNote: () =>
+      terse
+        ? 'No hem; st st edge rolls. Steam at blocking, or keep the roll.'
+        : 'There is no hem; the stocking stitch edge will roll. Steam it flat when you block, or keep the roll as the finish.',
     resetToStocking: (drop) =>
       (terse
         ? 'Change to your swatch needles and the stitch you swatched in'
@@ -657,6 +810,7 @@ type Kind =
   | 'co_edge'
   | 'dec_both'
   | 'dec_edge'
+  | 'gather'
   | 'mitre'
   | 'inc_both'
   | 'hold'
@@ -680,9 +834,11 @@ function classify(row: Row): Ev {
     case 'bind_off':
       return { row, kind: op.side === 'center' ? 'co_center' : 'co_edge', op };
     case 'decrease':
-      // The V-neckband mitres both ends with edge decreases (section 'mitre'); every
-      // other decrease is ordinary edge/both shaping.
+      // The V-neckband mitres both ends with edge decreases (section 'mitre'); a
+      // frill gathers the whole row (side 'across'); every other decrease is
+      // ordinary edge/both shaping.
       if (row.section === 'mitre') return { row, kind: 'mitre', op };
+      if (op.side === 'across') return { row, kind: 'gather', op };
       return { row, kind: op.side === 'both' ? 'dec_both' : 'dec_edge', op };
     case 'increase':
       return { row, kind: 'inc_both', op };
@@ -697,11 +853,13 @@ function classify(row: Row): Ev {
 
 function isResetBoundary(cur: Row, prev: Row | undefined): boolean {
   if (!prev) return false;
-  // rib -> body change. Not the band's own terminal rows (its rib runs straight into
-  // the marker row then off on waste yarn — no change to stocking stitch).
+  // hem -> body change (rib or any other hem style). Not the band's own terminal rows
+  // (its rib runs straight into the marker row then off on waste yarn — no change to
+  // stocking stitch), and not a folded band's internal facing/turn/outer boundaries,
+  // which share one counter run.
   if (
-    prev.section === 'rib' &&
-    cur.section !== 'rib' &&
+    HEM_END_SECTIONS.has(prev.section ?? '') &&
+    !HEM_SECTIONS.has(cur.section ?? '') &&
     cur.section !== 'castoff' &&
     cur.section !== 'mark' &&
     cur.section !== 'take_off'
@@ -760,17 +918,24 @@ export function renderPiece(
     // Machine reads the counter, which is relative to the last reset. Hand measures
     // the fabric, which is absolute from the cast-on edge — so both are passed.
     const lengthIn = pending.last.index * rowIn;
+    const sec = pending.section ?? '';
     const line =
-      pending.section === 'rib'
+      sec === 'rib'
         ? v.ribUntil(c, lengthIn)
-        : v.knitUntil(c, lengthIn, withCarriage ? pending.last.carriage : undefined);
+        : sec === 'folded_turn'
+          ? v.foldedTurn(c)
+          : HEM_SECTIONS.has(sec)
+            ? v.hemUntil(sec, c, lengthIn)
+            : v.knitUntil(c, lengthIn, withCarriage ? pending.last.carriage : undefined);
     // Two plain runs can end up back to back once a register drops what sat between
     // them — a machine resets its counter there, a hand knitter has nothing to do. Two
     // consecutive "work until it measures X" lines read as a contradiction, and the
-    // later one subsumes the earlier, so replace rather than append.
+    // later one subsumes the earlier, so replace rather than append. Hem-section lines
+    // are never subsumable: a folded band's facing, fold row and outer half are three
+    // distinct instructions that happen to be plain rows.
     if (lastLineWasPlain && lines.length && lines[lines.length - 1] !== '') lines[lines.length - 1] = line;
     else say(line);
-    lastLineWasPlain = true;
+    lastLineWasPlain = !HEM_SECTIONS.has(sec);
     prevCounter = c;
     pending = null;
   };
@@ -835,17 +1000,26 @@ export function renderPiece(
 
     if (isResetBoundary(row, prev)) {
       flushPlain(false);
-      const stocking = (prev as Row).section === 'rib';
+      const prevSec = (prev as Row).section ?? '';
+      const stocking = prevSec === 'rib';
       // At the change to stocking the rib's odd extra stitch is dropped on one side.
+      // (count === 1 keeps a frill's gather-across from being mistaken for the drop.)
       const drop =
         stocking &&
         row.ops.length === 1 &&
         row.ops[0].kind === 'decrease' &&
+        row.ops[0].count === 1 &&
         row.ops[0].side !== 'both'
           ? (row.ops[0] as { side: Carriage }).side
           : undefined;
-      lines.push(
-        stocking ? v.resetToStocking(drop, (prev as Row).carriage) : v.resetPlain((prev as Row).carriage),
+      // say(), not a raw push: the line must clear the plain-run flag, or the next
+      // "knit until" would subsume the reset instruction.
+      say(
+        stocking
+          ? v.resetToStocking(drop, (prev as Row).carriage)
+          : HEM_END_SECTIONS.has(prevSec)
+            ? v.hemChange(prevSec, (prev as Row).carriage)
+            : v.resetPlain((prev as Row).carriage),
       );
       // Starting the second (right) neck half: the parked side rejoins the work.
       if (row.side === 'right') say(v.rejoinRight());
@@ -881,7 +1055,16 @@ export function renderPiece(
       // which is why the hand version needs no easing markers and no seam for the band.
       if (technique === 'hand' && row.piece === 'collar') say(v.pickUp(n));
       else say(v.castOn(n, otherSide(row.carriage)));
-      say(v.ribTension());
+      // The tension line follows the hem: rib (and the neckband, whose cast-on row is
+      // its own section) keeps the historical rib-tension line; the other hem styles
+      // speak their own; hem 'none' casts straight onto the body, where the only thing
+      // worth saying is that the edge will roll.
+      {
+        const sec = row.section ?? '';
+        if (sec === 'body' || sec === 'taper') say(v.noHemNote());
+        else if (HEM_SECTIONS.has(sec) && sec !== 'rib') say(v.hemTension(sec));
+        else say(v.ribTension());
+      }
       say(v.setCounter());
       i += 1;
       continue;
@@ -889,10 +1072,26 @@ export function renderPiece(
 
     if (ev.kind === 'pick_up') {
       const n = (ev.op as { count: number }).count;
+      // A folded band's closing row picks its own cast-on edge up — a hem join, not
+      // a band pickup, and no counter reset (the hem's run continues to the change).
+      if (row.section === 'folded_join') {
+        say(v.foldedJoin(n));
+        i += 1;
+        continue;
+      }
       say(v.pickUp(n));
       say(v.ribTension());
       say(v.setCounter());
       prevCounter = 0;
+      i += 1;
+      continue;
+    }
+
+    if (ev.kind === 'gather') {
+      const op = ev.op as { count: number };
+      say(v.frillGather(op.count, row.stitches));
+      say(v.stitchCount(row.stitches, false));
+      pending = { section: row.section, last: row }; // the gather row starts the body run
       i += 1;
       continue;
     }

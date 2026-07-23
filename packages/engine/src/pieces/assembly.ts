@@ -82,7 +82,7 @@ export function assemblyReport(
   const achieved = shaping.achievedSts;
   const backShoulder = Math.round((achieved - bp.backNeckSts) / 2);
   const front = frontNeckPlan(size, style, gauge, neck, shoulder, opts);
-  const sleeve = sleevePlan(size, style, gauge, shoulder);
+  const sleeve = sleevePlan(size, style, gauge, shoulder, opts);
 
   const backSide = lowerPanelRows('back', size, style, gauge, shoulder, opts).length;
   const frontSide = lowerPanelRows('front', size, style, gauge, shoulder, opts).length;
@@ -173,7 +173,7 @@ function raglanAssemblyReport(
   opts: GarmentOptions = {},
 ): AssemblyReport {
   const rp = raglanPlan(size, style, gauge, opts);
-  const sleeve = sleevePlan(size, style, gauge, 'raglan');
+  const sleeve = sleevePlan(size, style, gauge, 'raglan', opts);
   const back = raglanBackRows(size, style, gauge, opts);
   const front = raglanFrontRows(size, style, gauge, neck, opts);
   const backLower = lowerPanelRows('back', size, style, gauge, 'raglan', opts).length;

@@ -26,8 +26,15 @@ export type Op =
    * a CDD), so the running total arithmetic is the same as a single-sided decrease.
    * A machine cannot work one: you cannot decrease mid-bed without shifting every
    * needle, which is why the machine band mitres at its two ends instead.
+   *
+   * `side: 'across'` gathers the whole row — knit two together all the way across
+   * (a frill hem halving back to the body width). `count` is the stitches removed,
+   * so the running-total arithmetic is unchanged. Hand: k2tog across; on a machine
+   * this needs every second stitch transferred, which is why a machine frill is
+   * blocked in the UI (a future machine feature — the bed is also too narrow for
+   * the doubled cast-on at most adult sizes).
    */
-  | { kind: 'decrease'; count: number; side: 'L' | 'R' | 'both' | 'center' }
+  | { kind: 'decrease'; count: number; side: 'L' | 'R' | 'both' | 'center' | 'across' }
   | { kind: 'increase'; count: number; side: 'L' | 'R' | 'both' }
   | { kind: 'hold'; count: number; side: 'L' | 'R' }
   | { kind: 'take_off'; count: number } // off the machine on waste yarn; stitches stay live

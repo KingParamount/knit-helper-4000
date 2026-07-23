@@ -127,13 +127,32 @@ export type BodyLength =
   | 'ankle';
 
 /**
+ * Hem style for the body and cuffs, from the `hem` option vocabulary (one choice
+ * covers both, as the source vocabulary applies it to both). 'ribbing' is the
+ * default and reproduces the original garment: an odd cast-on at rib tension that
+ * pulls in. Every other hem is worked at the full panel width (the source's own
+ * rule: a non-rib hem must equal the garment bottom width):
+ *  - 'moss_band' / 'garter_band' — a flat textured band, half the ribbing depth;
+ *  - 'folded_band'  — a stocking hem knit to twice its finished depth at tighter
+ *    tension, turned at a fold row, and closed by knitting the cast-on edge
+ *    together with the working row;
+ *  - 'frill'        — cast on double, work a short ruffle, then halve across into
+ *    the body. Hand knitting only for now: a machine bed is too narrow for the
+ *    doubled cast-on at most sizes (blocked in the UI; a future machine feature);
+ *  - 'none'         — cast on and go; the stocking edge rolls, and the prose says so.
+ * 'crochet_edge' is deliberately absent (no crochet — see Technique).
+ */
+export type HemStyle = 'ribbing' | 'moss_band' | 'garter_band' | 'folded_band' | 'frill' | 'none';
+
+/**
  * The optional style axes added after the original five positional parameters
  * (ease, neck, back neck, shoulder, technique). Passed as one trailing bag so each
  * new axis does not grow every signature; every field has a default that reproduces
- * the original garment (hip length). Later batches add hem and sleeve length here.
+ * the original garment (hip length, ribbed hem). Later batches add sleeve length here.
  */
 export interface GarmentOptions {
   bodyLength?: BodyLength;
+  hem?: HemStyle;
 }
 
 /**

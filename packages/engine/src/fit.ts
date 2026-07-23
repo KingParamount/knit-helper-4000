@@ -15,6 +15,7 @@ import type {
   BackNeckStyle,
   ShoulderStyle,
   BodyLength,
+  HemStyle,
   GarmentOptions,
 } from './data/types';
 import { garmentWidths, MIN_UPPER_ARM_EASE_IN } from './dimensions';
@@ -115,11 +116,12 @@ export function hemReachesHip(bodyLength: BodyLength): boolean {
 export const MIN_BODY_ROWS = 2;
 
 /**
- * May this body length be offered at this size / gauge / shoulder? A short length must
- * still clear the armhole and the hem rib — a crop over a deep raglan armhole can ask
+ * May this body length be offered at this size / gauge / shoulder / hem? A short length
+ * must still clear the armhole and the hem — a crop over a deep raglan armhole can ask
  * for a body shorter than its own top and bottom, which is unbuildable, so the UI
  * blocks it (the same block-not-warn policy as the flat neck). Longer lengths never
- * block: the tube just keeps going.
+ * block: the tube just keeps going. The hem matters: a shallow band or no hem frees
+ * rows, which is exactly what reopens crop×raglan.
  */
 export function bodyLengthAllowed(
   size: SizeRecord,
@@ -127,8 +129,19 @@ export function bodyLengthAllowed(
   gauge: Gauge,
   shoulder: ShoulderStyle,
   bodyLength: BodyLength,
+  hem: HemStyle = 'ribbing',
 ): boolean {
-  return backPlan(size, style, gauge, shoulder, 'scoop', { bodyLength }).bodyRows >= MIN_BODY_ROWS;
+  return backPlan(size, style, gauge, shoulder, 'scoop', { bodyLength, hem }).bodyRows >= MIN_BODY_ROWS;
+}
+
+/**
+ * May this hem be offered? A frill is hand-only for now: the doubled cast-on outruns
+ * a machine bed at most sizes, and the gather (knit two together all the way across)
+ * is a hand row. Blocked, not warned, when the technique is machine — a future
+ * machine feature (a separately-knit, grafted ruffle).
+ */
+export function hemAllowed(hem: HemStyle, technique: 'machine' | 'hand'): boolean {
+  return !(hem === 'frill' && technique === 'machine');
 }
 
 // --- The full Tier-B fit sweep: does the finished garment fit a human of this size? ---

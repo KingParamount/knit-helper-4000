@@ -19,6 +19,7 @@ export type {
   BackNeckStyle,
   ShoulderStyle,
   BodyLength,
+  HemStyle,
   GarmentOptions,
   Technique,
 } from './data/types';
@@ -73,6 +74,9 @@ export type { FrontNeckPlan } from './pieces/front';
 export { CUFF_EASE_IN, evenRows, sleevePlan, sleeveRows, sleeves } from './pieces/sleeve';
 export type { SleevePlan } from './pieces/sleeve';
 
+export { hemPlan, HEM_SECTIONS, HEM_END_SECTIONS } from './pieces/hem';
+export type { HemPlan } from './pieces/hem';
+
 export { PICKUP_PER_ROW, pickupPerRow, neckbandPlan, neckbandRows } from './pieces/neckband';
 export type { NeckbandPlan } from './pieces/neckband';
 
@@ -92,6 +96,7 @@ export {
   flatFrontAllowed,
   hemReachesHip,
   bodyLengthAllowed,
+  hemAllowed,
   MIN_BODY_ROWS,
   fitReport,
   HIP_STRETCH,

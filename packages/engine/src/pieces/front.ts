@@ -97,7 +97,8 @@ export function frontNeckPlan(
           : frontNeckDepthRows(size, gauge);
   const { centreCastOff, perSide } = frontNeckSplit(neck, frontNeckSts, gauge);
   return {
-    neckLineRow: plan.totalRows - neckDepthRows,
+    // Piece-row register: a folded hem's facing makes the piece taller than the garment.
+    neckLineRow: plan.pieceTotalRows - neckDepthRows,
     neckDepthRows,
     bodySts,
     frontNeckSts,

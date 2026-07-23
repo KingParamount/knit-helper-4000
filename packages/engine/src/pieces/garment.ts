@@ -13,6 +13,7 @@ import type {
   BackNeckStyle,
   ShoulderStyle,
   BodyLength,
+  HemStyle,
   GarmentOptions,
 } from '../data/types';
 import type { Gauge } from '../gauge';
@@ -32,6 +33,7 @@ export interface Garment {
   backNeck: BackNeckStyle;
   shoulder: ShoulderStyle;
   bodyLength: BodyLength;
+  hem: HemStyle;
 }
 
 /** Every piece of the set-in pullover for one size / ease style / gauge / neck style. */
@@ -44,17 +46,19 @@ export function assembleGarment(
   backNeck: BackNeckStyle = 'scoop',
   opts: GarmentOptions = {},
 ): Garment {
-  const s = sleeves(size, style, gauge, shoulder);
+  const s = sleeves(size, style, gauge, shoulder, opts);
   return {
     back: backRows(size, style, gauge, shoulder, backNeck, opts),
     front: frontRows(size, style, gauge, neck, shoulder, opts),
     sleeveLeft: s.left,
     sleeveRight: s.right,
-    // The neckband is length-independent: it picks up from the neck opening only.
+    // The neckband is length- and hem-independent: it picks up from the neck opening
+    // only, and its depth is the separate rib_neck measurement.
     neckband: neckbandRows(size, style, gauge, neck, shoulder, 'machine', backNeck),
     neck,
     backNeck,
     shoulder,
     bodyLength: opts.bodyLength ?? 'hip',
+    hem: opts.hem ?? 'ribbing',
   };
 }

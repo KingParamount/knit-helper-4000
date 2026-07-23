@@ -10,13 +10,14 @@
  * the armhole is deep (CAP_FILL) — see sleevePlan.
  */
 
-import type { SizeRecord, EaseStyleId, ShoulderStyle } from '../data/types';
+import type { SizeRecord, EaseStyleId, ShoulderStyle, HemStyle, GarmentOptions } from '../data/types';
 import { garmentWidths } from '../dimensions';
-import { type Gauge, evenStitchesFor, rowsFor, ribRowsFor } from '../gauge';
+import { type Gauge, evenStitchesFor, rowsFor } from '../gauge';
 import { type Row, type Piece, carriageForRow } from '../row';
 import { backPlan, armholeShaping } from './back';
 import { raglanPlan } from './raglan';
 import { SEAM_ALLOWANCE_STS } from './seams';
+import { hemPlan } from './hem';
 
 /** Cuff = wrist + this ease. ASSUMPTION (flag) — a ribbed cuff also stretches. */
 export const CUFF_EASE_IN = 1.0;
@@ -72,9 +73,10 @@ const MIN_CROWN_IN = 1.5;
 const CAP_FAST_EACH_END = 3;
 
 export interface SleevePlan {
-  ribCastOnSts: number; // cuff rib, cast on odd (bodyCuffSts + 1, extra on the right)
+  hem: HemStyle; // cuff hem style (shared with the body)
+  ribCastOnSts: number; // cuff hem cast-on (odd for rib, 2× for a frill, cuff otherwise)
   bodyCuffSts: number; // even count after the rib drops one on the right
-  ribRows: number;
+  ribRows: number; // rows in the cuff hem section (whatever the hem style)
   taperRows: number;
   incPerSide: number;
   sleeveTopSts: number; // achieved at the underarm
@@ -90,6 +92,7 @@ export function sleevePlan(
   style: EaseStyleId,
   gauge: Gauge,
   shoulder: ShoulderStyle = 'set_in',
+  opts: GarmentOptions = {},
 ): SleevePlan {
   const w = garmentWidths(size, style, shoulder);
   const body = backPlan(size, style, gauge, shoulder);
@@ -97,10 +100,12 @@ export function sleevePlan(
   // One underarm seam, eating a stitch from each of the sleeve's two edges — cut it
   // wider at both cuff and top so the sewn tube measures what it should.
   const bodyCuffSts = evenStitchesFor(size.wrist + CUFF_EASE_IN, gauge) + 2 * SEAM_ALLOWANCE_STS; // even
-  const ribCastOnSts = bodyCuffSts + 1; // rib cast on odd, extra on the right
-  const ribRows = ribRowsFor(size.rib_body, gauge);
-  // Sleeve length = arm length + the sourced length ease (ease_arml), less the rib.
-  const taperRows = rowsFor(size.arm_length + size.ease_arml, gauge) - ribRows;
+  const hp = hemPlan(size, gauge, opts.hem ?? 'ribbing', bodyCuffSts);
+  const ribCastOnSts = hp.castOnSts;
+  const ribRows = hp.pieceRows;
+  // Sleeve length = arm length + the sourced length ease (ease_arml), less the hem's
+  // contribution to hanging length (a folded cuff's facing turns up inside).
+  const taperRows = rowsFor(size.arm_length + size.ease_arml, gauge) - hp.lengthRows;
   // NB the allowance is deliberately NOT added at the top. The sleeve top is not a
   // free edge — it is sewn into the armhole, and the Tier-A join invariant requires
   // the two to match. Widening it breaks that join (it did: drop-shoulder Child sizes
@@ -122,6 +127,7 @@ export function sleevePlan(
   // top width becomes the sewn edge (capTopSts), the cap-shaping fields are 0.
   if (shoulder === 'drop') {
     return {
+      hem: hp.hem,
       ribCastOnSts,
       bodyCuffSts,
       ribRows,
@@ -145,6 +151,7 @@ export function sleevePlan(
     const slvUA = sleeveTopSts - 2 * rp.underarmCastOff;
     const capDecPerSide = Math.round((slvUA - crown) / 2);
     return {
+      hem: hp.hem,
       ribCastOnSts,
       bodyCuffSts,
       ribRows,
@@ -183,6 +190,7 @@ export function sleevePlan(
   const capHeightRows = Math.min(maxHeight, Math.max(minHeight, idealHeight));
 
   return {
+    hem: hp.hem,
     ribCastOnSts,
     bodyCuffSts,
     ribRows,
@@ -204,8 +212,10 @@ export function sleeveRows(
   style: EaseStyleId,
   gauge: Gauge,
   shoulder: ShoulderStyle = 'set_in',
+  opts: GarmentOptions = {},
 ): Row[] {
-  const p = sleevePlan(size, style, gauge, shoulder);
+  const p = sleevePlan(size, style, gauge, shoulder, opts);
+  const hp = hemPlan(size, gauge, opts.hem ?? 'ribbing', p.bodyCuffSts);
   const rows: Row[] = [];
   let index = 0;
   let stitches = 0;
@@ -221,16 +231,29 @@ export function sleeveRows(
     rows.push({ index, piece, stitches, carriage: carriageForRow(index), ops, section });
   };
 
-  // Cuff cast-on (odd rib) + rib.
-  push([{ kind: 'cast_on', count: p.ribCastOnSts }], 'rib');
-  for (let i = 2; i <= p.ribRows; i++) push([], 'rib');
+  // Cuff cast-on + hem (rib by default; the hem plan names the sections and supplies
+  // any in-hem ops, e.g. a folded cuff's closing pick-up row).
+  if (hp.pieceRows > 0) {
+    push([{ kind: 'cast_on', count: p.ribCastOnSts }, ...hp.opsAt(1)], hp.sectionAt(1));
+    for (let i = 2; i <= p.ribRows; i++) push(hp.opsAt(i), hp.sectionAt(i));
+  } else {
+    // No hem: the cast-on is the first taper row (its edge rolls; the prose says so).
+    push([{ kind: 'cast_on', count: p.ribCastOnSts }], 'taper');
+  }
 
-  // Taper: at the change to stocking, drop the rib's extra stitch on the right to
-  // reach the even cuff count; then increase 1 st each end on evenly spread rows.
-  const incAt = new Set(evenRows(p.incPerSide, p.taperRows));
-  for (let t = 1; t <= p.taperRows; t++) {
-    if (t === 1) push([{ kind: 'decrease', count: 1, side: 'R' }], 'taper');
-    else push(incAt.has(t) ? [{ kind: 'increase', count: 1, side: 'both' }] : [], 'taper');
+  // Taper: the first stocking row carries the hem's change ops (the rib drops its odd
+  // extra stitch on the right; a frill gathers across); then increase 1 st each end on
+  // evenly spread rows. With no hem the cast-on row IS taper row 1, so the increases
+  // spread over the remaining rows instead.
+  const firstTaper = hp.pieceRows > 0 ? 1 : 2;
+  const incAt = new Set(evenRows(p.incPerSide, p.taperRows - (firstTaper - 1)));
+  for (let t = firstTaper; t <= p.taperRows; t++) {
+    if (t === firstTaper && hp.firstBodyOps.length > 0) push(hp.firstBodyOps, 'taper');
+    else
+      push(
+        incAt.has(t - (firstTaper - 1)) ? [{ kind: 'increase', count: 1, side: 'both' }] : [],
+        'taper',
+      );
   }
 
   // Drop shoulder: no cap — the whole straight top comes off on waste yarn (it sews
@@ -294,9 +317,10 @@ export function sleeves(
   style: EaseStyleId,
   gauge: Gauge,
   shoulder: ShoulderStyle = 'set_in',
+  opts: GarmentOptions = {},
 ): { left: Row[]; right: Row[] } {
   return {
-    left: sleeveRows('sleeve_l', size, style, gauge, shoulder),
-    right: sleeveRows('sleeve_r', size, style, gauge, shoulder),
+    left: sleeveRows('sleeve_l', size, style, gauge, shoulder, opts),
+    right: sleeveRows('sleeve_r', size, style, gauge, shoulder, opts),
   };
 }

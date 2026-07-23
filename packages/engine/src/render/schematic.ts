@@ -17,6 +17,7 @@
 
 import type { Row, Carriage } from '../row';
 import type { Gauge } from '../gauge';
+import { HEM_SECTIONS } from '../pieces/hem';
 
 /** A point in stitch/row space: x = stitches from the centre line, y = rows from cast-on. */
 export interface Pt {
@@ -60,11 +61,22 @@ export interface PieceSchematic {
   widthSts: number; // full cast-on width
   heightRows: number;
   ribRows: number;
+  /** Band label for the tinted hem strip ('rib' when absent — the historical default). */
+  hemLabel?: string;
   gauge: Gauge;
   measures: Measure[];
   /** Shaping symbols for the per-stitch chart. */
   marks: ShapeMark[];
 }
+
+/** What the tinted band at the bottom of a piece is called, per hem style. */
+const HEM_LABELS: Record<string, string> = {
+  ribbing: 'rib',
+  moss_band: 'moss',
+  garter_band: 'garter',
+  folded_band: 'hem',
+  frill: 'frill',
+};
 
 // ---------------------------------------------------------------------------
 // Building the Back outline from its row array.
@@ -95,6 +107,7 @@ function splitNeckSchematic(
     totalRows: number;
     neckWidthSts: number;
     armholeRows: number;
+    hemLabel?: string;
   },
 ): PieceSchematic {
   const bodyHalf = opts.bodySts / 2;
@@ -158,6 +171,7 @@ function splitNeckSchematic(
     widthSts: opts.bodySts,
     heightRows: topY,
     ribRows: opts.ribRows,
+    hemLabel: opts.hemLabel,
     gauge,
     measures,
     marks,
@@ -166,7 +180,15 @@ function splitNeckSchematic(
 
 export function backSchematic(
   rows: Row[],
-  plan: { bodySts: number; backNeckSts: number; ribRows: number; totalRows: number; armholeRows: number },
+  plan: {
+    bodySts: number;
+    backNeckSts: number;
+    ribRows: number;
+    totalRows: number;
+    pieceTotalRows?: number;
+    armholeRows: number;
+    hem?: string;
+  },
   gauge: Gauge,
 ): PieceSchematic {
   return splitNeckSchematic(rows, gauge, {
@@ -175,9 +197,12 @@ export function backSchematic(
     neckLabel: 'back neck',
     bodySts: plan.bodySts,
     ribRows: plan.ribRows,
-    totalRows: plan.totalRows,
+    // The knitted piece's height — a folded hem's facing makes it taller than the
+    // garment length, and the schematic draws the piece you knit.
+    totalRows: plan.pieceTotalRows ?? plan.totalRows,
     neckWidthSts: plan.backNeckSts,
     armholeRows: plan.armholeRows,
+    hemLabel: plan.hem ? HEM_LABELS[plan.hem] : undefined,
   });
 }
 
@@ -187,7 +212,14 @@ export function backSchematic(
 
 export function frontSchematic(
   rows: Row[],
-  plan: { bodySts: number; ribRows: number; totalRows: number; armholeRows: number },
+  plan: {
+    bodySts: number;
+    ribRows: number;
+    totalRows: number;
+    pieceTotalRows?: number;
+    armholeRows: number;
+    hem?: string;
+  },
   fnp: { neckLineRow: number; frontNeckSts: number; shoulderSts: number },
   gauge: Gauge,
 ): PieceSchematic {
@@ -198,8 +230,9 @@ export function frontSchematic(
     ? (((split.ops[0] as { count?: number })?.count) ?? 0)
     : fnp.frontNeckSts;
   // The two neck halves continue the row index past the garment top, so take the
-  // top from the plan rather than the last row index.
-  const topY = plan.totalRows;
+  // top from the plan rather than the last row index (piece rows: a folded hem's
+  // facing makes the piece taller than the garment).
+  const topY = plan.pieceTotalRows ?? plan.totalRows;
   // Below the split, the front is the back: track its true edges up to the split.
   const { rightPts, leftPts, underarmY, marks } = trackBodyEdges(rows, bodyHalf, splitY);
   const achievedHalf = rightPts[rightPts.length - 1].x; // armhole width reached
@@ -262,6 +295,7 @@ export function frontSchematic(
     widthSts: plan.bodySts,
     heightRows: topY,
     ribRows: plan.ribRows,
+    hemLabel: plan.hem ? HEM_LABELS[plan.hem] : undefined,
     gauge,
     measures,
     marks,
@@ -357,6 +391,13 @@ function trackBodyEdges(
           marks.push({ kind: 'castoff', x: -(leftSts + op.count / 2), y: cy, span: op.count });
         }
       } else if (op.kind === 'decrease') {
+        if (op.side === 'across') {
+          // A frill's gather: the whole row halves back to the panel width. The
+          // silhouette snaps in symmetrically; no edge glyph (nothing happens at
+          // an edge — the whole row changes).
+          rightSts -= Math.ceil(op.count / 2);
+          leftSts -= Math.floor(op.count / 2);
+        }
         if (op.side === 'R' || op.side === 'both') {
           rightSts -= op.count;
           marks.push({ kind: 'dec', x: rightSts - 0.5, y: cy, lean: 1 });
@@ -376,8 +417,8 @@ function trackBodyEdges(
         }
       }
     }
-    const rx = r.section === 'rib' ? bodyHalf : rightSts;
-    const lx = r.section === 'rib' ? -bodyHalf : -leftSts;
+    const rx = HEM_SECTIONS.has(r.section ?? '') ? bodyHalf : rightSts;
+    const lx = HEM_SECTIONS.has(r.section ?? '') ? -bodyHalf : -leftSts;
     // On a change, first close off the plateau (a flat run holds until the row
     // before), so a cast-off reads as a step and never a diagonal taper.
     if (rx !== lastR) {
@@ -404,7 +445,13 @@ function trackBodyEdges(
 
 export function sleeveSchematic(
   rows: Row[],
-  plan: { bodyCuffSts: number; sleeveTopSts: number; capTopSts: number; ribRows: number },
+  plan: {
+    bodyCuffSts: number;
+    sleeveTopSts: number;
+    capTopSts: number;
+    ribRows: number;
+    hem?: string;
+  },
   gauge: Gauge,
 ): PieceSchematic {
   const cuffHalf = plan.bodyCuffSts / 2;
@@ -440,6 +487,12 @@ export function sleeveSchematic(
           marks.push({ kind: 'castoff', x: -(leftSts + op.count / 2), y: cy, span: op.count });
         }
       } else if (op.kind === 'decrease') {
+        if (op.side === 'across') {
+          // A frill cuff's gather: the row halves back to the cuff width — the
+          // silhouette snaps in symmetrically, no edge glyph.
+          rightSts -= Math.ceil(op.count / 2);
+          leftSts -= Math.floor(op.count / 2);
+        }
         if (op.side === 'R' || op.side === 'both') {
           rightSts -= op.count;
           marks.push({ kind: 'dec', x: rightSts - 0.5, y: cy, lean: 1 });
@@ -451,8 +504,8 @@ export function sleeveSchematic(
       }
     }
     if (r.section === 'cap' && capStartY === 0) capStartY = r.index - 1; // underarm
-    const rx = r.section === 'rib' ? cuffHalf : rightSts;
-    const lx = r.section === 'rib' ? -cuffHalf : -leftSts;
+    const rx = HEM_SECTIONS.has(r.section ?? '') ? cuffHalf : rightSts;
+    const lx = HEM_SECTIONS.has(r.section ?? '') ? -cuffHalf : -leftSts;
     if (rx > maxHalf) maxHalf = rx;
     // Close the plateau before a change, so the underarm cast-off steps in rather
     // than sloping diagonally from the last taper increase.
@@ -497,6 +550,7 @@ export function sleeveSchematic(
     widthSts: Math.round(maxHalf * 2),
     heightRows: topY,
     ribRows: plan.ribRows,
+    hemLabel: plan.hem ? HEM_LABELS[plan.hem] : undefined,
     gauge,
     measures,
     marks,
@@ -752,7 +806,7 @@ export function schematicSvg(s: PieceSchematic, opts: SvgOpts = {}): string {
       `<rect x="${X(-halfW).toFixed(1)}" y="${ribTop.toFixed(1)}" width="${(s.widthSts * cellW).toFixed(1)}" height="${(Y(0) - ribTop).toFixed(1)}" fill="#e9e4d6"/>`,
     );
     parts.push(
-      `<text x="${(X(-halfW) + 4).toFixed(1)}" y="${(Y(0) - 5).toFixed(1)}" font-size="11" fill="#7c745f">rib</text>`,
+      `<text x="${(X(-halfW) + 4).toFixed(1)}" y="${(Y(0) - 5).toFixed(1)}" font-size="11" fill="#7c745f">${s.hemLabel ?? 'rib'}</text>`,
     );
   }
 

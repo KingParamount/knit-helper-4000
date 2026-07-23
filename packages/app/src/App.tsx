@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
-import { availableChests, schematicMetrics, flatBackAllowed, bodyLengthAllowed } from '@knit-helper-4000/engine';
-import type { Category, Units, NeckStyle, BackNeckStyle, ShoulderStyle, BodyLength } from '@knit-helper-4000/engine';
+import { availableChests, schematicMetrics, flatBackAllowed, bodyLengthAllowed, hemAllowed } from '@knit-helper-4000/engine';
+import type { Category, Units, NeckStyle, BackNeckStyle, ShoulderStyle, BodyLength, HemStyle } from '@knit-helper-4000/engine';
 import {
   DEFAULT_SWATCH,
   buildPattern,
@@ -173,6 +173,14 @@ const BODY_LENGTHS: { id: BodyLength; label: string }[] = [
   { id: 'calf', label: 'Calf' },
   { id: 'ankle', label: 'Ankle' },
 ];
+const HEMS: { id: HemStyle; label: string }[] = [
+  { id: 'ribbing', label: 'Ribbing' },
+  { id: 'moss_band', label: 'Moss band' },
+  { id: 'garter_band', label: 'Garter band' },
+  { id: 'folded_band', label: 'Folded band' },
+  { id: 'frill', label: 'Frill' },
+  { id: 'none', label: 'No hem' },
+];
 const PIECES: { id: PieceId; label: string }[] = [
   { id: 'back', label: 'Back' },
   { id: 'front', label: 'Front' },
@@ -189,6 +197,7 @@ export function App(): JSX.Element {
   const [backNeck, setBackNeck] = useState<BackNeckStyle>('scoop');
   const [shoulder, setShoulder] = useState<ShoulderStyle>('set_in');
   const [bodyLength, setBodyLength] = useState<BodyLength>('hip');
+  const [hem, setHem] = useState<HemStyle>('ribbing');
   const [swatch, setSwatch] = useState<Swatch>(DEFAULT_SWATCH);
   const [output, setOutput] = useState<OutputId>('full');
   const [piece, setPiece] = useState<PieceId>('back');
@@ -228,29 +237,36 @@ export function App(): JSX.Element {
   const flatBackOk = sizeRec ? flatBackAllowed(sizeRec, neck) : true;
   const effBackNeck: BackNeckStyle = backNeck === 'flat' && !flatBackOk ? 'scoop' : backNeck;
 
+  // Method maps straight onto the engine's Technique (machine | hand).
+  const technique = method === 'hand' ? ('hand' as const) : ('machine' as const);
+
+  // A frill hem is hand-only (the doubled cast-on outruns a machine bed); blocked,
+  // not warned, and the selection falls back to ribbing so the pattern stays buildable.
+  const hemOk = (h: HemStyle): boolean => hemAllowed(h, technique);
+  const effHem: HemStyle = hemOk(hem) ? hem : 'ribbing';
+
   // A short body must still clear its own armhole + hem (a crop over a deep raglan can
   // ask for a body shorter than its top and bottom). Same block-not-warn policy as the
   // flat back; a blocked selection falls back to hip so the pattern stays buildable.
+  // The hem feeds in: a shallow band or no hem frees rows and can unblock crop.
   const lengthOk = (bl: BodyLength): boolean =>
-    sizeRec ? bodyLengthAllowed(sizeRec, ease, gaugeFromSwatch(swatch), shoulder, bl) : true;
+    sizeRec ? bodyLengthAllowed(sizeRec, ease, gaugeFromSwatch(swatch), shoulder, bl, effHem) : true;
   const effBodyLength: BodyLength = lengthOk(bodyLength) ? bodyLength : 'hip';
 
-  // Method maps straight onto the engine's Technique (machine | hand).
-  const technique = method === 'hand' ? ('hand' as const) : ('machine' as const);
   const input = {
     category, chest, units, ease, neck, backNeck: effBackNeck, shoulder,
-    bodyLength: effBodyLength, swatch, technique,
+    bodyLength: effBodyLength, hem: effHem, swatch, technique,
   };
   const gauge = gaugeReadout(gaugeFromSwatch(swatch), units);
 
   // Live outputs — the engine is pure and fast, so this runs every render.
   const patternText = useMemo(
     () => buildPatternText(input, output === 'concise' ? 'abbreviated' : 'verbose'),
-    [category, chest, ease, neck, effBackNeck, shoulder, effBodyLength, swatch, output, technique],
+    [category, chest, ease, neck, effBackNeck, shoulder, effBodyLength, effHem, swatch, output, technique],
   );
   const schematics = useMemo(
     () => buildSchematics(input),
-    [category, chest, ease, neck, effBackNeck, shoulder, effBodyLength, swatch, technique],
+    [category, chest, ease, neck, effBackNeck, shoulder, effBodyLength, effHem, swatch, technique],
   );
 
   const diagramSvg = (pid: PieceId, factor?: number): string =>
@@ -465,12 +481,14 @@ export function App(): JSX.Element {
           </Tile>
           <Tile title="Hem">
             <div className="btn-row">
-              <Btn label="Ribbing" state="selected" />
-              <Btn label="Moss band" state="soon" />
-              <Btn label="Garter band" state="soon" />
-              <Btn label="Folded band" state="soon" />
-              <Btn label="Frill" state="soon" />
-              <Btn label="No hem" state="soon" />
+              {HEMS.map((h) => (
+                <Btn
+                  key={h.id}
+                  label={h.label}
+                  state={!hemOk(h.id) ? 'blocked' : effHem === h.id ? 'selected' : 'normal'}
+                  onClick={() => setHem(h.id)}
+                />
+              ))}
             </div>
           </Tile>
         </Section>
