@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
-import { availableChests, schematicMetrics, flatBackAllowed, bodyLengthAllowed, hemAllowed } from '@knit-helper-4000/engine';
+import { availableChests, schematicMetrics, flatBackAllowed, bodyLengthAllowed, hemAllowed, sleeveStyleAllowed } from '@knit-helper-4000/engine';
 import type { Category, Units, NeckStyle, BackNeckStyle, ShoulderStyle, BodyLength, HemStyle, SleeveLength } from '@knit-helper-4000/engine';
 import {
   DEFAULT_SWATCH,
@@ -186,6 +186,7 @@ const SLEEVE_LENGTHS: { id: SleeveLength; label: string }[] = [
   { id: 'three_quarter', label: '¾ length' },
   { id: 'half', label: 'Half' },
   { id: 'short', label: 'Short' },
+  { id: 'cap', label: 'Cap' },
 ];
 const PIECES: { id: PieceId; label: string }[] = [
   { id: 'back', label: 'Back' },
@@ -260,20 +261,25 @@ export function App(): JSX.Element {
     sizeRec ? bodyLengthAllowed(sizeRec, ease, gaugeFromSwatch(swatch), shoulder, bl, effHem) : true;
   const effBodyLength: BodyLength = lengthOk(bodyLength) ? bodyLength : 'hip';
 
+  // A cap needs a set-in shoulder (it is the cap bell shortened); a blocked pick falls
+  // back to a full sleeve so the pattern stays buildable. Same block-not-warn policy.
+  const sleeveOk = (sl: SleeveLength): boolean => sleeveStyleAllowed(shoulder, sl);
+  const effSleeveLength: SleeveLength = sleeveOk(sleeveLength) ? sleeveLength : 'full';
+
   const input = {
     category, chest, units, ease, neck, backNeck: effBackNeck, shoulder,
-    bodyLength: effBodyLength, hem: effHem, sleeveLength, swatch, technique,
+    bodyLength: effBodyLength, hem: effHem, sleeveLength: effSleeveLength, swatch, technique,
   };
   const gauge = gaugeReadout(gaugeFromSwatch(swatch), units);
 
   // Live outputs — the engine is pure and fast, so this runs every render.
   const patternText = useMemo(
     () => buildPatternText(input, output === 'concise' ? 'abbreviated' : 'verbose'),
-    [category, chest, ease, neck, effBackNeck, shoulder, effBodyLength, effHem, sleeveLength, swatch, output, technique],
+    [category, chest, ease, neck, effBackNeck, shoulder, effBodyLength, effHem, effSleeveLength, swatch, output, technique],
   );
   const schematics = useMemo(
     () => buildSchematics(input),
-    [category, chest, ease, neck, effBackNeck, shoulder, effBodyLength, effHem, sleeveLength, swatch, technique],
+    [category, chest, ease, neck, effBackNeck, shoulder, effBodyLength, effHem, effSleeveLength, swatch, technique],
   );
 
   const diagramSvg = (pid: PieceId, factor?: number): string =>
@@ -566,11 +572,10 @@ export function App(): JSX.Element {
                   key={l.id}
                   icon={<IconSleeve />}
                   label={l.label}
-                  state={sleeveLength === l.id ? 'selected' : 'normal'}
+                  state={!sleeveOk(l.id) ? 'blocked' : effSleeveLength === l.id ? 'selected' : 'normal'}
                   onClick={() => setSleeveLength(l.id)}
                 />
               ))}
-              <Btn icon={<IconSleeve />} label="Cap" state="soon" />
               <Btn icon={<IconSleeve />} label="Sleeveless" state="soon" />
             </div>
           </Tile>

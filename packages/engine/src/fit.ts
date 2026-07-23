@@ -106,6 +106,28 @@ export function flatFrontAllowed(size: SizeRecord, backNeck: BackNeckStyle = 'sc
   return neckClearsHead(size, 'flat', backNeck);
 }
 
+/**
+ * May this sleeve length be offered with this shoulder?
+ *  - A modern CAP is the set-in cap bell shortened to cap the shoulder — it only makes
+ *    sense with a set-in shoulder (a drop has no cap to shorten, and its short sleeve is
+ *    already the 'short' length; a raglan/saddle IS its sleeve top). set-in only.
+ *  - SLEEVELESS finishes the armhole with a picked-up band; a set-in or drop armhole is
+ *    an edge to band, but a raglan's seam and a saddle's strap ARE the sleeve, so there
+ *    is nothing to make the shoulder from without one.
+ * (Knitware's RAGLAN_NO_CAP + SADDLE_NEEDS_SLEEVES, plus our own block on the sleeveless
+ * raglan Knitware emits but cannot actually build.) The sleeved lengths go with anything.
+ */
+export function sleeveStyleAllowed(shoulder: ShoulderStyle, sleeveLength: SleeveLength): boolean {
+  if (sleeveLength === 'cap') return shoulder === 'set_in';
+  if (sleeveLength === 'sleeveless') return shoulder === 'set_in' || shoulder === 'drop';
+  return true;
+}
+
+/** Is this a sleeveless garment (no sleeve pieces; a picked-up armhole band instead)? */
+export function isSleeveless(sleeveLength: SleeveLength | undefined): boolean {
+  return sleeveLength === 'sleeveless';
+}
+
 /** Does the hem sit at or below the hip (so the tube must clear the hip on the way down)? */
 export function hemReachesHip(bodyLength: BodyLength): boolean {
   return BODY_LENGTHS.indexOf(bodyLength) >= BODY_LENGTHS.indexOf('hip');

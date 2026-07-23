@@ -72,7 +72,7 @@ export {
 } from './pieces/front';
 export type { FrontNeckPlan } from './pieces/front';
 
-export { CUFF_EASE_IN, SLEEVE_LENGTH_FRACTION, evenRows, sleevePlan, sleeveRows, sleeves } from './pieces/sleeve';
+export { CUFF_EASE_IN, SLEEVE_LENGTH_FRACTION, MIN_CAP_TAPER_ROWS, evenRows, sleevePlan, sleeveRows, sleeves } from './pieces/sleeve';
 export type { SleevePlan } from './pieces/sleeve';
 
 export { hemPlan, HEM_SECTIONS, HEM_END_SECTIONS } from './pieces/hem';
@@ -98,6 +98,8 @@ export {
   hemReachesHip,
   bodyLengthAllowed,
   hemAllowed,
+  sleeveStyleAllowed,
+  isSleeveless,
   MIN_BODY_ROWS,
   fitReport,
   HIP_STRETCH,

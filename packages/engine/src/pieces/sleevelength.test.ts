@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { sizes, findSize } from '../data/sizes';
 import type { HemStyle, ShoulderStyle, SleeveLength } from '../data/types';
 import { DEFAULT_GAUGE } from '../gauge';
-import { sleevePlan, sleeveRows, SLEEVE_LENGTH_FRACTION, CUFF_EASE_IN } from './sleeve';
+import { sleevePlan, sleeveRows, SLEEVE_LENGTH_FRACTION, CUFF_EASE_IN, MIN_CAP_TAPER_ROWS } from './sleeve';
+import { sleeveStyleAllowed } from '../fit';
 import { hemPlan } from './hem';
 import { garmentWidths } from '../dimensions';
 import { assembleGarment } from './garment';
@@ -81,6 +82,49 @@ describe('the truncated taper', () => {
           expect(p.taperRows, `${s.category} ${s.chest} ${sl}`).toBeGreaterThanOrEqual(2);
           expect(p.taperRows).toBeGreaterThanOrEqual(p.incPerSide);
         }
+  });
+});
+
+describe('the cap sleeve (a short set-in cap)', () => {
+  it('is a set-in shoulder feature only', () => {
+    expect(sleeveStyleAllowed('set_in', 'cap')).toBe(true);
+    for (const sh of ['drop', 'raglan', 'saddle'] as ShoulderStyle[])
+      expect(sleeveStyleAllowed(sh, 'cap')).toBe(false);
+    // The sleeved lengths go with any shoulder.
+    for (const sh of SHOULDERS) for (const sl of LENGTHS) expect(sleeveStyleAllowed(sh, sl)).toBe(true);
+  });
+
+  it('is almost all cap: a floored taper, then the full cap bell', () => {
+    for (const s of inSizes)
+      for (const g of GAUGES) {
+        const cap = sleevePlan(s, 'moderate', g, 'set_in', { sleeveLength: 'cap' });
+        const short = sleevePlan(s, 'moderate', g, 'set_in', { sleeveLength: 'short' });
+        const full = sleevePlan(s, 'moderate', g, 'set_in', { sleeveLength: 'full' });
+        // Shortest of the lot below the armhole, but never below the knittable floor.
+        expect(cap.taperRows).toBeGreaterThanOrEqual(MIN_CAP_TAPER_ROWS);
+        expect(cap.taperRows).toBeLessThanOrEqual(short.taperRows);
+        // Casts on near the sleeve top (a cap has no wrist to taper from), so it barely
+        // increases — but the cap bell is the same one that fills the armhole. (At a
+        // coarse gauge the cap/short cuff difference can round to the same stitch.)
+        expect(cap.bodyCuffSts).toBeGreaterThanOrEqual(short.bodyCuffSts);
+        expect(cap.incPerSide).toBeLessThanOrEqual(short.incPerSide);
+        expect(cap.capHeightRows).toBe(full.capHeightRows);
+      }
+  });
+
+  it('sews up across every size and gauge', () => {
+    let checked = 0;
+    for (const s of inSizes)
+      for (const g of GAUGES) {
+        const r = assemblyReport(s, 'moderate', g, 'round', 'set_in', 'scoop', { sleeveLength: 'cap' });
+        expect(r.allOk, `${r.size} cap: ${JSON.stringify(r.invariants.filter((i) => !i.ok))}`).toBe(true);
+        for (const rows of [
+          sleeveRows('sleeve_l', s, 'moderate', g, 'set_in', { sleeveLength: 'cap' }),
+        ])
+          for (const row of rows) expect(row.carriage).toMatch(/^[LR]$/);
+        checked++;
+      }
+    expect(checked).toBe(inSizes.length * GAUGES.length);
   });
 });
 

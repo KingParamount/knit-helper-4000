@@ -40,7 +40,17 @@ export const SLEEVE_LENGTH_FRACTION: Record<SleeveLength, number> = {
   three_quarter: 0.75,
   half: 0.5,
   short: 0.25,
+  // A cap is almost all cap: a sliver of straight sleeve below the armhole, then the
+  // bell. Its taper is floored (MIN_CAP_TAPER_ROWS) so the cuff is a real band, not a
+  // rounding artefact.
+  cap: 0.1,
+  // Sleeveless has no sleeve piece; the value is never read (the generators skip the
+  // sleeve for it), but the Record type demands an entry.
+  sleeveless: 0,
 };
+
+/** A cap keeps at least this many straight rows below the bell, so the cuff is knittable. */
+export const MIN_CAP_TAPER_ROWS = 4;
 
 /**
  * A sleeve hem never takes more than this fraction of the sleeve's length — a full
@@ -146,8 +156,12 @@ export function sleevePlan(
   const ribCastOnSts = hp.castOnSts;
   const ribRows = hp.pieceRows;
   // Sleeve length less the hem's contribution to hanging length (a folded cuff's
-  // facing turns up inside).
-  const taperRows = rowsFor(lengthIn, gauge) - hp.lengthRows;
+  // facing turns up inside). A cap floors the straight run so its tiny sleeve is still
+  // knittable below the bell.
+  const taperRows = Math.max(
+    sleeveLength === 'cap' ? MIN_CAP_TAPER_ROWS : 0,
+    rowsFor(lengthIn, gauge) - hp.lengthRows,
+  );
   // NB the allowance is deliberately NOT added at the top. The sleeve top is not a
   // free edge — it is sewn into the armhole, and the Tier-A join invariant requires
   // the two to match. Widening it breaks that join (it did: drop-shoulder Child sizes

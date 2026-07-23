@@ -145,15 +145,21 @@ export type BodyLength =
 export type HemStyle = 'ribbing' | 'moss_band' | 'garter_band' | 'folded_band' | 'frill' | 'none';
 
 /**
- * Sleeve length, from the `sleeve_length` option vocabulary. Each is a fraction of
- * the full underarm-to-wrist length (arm_length + ease_arml), and the sleeve is the
- * full sleeve's taper TRUNCATED: the hem width sits on the same straight line from
- * the sleeve top to the wrist, so a shorter sleeve casts on wider and increases
- * less, and 'full' reproduces the original garment exactly. 'cap' and 'sleeveless'
- * are deliberately absent for now — they are new construction (armhole finishes),
- * queued behind a Knitware harvest.
+ * Sleeve length, from the `sleeve_length` option vocabulary. full / three_quarter /
+ * half / short are fractions of the full underarm-to-wrist length (arm_length +
+ * ease_arml): the sleeve is the full sleeve's taper TRUNCATED — the hem width sits on
+ * the same straight line from the sleeve top to the wrist, so a shorter sleeve casts
+ * on wider and increases less, and 'full' reproduces the original garment exactly.
+ *
+ * 'cap' is a very short set-in sleeve: almost no sleeve below the armhole, just the
+ * cap that caps the shoulder. It casts on near the upper-arm width and the usual cap
+ * bell fills the armhole — a modern cap, not Knitware's picked-up armhole edging.
+ *
+ * 'sleeveless' is no sleeve at all: the armhole is finished with a picked-up band and
+ * the body armhole is cut deeper and narrower so it sits against the body. It needs a
+ * set-in or drop shoulder — a raglan or saddle IS its sleeve (see the constraints).
  */
-export type SleeveLength = 'full' | 'three_quarter' | 'half' | 'short';
+export type SleeveLength = 'full' | 'three_quarter' | 'half' | 'short' | 'cap' | 'sleeveless';
 
 /**
  * The optional style axes added after the original five positional parameters
