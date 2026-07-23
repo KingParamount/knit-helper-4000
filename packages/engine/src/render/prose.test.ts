@@ -38,19 +38,19 @@ describe('plain stretches read the dial', () => {
     }
   });
   it('states the body end and carriage', () => {
-    expect(has(back, 'Knit until the row counter reads 120. The carriage should be on the left.')).toBe(true);
+    expect(has(back, 'Knit until the row counter reads 140. The carriage should be on the left.')).toBe(true);
   });
 });
 
 describe('armhole shaping (verbose)', () => {
   it('leads each cast-off with the counter and states the edge', () => {
-    expect(has(back, 'Knit 1 row to row counter 121, then cast off 7 stitches at the right hand edge.')).toBe(true);
-    expect(has(back, 'Knit 1 row to row counter 122, then cast off 7 stitches at the left hand edge.')).toBe(true);
+    expect(has(back, 'Knit 1 row to row counter 141, then cast off 7 stitches at the right hand edge.')).toBe(true);
+    expect(has(back, 'Knit 1 row to row counter 142, then cast off 7 stitches at the left hand edge.')).toBe(true);
   });
   it('states a decrease once then repeats it, per phase', () => {
-    expect(has(back, 'Knit 1 row to row counter 123, then decrease 1 stitch at either end of the row.')).toBe(true);
-    expect(has(back, 'Repeat the last instruction for row counts 124 to 127 (making a total of 5 times). The carriage should be on the right.')).toBe(true);
-    expect(has(back, 'on every 2nd row, at row counts 131, 133, 135, 137, 139, 141, 143 and 145 (making a total of 9 times)')).toBe(true);
+    expect(has(back, 'Knit 1 row to row counter 143, then decrease 1 stitch at either end of the row.')).toBe(true);
+    expect(has(back, 'Repeat the last instruction for row counts 144 to 147 (making a total of 5 times). The carriage should be on the right.')).toBe(true);
+    expect(has(back, 'on every 2nd row, at row counts 151, 153, 155, 157, 159, 161, 163 and 165 (making a total of 9 times)')).toBe(true);
   });
 });
 
@@ -78,9 +78,9 @@ describe('abbreviated mode', () => {
   it('abbreviates the transition, shaping and carriage', () => {
     expect(has(backT, 'RC to 000, change to st st, set to MT, dec 1 st at RH. COL.')).toBe(true);
     expect(has(backT, '146 st (73L, 73R).')).toBe(true);
-    expect(has(backT, 'Kn to RC 121, then BO 7 st at RH.')).toBe(true);
-    expect(has(backT, 'Kn to RC 123, then dec 1 st at either end.')).toBe(true);
-    expect(has(backT, 'Rpt instruction for RC 124 to 127 (total 5 times). COR.')).toBe(true);
+    expect(has(backT, 'Kn to RC 141, then BO 7 st at RH.')).toBe(true);
+    expect(has(backT, 'Kn to RC 143, then dec 1 st at either end.')).toBe(true);
+    expect(has(backT, 'Rpt instruction for RC 144 to 147 (total 5 times). COR.')).toBe(true);
   });
   it('divides for the back neck and short-rows the shoulders; never CO for a cast-off', () => {
     expect(has(backT, 'BO centre 42 st loosely to divide for neck.')).toBe(true);

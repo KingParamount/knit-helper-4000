@@ -158,10 +158,15 @@ describe('hem availability and the crop reopening', () => {
     }
   });
 
-  it('a shallow hem reopens crop×raglan for adults (the guard reads the real hem depth)', () => {
-    for (const s of inSizes.filter((x) => x.category === 'Man' || x.category === 'Woman')) {
-      expect(bodyLengthAllowed(s, 'moderate', G, 'raglan', 'crop', 'ribbing')).toBe(false);
-      expect(bodyLengthAllowed(s, 'moderate', G, 'raglan', 'crop', 'moss_band')).toBe(true);
+  it('a shallow hem reopens the last blocked crop raglans (the guard reads the real hem depth)', () => {
+    // After the length-cover allowance the only crop that still blocks is a small child's
+    // raglan at a coarse gauge; a shallower band (half-depth moss/garter, or no hem) frees
+    // the rows and reopens it.
+    for (const chest of [22, 26]) {
+      const s = findSize('Child', chest, 'in')!;
+      expect(bodyLengthAllowed(s, 'moderate', G3, 'raglan', 'crop', 'ribbing')).toBe(false);
+      expect(bodyLengthAllowed(s, 'moderate', G3, 'raglan', 'crop', 'moss_band')).toBe(true);
+      expect(bodyLengthAllowed(s, 'moderate', G3, 'raglan', 'crop', 'none')).toBe(true);
     }
   });
 });

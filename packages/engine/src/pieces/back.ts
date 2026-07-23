@@ -130,9 +130,29 @@ function napeToHemInches(size: SizeRecord, bodyLength: BodyLength): number {
   }
 }
 
-/** Body length to the SHOULDER line (nape-to-hem, less the neck/shoulder rise). */
+/**
+ * Garment length allowance: how far the hem hangs BELOW its named landmark. A named
+ * length means the garment *covers* that landmark, not that its hem lands exactly on
+ * it — a hem stopping on the fullest hip sits at the widest point and rides up, the
+ * classic unflattering length. So the hem clears the landmark by this much, which is
+ * also what lets it hang past the point instead of curving up before it.
+ *
+ * A modern hip-length women's medium runs ~24–26" from the shoulder; our raw
+ * anatomical hip lands ~23", so ~2" of clearance puts it mid-range. Knitware bakes in
+ * a larger, near-constant ~4.5" (its "hip" is really a low-hip/tunic) — we take the
+ * lighter, more current clearance (King, 2026-07-23). Verified against the harvested
+ * KW Body Length ladder: our named lengths reproduced KW's ONE notch shorter (our
+ * 'hip' == KW 'Regular') because they were raw landmarks; this allowance is the
+ * "covers, not reaches" correction. See knitware-phase4-harvest.
+ */
+export const LENGTH_COVER_IN = 2.0;
+
+/**
+ * Body length to the SHOULDER line: nape-to-hem, less the neck/shoulder rise, plus the
+ * clearance that carries the hem past (covering) the landmark.
+ */
 export function bodyLengthInches(size: SizeRecord, bodyLength: BodyLength = 'hip'): number {
-  return napeToHemInches(size, bodyLength) - neckRiseInches(size);
+  return napeToHemInches(size, bodyLength) - neckRiseInches(size) + LENGTH_COVER_IN;
 }
 
 export function backPlan(

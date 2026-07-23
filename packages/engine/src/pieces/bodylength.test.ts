@@ -3,7 +3,7 @@ import { sizes, findSize } from '../data/sizes';
 import { easeStyles } from '../data/options';
 import type { EaseStyleId, ShoulderStyle, BodyLength } from '../data/types';
 import { DEFAULT_GAUGE } from '../gauge';
-import { backPlan, backRows, bodyLengthInches, BODY_LENGTHS } from './back';
+import { backPlan, backRows, bodyLengthInches, BODY_LENGTHS, LENGTH_COVER_IN } from './back';
 import { frontRows } from './front';
 import { assembleGarment } from './garment';
 import { assemblyReport } from './assembly';
@@ -37,19 +37,31 @@ describe('the body-length ladder', () => {
   it('hip is the default and reproduces the original formula', () => {
     for (const s of inSizes) {
       expect(bodyLengthInches(s)).toBe(bodyLengthInches(s, 'hip'));
-      // nape-to-hip less the neck rise (the pre-body-length behaviour, back.ts).
+      // nape-to-hip, less the neck rise, plus the cover allowance (back.ts).
       const rise = Math.min(1.6, Math.max(0, (s.neck_depth - 1.7) * 2.3));
-      expect(bodyLengthInches(s, 'hip')).toBeCloseTo(s.neck_to_waist + s.waist_to_hip - rise, 10);
+      expect(bodyLengthInches(s, 'hip')).toBeCloseTo(
+        s.neck_to_waist + s.waist_to_hip - rise + LENGTH_COVER_IN,
+        10,
+      );
     }
   });
 
-  it('the measured anchors land on their columns (waist / hip / knee / ankle)', () => {
+  it('the measured anchors land on their columns + cover (waist / hip / knee / ankle)', () => {
     const rise = (s: (typeof inSizes)[number]): number =>
       Math.min(1.6, Math.max(0, (s.neck_depth - 1.7) * 2.3));
     for (const s of inSizes) {
-      expect(bodyLengthInches(s, 'waist')).toBeCloseTo(s.neck_to_waist - rise(s), 10);
-      expect(bodyLengthInches(s, 'knee')).toBeCloseTo(s.neck_to_waist + s.waist_to_knee - rise(s), 10);
-      expect(bodyLengthInches(s, 'ankle')).toBeCloseTo(s.neck_to_waist + s.waist_to_ankle - rise(s), 10);
+      expect(bodyLengthInches(s, 'waist')).toBeCloseTo(s.neck_to_waist - rise(s) + LENGTH_COVER_IN, 10);
+      expect(bodyLengthInches(s, 'knee')).toBeCloseTo(s.neck_to_waist + s.waist_to_knee - rise(s) + LENGTH_COVER_IN, 10);
+      expect(bodyLengthInches(s, 'ankle')).toBeCloseTo(s.neck_to_waist + s.waist_to_ankle - rise(s) + LENGTH_COVER_IN, 10);
+    }
+  });
+
+  it('the cover allowance carries the hem past (not onto) the landmark', () => {
+    // "hip length" covers the hip; the hem hangs LENGTH_COVER_IN below the raw landmark.
+    for (const s of inSizes) {
+      const rise = Math.min(1.6, Math.max(0, (s.neck_depth - 1.7) * 2.3));
+      const rawHip = s.neck_to_waist + s.waist_to_hip - rise;
+      expect(bodyLengthInches(s, 'hip') - rawHip).toBeCloseTo(LENGTH_COVER_IN, 10);
     }
   });
 });
@@ -93,33 +105,38 @@ describe('bodyLengthAllowed (the UI block, calibrated to our data)', () => {
             expect(bodyLengthAllowed(s, 'moderate', g, sh, bl), `${s.category} ${s.chest} ${sh} ${bl}`).toBe(true);
   });
 
-  it('only crop and waist ever block, and waist only for the smallest raglans', () => {
+  it('only CROP ever blocks now, and only for the smallest child raglans at a coarse gauge', () => {
+    // The cover allowance lengthened every garment ~2", so the crop-blocking that once
+    // hit all raglans and all baby/child set-ins now bites only the tightest corner:
+    // Child 22/24/26 raglans at the coarse sweep gauges (deep raglan armhole + full rib
+    // eats a small torso). Everything else — including crop set-in everywhere, and crop
+    // raglan for every adult — is buildable.
     for (const s of inSizes)
       for (const sh of SHOULDERS)
         for (const g of GAUGES)
           for (const bl of BODY_LENGTHS) {
             if (bodyLengthAllowed(s, 'moderate', g, sh, bl)) continue;
-            expect(['crop', 'waist']).toContain(bl);
-            if (bl === 'waist') {
-              // Calibrated: a raglan's deeper armhole + the full hem rib outruns the
-              // shortest torsos — babies and the two smallest children.
-              expect(sh).toBe('raglan');
-              expect(s.category === 'Baby' || (s.category === 'Child' && s.chest <= 22)).toBe(true);
-            }
+            expect(bl).toBe('crop');
+            expect(sh).toBe('raglan');
+            expect(s.category).toBe('Child');
+            expect(s.chest).toBeLessThanOrEqual(26);
           }
   });
 
-  it('crop: fine for men at set-in, impossible for every raglan (the deep raglan + full rib eats it)', () => {
+  it('crop set-in is buildable everywhere, and crop raglan for every adult', () => {
     for (const s of inSizes) {
-      if (s.category === 'Man') expect(bodyLengthAllowed(s, 'moderate', G, 'set_in', 'crop')).toBe(true);
-      // Note: hem styles (next phase) may reopen this — the guard reads the real hem depth.
-      for (const g of GAUGES) expect(bodyLengthAllowed(s, 'moderate', g, 'raglan', 'crop')).toBe(false);
+      expect(bodyLengthAllowed(s, 'moderate', G, 'set_in', 'crop')).toBe(true);
+      if (s.category === 'Man' || s.category === 'Woman')
+        for (const g of GAUGES) expect(bodyLengthAllowed(s, 'moderate', g, 'raglan', 'crop')).toBe(true);
     }
   });
 
-  it('crop is blocked for every baby and child at set-in (their armhole + hem is the whole length)', () => {
-    for (const s of inSizes.filter((x) => x.category === 'Baby' || x.category === 'Child'))
-      expect(bodyLengthAllowed(s, 'moderate', G, 'set_in', 'crop')).toBe(false);
+  it('a no-hem reopens the last blocked crop raglans (the guard reads the real hem depth)', () => {
+    for (const s of inSizes)
+      for (const sh of SHOULDERS)
+        for (const g of GAUGES)
+          if (!bodyLengthAllowed(s, 'moderate', g, sh, 'crop', 'ribbing'))
+            expect(bodyLengthAllowed(s, 'moderate', g, sh, 'crop', 'none')).toBe(true);
   });
 });
 
