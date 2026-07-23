@@ -20,6 +20,7 @@ export type {
   ShoulderStyle,
   BodyLength,
   HemStyle,
+  SleeveLength,
   GarmentOptions,
   Technique,
 } from './data/types';
@@ -71,7 +72,7 @@ export {
 } from './pieces/front';
 export type { FrontNeckPlan } from './pieces/front';
 
-export { CUFF_EASE_IN, evenRows, sleevePlan, sleeveRows, sleeves } from './pieces/sleeve';
+export { CUFF_EASE_IN, SLEEVE_LENGTH_FRACTION, evenRows, sleevePlan, sleeveRows, sleeves } from './pieces/sleeve';
 export type { SleevePlan } from './pieces/sleeve';
 
 export { hemPlan, HEM_SECTIONS, HEM_END_SECTIONS } from './pieces/hem';

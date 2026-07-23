@@ -16,11 +16,13 @@ import type {
   ShoulderStyle,
   BodyLength,
   HemStyle,
+  SleeveLength,
   GarmentOptions,
 } from './data/types';
 import { garmentWidths, MIN_UPPER_ARM_EASE_IN } from './dimensions';
 import type { Gauge } from './gauge';
 import { backPlan, BODY_LENGTHS } from './pieces/back';
+import { CUFF_EASE_IN, SLEEVE_LENGTH_FRACTION } from './pieces/sleeve';
 import {
   NECK_STRETCH_MAX,
   crewSuitable,
@@ -233,6 +235,22 @@ export function fitReport(
       label: 'v depth sensible',
       ok: vDepth >= MIN_V_DEPTH_IN && vDepth <= maxVDepthIn(size),
       detail: `V drops ${vDepth.toFixed(1)}" (${capped ? `cap ${maxVDepthIn(size)}"` : 'head-fit'})`,
+    });
+  }
+
+  // A shortened sleeve's hem lands partway down the arm, where the arm is thicker
+  // than the wrist — the hem must still go round it. The arm is modelled as a
+  // straight taper from upper arm to wrist (the same line the sleeve itself is cut
+  // from); knit stretch makes flat-to-flat parity sufficient.
+  const sleeveLength = opts.sleeveLength ?? 'full';
+  if (sleeveLength !== 'full') {
+    const frac = SLEEVE_LENGTH_FRACTION[sleeveLength];
+    const hemWidth = w.sleeveTop + frac * (size.wrist + CUFF_EASE_IN - w.sleeveTop);
+    const armAt = size.upper_arm + frac * (size.wrist - size.upper_arm);
+    checks.push({
+      label: 'sleeve hem clears the arm',
+      ok: hemWidth >= armAt,
+      detail: `hem ${hemWidth.toFixed(1)}" vs arm ≈${armAt.toFixed(1)}" at the ${sleeveLength.replace('_', '-')} point`,
     });
   }
 

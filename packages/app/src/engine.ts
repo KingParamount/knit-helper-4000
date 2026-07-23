@@ -27,6 +27,7 @@ import type {
   ShoulderStyle,
   BodyLength,
   HemStyle,
+  SleeveLength,
   Technique,
   ProseStyle,
   Pattern,
@@ -92,6 +93,8 @@ export interface BuildInput {
   bodyLength?: BodyLength;
   /** Hem style for body and cuffs; defaults to 'ribbing' when omitted. */
   hem?: HemStyle;
+  /** Sleeve length; defaults to 'full' when omitted. */
+  sleeveLength?: SleeveLength;
   /** How it is made. Machine unless said otherwise. */
   technique?: Technique;
   swatch: Swatch;
@@ -114,7 +117,7 @@ export function buildPattern(input: BuildInput, style: ProseStyle): Pattern | nu
   const neck = input.neck ?? 'round';
   const backNeck = input.backNeck ?? 'scoop';
   const shoulder = input.shoulder ?? 'set_in';
-  const opts = { bodyLength: input.bodyLength ?? 'hip', hem: input.hem ?? 'ribbing' } as const;
+  const opts = { bodyLength: input.bodyLength ?? 'hip', hem: input.hem ?? 'ribbing', sleeveLength: input.sleeveLength ?? 'full' } as const;
   // Hand prose measures rather than counts, so it needs the row gauge and the
   // knitter's units; machine prose reads neither.
   return renderPattern(assembleGarment(size, input.ease, g, neck, shoulder, backNeck, opts), {
@@ -138,7 +141,7 @@ export function buildSchematics(input: BuildInput): Record<PieceId, PieceSchemat
   const neck = input.neck ?? 'round';
   const backNeck = input.backNeck ?? 'scoop';
   const shoulder = input.shoulder ?? 'set_in';
-  const opts = { bodyLength: input.bodyLength ?? 'hip', hem: input.hem ?? 'ribbing' } as const;
+  const opts = { bodyLength: input.bodyLength ?? 'hip', hem: input.hem ?? 'ribbing', sleeveLength: input.sleeveLength ?? 'full' } as const;
   const bp = backPlan(size, input.ease, g, shoulder, backNeck, opts);
   const fnp = frontNeckPlan(size, input.ease, g, neck, shoulder, opts);
   const sp = sleevePlan(size, input.ease, g, shoulder, opts);

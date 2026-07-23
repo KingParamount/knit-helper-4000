@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
 import { availableChests, schematicMetrics, flatBackAllowed, bodyLengthAllowed, hemAllowed } from '@knit-helper-4000/engine';
-import type { Category, Units, NeckStyle, BackNeckStyle, ShoulderStyle, BodyLength, HemStyle } from '@knit-helper-4000/engine';
+import type { Category, Units, NeckStyle, BackNeckStyle, ShoulderStyle, BodyLength, HemStyle, SleeveLength } from '@knit-helper-4000/engine';
 import {
   DEFAULT_SWATCH,
   buildPattern,
@@ -181,6 +181,12 @@ const HEMS: { id: HemStyle; label: string }[] = [
   { id: 'frill', label: 'Frill' },
   { id: 'none', label: 'No hem' },
 ];
+const SLEEVE_LENGTHS: { id: SleeveLength; label: string }[] = [
+  { id: 'full', label: 'Full' },
+  { id: 'three_quarter', label: '¾ length' },
+  { id: 'half', label: 'Half' },
+  { id: 'short', label: 'Short' },
+];
 const PIECES: { id: PieceId; label: string }[] = [
   { id: 'back', label: 'Back' },
   { id: 'front', label: 'Front' },
@@ -198,6 +204,7 @@ export function App(): JSX.Element {
   const [shoulder, setShoulder] = useState<ShoulderStyle>('set_in');
   const [bodyLength, setBodyLength] = useState<BodyLength>('hip');
   const [hem, setHem] = useState<HemStyle>('ribbing');
+  const [sleeveLength, setSleeveLength] = useState<SleeveLength>('full');
   const [swatch, setSwatch] = useState<Swatch>(DEFAULT_SWATCH);
   const [output, setOutput] = useState<OutputId>('full');
   const [piece, setPiece] = useState<PieceId>('back');
@@ -255,18 +262,18 @@ export function App(): JSX.Element {
 
   const input = {
     category, chest, units, ease, neck, backNeck: effBackNeck, shoulder,
-    bodyLength: effBodyLength, hem: effHem, swatch, technique,
+    bodyLength: effBodyLength, hem: effHem, sleeveLength, swatch, technique,
   };
   const gauge = gaugeReadout(gaugeFromSwatch(swatch), units);
 
   // Live outputs — the engine is pure and fast, so this runs every render.
   const patternText = useMemo(
     () => buildPatternText(input, output === 'concise' ? 'abbreviated' : 'verbose'),
-    [category, chest, ease, neck, effBackNeck, shoulder, effBodyLength, effHem, swatch, output, technique],
+    [category, chest, ease, neck, effBackNeck, shoulder, effBodyLength, effHem, sleeveLength, swatch, output, technique],
   );
   const schematics = useMemo(
     () => buildSchematics(input),
-    [category, chest, ease, neck, effBackNeck, shoulder, effBodyLength, effHem, swatch, technique],
+    [category, chest, ease, neck, effBackNeck, shoulder, effBodyLength, effHem, sleeveLength, swatch, technique],
   );
 
   const diagramSvg = (pid: PieceId, factor?: number): string =>
@@ -554,10 +561,15 @@ export function App(): JSX.Element {
           </Tile>
           <Tile title="Sleeve length">
             <div className="btn-row">
-              <Btn icon={<IconSleeve />} label="Full" state="selected" />
-              <Btn icon={<IconSleeve />} label="¾ length" state="soon" />
-              <Btn icon={<IconSleeve />} label="Half" state="soon" />
-              <Btn icon={<IconSleeve />} label="Short" state="soon" />
+              {SLEEVE_LENGTHS.map((l) => (
+                <Btn
+                  key={l.id}
+                  icon={<IconSleeve />}
+                  label={l.label}
+                  state={sleeveLength === l.id ? 'selected' : 'normal'}
+                  onClick={() => setSleeveLength(l.id)}
+                />
+              ))}
               <Btn icon={<IconSleeve />} label="Cap" state="soon" />
               <Btn icon={<IconSleeve />} label="Sleeveless" state="soon" />
             </div>

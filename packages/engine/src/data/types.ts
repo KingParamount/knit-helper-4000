@@ -145,6 +145,17 @@ export type BodyLength =
 export type HemStyle = 'ribbing' | 'moss_band' | 'garter_band' | 'folded_band' | 'frill' | 'none';
 
 /**
+ * Sleeve length, from the `sleeve_length` option vocabulary. Each is a fraction of
+ * the full underarm-to-wrist length (arm_length + ease_arml), and the sleeve is the
+ * full sleeve's taper TRUNCATED: the hem width sits on the same straight line from
+ * the sleeve top to the wrist, so a shorter sleeve casts on wider and increases
+ * less, and 'full' reproduces the original garment exactly. 'cap' and 'sleeveless'
+ * are deliberately absent for now — they are new construction (armhole finishes),
+ * queued behind a Knitware harvest.
+ */
+export type SleeveLength = 'full' | 'three_quarter' | 'half' | 'short';
+
+/**
  * The optional style axes added after the original five positional parameters
  * (ease, neck, back neck, shoulder, technique). Passed as one trailing bag so each
  * new axis does not grow every signature; every field has a default that reproduces
@@ -153,6 +164,7 @@ export type HemStyle = 'ribbing' | 'moss_band' | 'garter_band' | 'folded_band' |
 export interface GarmentOptions {
   bodyLength?: BodyLength;
   hem?: HemStyle;
+  sleeveLength?: SleeveLength;
 }
 
 /**

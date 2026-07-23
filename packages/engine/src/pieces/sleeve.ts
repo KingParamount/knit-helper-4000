@@ -10,7 +10,14 @@
  * the armhole is deep (CAP_FILL) — see sleevePlan.
  */
 
-import type { SizeRecord, EaseStyleId, ShoulderStyle, HemStyle, GarmentOptions } from '../data/types';
+import type {
+  SizeRecord,
+  EaseStyleId,
+  ShoulderStyle,
+  HemStyle,
+  SleeveLength,
+  GarmentOptions,
+} from '../data/types';
 import { garmentWidths } from '../dimensions';
 import { type Gauge, evenStitchesFor, rowsFor } from '../gauge';
 import { type Row, type Piece, carriageForRow } from '../row';
@@ -21,6 +28,27 @@ import { hemPlan } from './hem';
 
 /** Cuff = wrist + this ease. ASSUMPTION (flag) — a ribbed cuff also stretches. */
 export const CUFF_EASE_IN = 1.0;
+
+/**
+ * Each sleeve length as a fraction of the full underarm length. Anchored to where
+ * the hems land on the arm (arm_length is underarm-to-wrist): three-quarter ends
+ * mid-forearm, half at the elbow (roughly halfway down), short a hand's width or so
+ * below the underarm — the standard tee proportion.
+ */
+export const SLEEVE_LENGTH_FRACTION: Record<SleeveLength, number> = {
+  full: 1,
+  three_quarter: 0.75,
+  half: 0.5,
+  short: 0.25,
+};
+
+/**
+ * A sleeve hem never takes more than this fraction of the sleeve's length — a full
+ * sleeve keeps the size's rib depth (unchanged), but a short sleeve at that depth
+ * would be over half hem, so the band shallows with the sleeve (short-sleeve bands
+ * run ~1–1.5" in ordinary practice).
+ */
+const MAX_HEM_FRACTION = 0.3;
 
 /**
  * A saddle strap's width (inches), scaling gently with size — Knitware's "Shldr Band
@@ -74,9 +102,11 @@ const CAP_FAST_EACH_END = 3;
 
 export interface SleevePlan {
   hem: HemStyle; // cuff hem style (shared with the body)
+  sleeveLength: SleeveLength;
   ribCastOnSts: number; // cuff hem cast-on (odd for rib, 2× for a frill, cuff otherwise)
   bodyCuffSts: number; // even count after the rib drops one on the right
   ribRows: number; // rows in the cuff hem section (whatever the hem style)
+  hemDepthIn: number; // resolved cuff hem depth (shallows with the sleeve length)
   taperRows: number;
   incPerSide: number;
   sleeveTopSts: number; // achieved at the underarm
@@ -97,15 +127,27 @@ export function sleevePlan(
   const w = garmentWidths(size, style, shoulder);
   const body = backPlan(size, style, gauge, shoulder);
 
+  // A shorter sleeve is the full sleeve's taper TRUNCATED: the hem sits on the same
+  // straight line from the sleeve top down to the wrist cuff, cut off at the chosen
+  // fraction. So a short sleeve casts on wider (nearer the sleeve-top width, which
+  // already carries the fit ease) and increases less, and 'full' lands exactly on
+  // wrist + CUFF_EASE_IN — the original garment, unchanged.
+  const sleeveLength = opts.sleeveLength ?? 'full';
+  const frac = SLEEVE_LENGTH_FRACTION[sleeveLength];
+  const lengthIn = (size.arm_length + size.ease_arml) * frac;
+  const fullCuffIn = size.wrist + CUFF_EASE_IN;
+  const hemWidthIn = w.sleeveTop + frac * (fullCuffIn - w.sleeveTop);
+
   // One underarm seam, eating a stitch from each of the sleeve's two edges — cut it
   // wider at both cuff and top so the sewn tube measures what it should.
-  const bodyCuffSts = evenStitchesFor(size.wrist + CUFF_EASE_IN, gauge) + 2 * SEAM_ALLOWANCE_STS; // even
-  const hp = hemPlan(size, gauge, opts.hem ?? 'ribbing', bodyCuffSts);
+  const bodyCuffSts = evenStitchesFor(hemWidthIn, gauge) + 2 * SEAM_ALLOWANCE_STS; // even
+  const hemDepthIn = Math.min(size.rib_body, MAX_HEM_FRACTION * lengthIn);
+  const hp = hemPlan(size, gauge, opts.hem ?? 'ribbing', bodyCuffSts, hemDepthIn);
   const ribCastOnSts = hp.castOnSts;
   const ribRows = hp.pieceRows;
-  // Sleeve length = arm length + the sourced length ease (ease_arml), less the hem's
-  // contribution to hanging length (a folded cuff's facing turns up inside).
-  const taperRows = rowsFor(size.arm_length + size.ease_arml, gauge) - hp.lengthRows;
+  // Sleeve length less the hem's contribution to hanging length (a folded cuff's
+  // facing turns up inside).
+  const taperRows = rowsFor(lengthIn, gauge) - hp.lengthRows;
   // NB the allowance is deliberately NOT added at the top. The sleeve top is not a
   // free edge — it is sewn into the armhole, and the Tier-A join invariant requires
   // the two to match. Widening it breaks that join (it did: drop-shoulder Child sizes
@@ -120,7 +162,10 @@ export function sleevePlan(
   // total can reach. Invisible at a fine gauge, where half a stitch is a rounding error;
   // a third of an inch on chunky yarn.
   const exactTopSts = (w.sleeveTop * gauge.bodySt) / 4;
-  const incPerSide = Math.round((exactTopSts - bodyCuffSts) / 2);
+  // Clamped at zero: a short sleeve's even-rounded cast-on can land a stitch above
+  // the exact top target (two baby sizes at chunky gauge), and a sleeve that
+  // "increases minus one" is a nonsense — it just knits straight, top = cast-on.
+  const incPerSide = Math.max(0, Math.round((exactTopSts - bodyCuffSts) / 2));
   const sleeveTopSts = bodyCuffSts + 2 * incPerSide; // even
 
   // A drop sleeve has no cap: it tapers to the top and binds off straight. The whole
@@ -128,6 +173,8 @@ export function sleevePlan(
   if (shoulder === 'drop') {
     return {
       hem: hp.hem,
+      sleeveLength,
+      hemDepthIn,
       ribCastOnSts,
       bodyCuffSts,
       ribRows,
@@ -152,6 +199,8 @@ export function sleevePlan(
     const capDecPerSide = Math.round((slvUA - crown) / 2);
     return {
       hem: hp.hem,
+      sleeveLength,
+      hemDepthIn,
       ribCastOnSts,
       bodyCuffSts,
       ribRows,
@@ -191,6 +240,8 @@ export function sleevePlan(
 
   return {
     hem: hp.hem,
+    sleeveLength,
+    hemDepthIn,
     ribCastOnSts,
     bodyCuffSts,
     ribRows,
@@ -215,7 +266,7 @@ export function sleeveRows(
   opts: GarmentOptions = {},
 ): Row[] {
   const p = sleevePlan(size, style, gauge, shoulder, opts);
-  const hp = hemPlan(size, gauge, opts.hem ?? 'ribbing', p.bodyCuffSts);
+  const hp = hemPlan(size, gauge, opts.hem ?? 'ribbing', p.bodyCuffSts, p.hemDepthIn);
   const rows: Row[] = [];
   let index = 0;
   let stitches = 0;

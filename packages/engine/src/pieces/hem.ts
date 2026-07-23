@@ -38,10 +38,20 @@ export interface HemPlan {
 
 const NO_OPS: Row['ops'] = [];
 
-export function hemPlan(size: SizeRecord, gauge: Gauge, hem: HemStyle, panelSts: number): HemPlan {
+export function hemPlan(
+  size: SizeRecord,
+  gauge: Gauge,
+  hem: HemStyle,
+  panelSts: number,
+  /**
+   * Hem depth in inches; defaults to the size's rib depth. A short sleeve passes a
+   * shallower depth so its band does not swallow the sleeve (see sleevePlan).
+   */
+  depthIn: number = size.rib_body,
+): HemPlan {
   switch (hem) {
     case 'ribbing': {
-      const rows = ribRowsFor(size.rib_body, gauge);
+      const rows = ribRowsFor(depthIn, gauge);
       return {
         hem,
         castOnSts: panelSts + 1, // odd, extra stitch on the right
@@ -54,7 +64,7 @@ export function hemPlan(size: SizeRecord, gauge: Gauge, hem: HemStyle, panelSts:
     }
     case 'moss_band':
     case 'garter_band': {
-      const rows = Math.max(2, ribRowsFor(size.rib_body / 2, gauge));
+      const rows = Math.max(2, ribRowsFor(depthIn / 2, gauge));
       return {
         hem,
         castOnSts: panelSts,
@@ -69,7 +79,7 @@ export function hemPlan(size: SizeRecord, gauge: Gauge, hem: HemStyle, panelSts:
       // Facing (inside) and outer half are the same depth; the fold row is the first
       // row of the outer half; the last row picks the cast-on edge up and knits it
       // together with the working stitches, closing the hem.
-      const depth = Math.max(2, ribRowsFor(size.rib_body, gauge));
+      const depth = Math.max(2, ribRowsFor(depthIn, gauge));
       const pieceRows = 2 * depth;
       return {
         hem,
@@ -83,7 +93,7 @@ export function hemPlan(size: SizeRecord, gauge: Gauge, hem: HemStyle, panelSts:
       };
     }
     case 'frill': {
-      const rows = Math.max(4, ribRowsFor(size.rib_body / 2, gauge));
+      const rows = Math.max(4, ribRowsFor(depthIn / 2, gauge));
       return {
         hem,
         castOnSts: 2 * panelSts,

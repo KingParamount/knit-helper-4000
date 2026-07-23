@@ -14,6 +14,7 @@ import type {
   ShoulderStyle,
   BodyLength,
   HemStyle,
+  SleeveLength,
   GarmentOptions,
 } from '../data/types';
 import type { Gauge } from '../gauge';
@@ -34,6 +35,7 @@ export interface Garment {
   shoulder: ShoulderStyle;
   bodyLength: BodyLength;
   hem: HemStyle;
+  sleeveLength: SleeveLength;
 }
 
 /** Every piece of the set-in pullover for one size / ease style / gauge / neck style. */
@@ -60,5 +62,6 @@ export function assembleGarment(
     shoulder,
     bodyLength: opts.bodyLength ?? 'hip',
     hem: opts.hem ?? 'ribbing',
+    sleeveLength: opts.sleeveLength ?? 'full',
   };
 }
