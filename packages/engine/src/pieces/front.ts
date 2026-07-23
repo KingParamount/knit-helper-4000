@@ -9,7 +9,7 @@
  * Both halves must end at the back's shoulder count, to graft.
  */
 
-import type { SizeRecord, EaseStyleId, NeckStyle, ShoulderStyle } from '../data/types';
+import type { SizeRecord, EaseStyleId, NeckStyle, ShoulderStyle, GarmentOptions } from '../data/types';
 import { type Gauge, rowsFor, stitchesFor } from '../gauge';
 import { type Row, carriageForRow } from '../row';
 import { backPlan, panelThroughArmhole, armholeShaping, splitIntoSteps, SHOULDER_STEP_STS } from './back';
@@ -77,8 +77,9 @@ export function frontNeckPlan(
   gauge: Gauge,
   neck: NeckStyle = 'round',
   shoulder: ShoulderStyle = 'set_in',
+  opts: GarmentOptions = {},
 ): FrontNeckPlan {
-  const plan = backPlan(size, style, gauge, shoulder);
+  const plan = backPlan(size, style, gauge, shoulder, 'scoop', opts);
   const bodySts = armholeShaping(plan.bodySts, plan.upperBackSts).achievedSts;
   const shoulderSts = Math.round((bodySts - plan.backNeckSts) / 2); // match the back
   const frontNeckSts = bodySts - 2 * shoulderSts;
@@ -113,9 +114,10 @@ export function frontToNeck(
   gauge: Gauge,
   neck: NeckStyle = 'round',
   shoulder: ShoulderStyle = 'set_in',
+  opts: GarmentOptions = {},
 ): Row[] {
-  const rows = panelThroughArmhole('front', size, style, gauge, shoulder);
-  const { neckLineRow } = frontNeckPlan(size, style, gauge, neck, shoulder);
+  const rows = panelThroughArmhole('front', size, style, gauge, shoulder, opts);
+  const { neckLineRow } = frontNeckPlan(size, style, gauge, neck, shoulder, opts);
   let index = rows.length;
   const stitches = rows[rows.length - 1].stitches;
   while (index < neckLineRow) {
@@ -151,10 +153,11 @@ export function frontRows(
   gauge: Gauge,
   neck: NeckStyle = 'round',
   shoulder: ShoulderStyle = 'set_in',
+  opts: GarmentOptions = {},
 ): Row[] {
-  if (shoulder === 'raglan') return raglanFrontRows(size, style, gauge, neck);
-  const rows = frontToNeck(size, style, gauge, neck, shoulder);
-  const fp = frontNeckPlan(size, style, gauge, neck, shoulder);
+  if (shoulder === 'raglan') return raglanFrontRows(size, style, gauge, neck, opts);
+  const rows = frontToNeck(size, style, gauge, neck, shoulder, opts);
+  const fp = frontNeckPlan(size, style, gauge, neck, shoulder, opts);
   const shoulderSteps = splitIntoSteps(fp.shoulderSts, SHOULDER_STEP_STS);
   const perSide = fp.perSide;
   const centreCastOff = fp.centreCastOff; // full front-neck width for a flat; 0 for a V

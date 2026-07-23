@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
-import { availableChests, schematicMetrics, flatBackAllowed } from '@knit-helper-4000/engine';
-import type { Category, Units, NeckStyle, BackNeckStyle, ShoulderStyle } from '@knit-helper-4000/engine';
+import { availableChests, schematicMetrics, flatBackAllowed, bodyLengthAllowed } from '@knit-helper-4000/engine';
+import type { Category, Units, NeckStyle, BackNeckStyle, ShoulderStyle, BodyLength } from '@knit-helper-4000/engine';
 import {
   DEFAULT_SWATCH,
   buildPattern,
@@ -162,6 +162,17 @@ const EASES: { id: EaseId; label: string }[] = [
   { id: 'comfortable', label: 'Comfortable' },
   { id: 'oversized', label: 'Oversized' },
 ];
+const BODY_LENGTHS: { id: BodyLength; label: string }[] = [
+  { id: 'crop', label: 'Crop' },
+  { id: 'waist', label: 'Waist' },
+  { id: 'regular', label: 'Regular' },
+  { id: 'hip', label: 'Hip' },
+  { id: 'thigh', label: 'Thigh' },
+  { id: 'above_knee', label: 'Above knee' },
+  { id: 'knee', label: 'Knee' },
+  { id: 'calf', label: 'Calf' },
+  { id: 'ankle', label: 'Ankle' },
+];
 const PIECES: { id: PieceId; label: string }[] = [
   { id: 'back', label: 'Back' },
   { id: 'front', label: 'Front' },
@@ -177,6 +188,7 @@ export function App(): JSX.Element {
   const [neck, setNeck] = useState<NeckStyle>('round');
   const [backNeck, setBackNeck] = useState<BackNeckStyle>('scoop');
   const [shoulder, setShoulder] = useState<ShoulderStyle>('set_in');
+  const [bodyLength, setBodyLength] = useState<BodyLength>('hip');
   const [swatch, setSwatch] = useState<Swatch>(DEFAULT_SWATCH);
   const [output, setOutput] = useState<OutputId>('full');
   const [piece, setPiece] = useState<PieceId>('back');
@@ -216,19 +228,29 @@ export function App(): JSX.Element {
   const flatBackOk = sizeRec ? flatBackAllowed(sizeRec, neck) : true;
   const effBackNeck: BackNeckStyle = backNeck === 'flat' && !flatBackOk ? 'scoop' : backNeck;
 
+  // A short body must still clear its own armhole + hem (a crop over a deep raglan can
+  // ask for a body shorter than its top and bottom). Same block-not-warn policy as the
+  // flat back; a blocked selection falls back to hip so the pattern stays buildable.
+  const lengthOk = (bl: BodyLength): boolean =>
+    sizeRec ? bodyLengthAllowed(sizeRec, ease, gaugeFromSwatch(swatch), shoulder, bl) : true;
+  const effBodyLength: BodyLength = lengthOk(bodyLength) ? bodyLength : 'hip';
+
   // Method maps straight onto the engine's Technique (machine | hand).
   const technique = method === 'hand' ? ('hand' as const) : ('machine' as const);
-  const input = { category, chest, units, ease, neck, backNeck: effBackNeck, shoulder, swatch, technique };
+  const input = {
+    category, chest, units, ease, neck, backNeck: effBackNeck, shoulder,
+    bodyLength: effBodyLength, swatch, technique,
+  };
   const gauge = gaugeReadout(gaugeFromSwatch(swatch), units);
 
   // Live outputs — the engine is pure and fast, so this runs every render.
   const patternText = useMemo(
     () => buildPatternText(input, output === 'concise' ? 'abbreviated' : 'verbose'),
-    [category, chest, ease, neck, shoulder, swatch, output, technique],
+    [category, chest, ease, neck, effBackNeck, shoulder, effBodyLength, swatch, output, technique],
   );
   const schematics = useMemo(
     () => buildSchematics(input),
-    [category, chest, ease, neck, shoulder, swatch, technique],
+    [category, chest, ease, neck, effBackNeck, shoulder, effBodyLength, swatch, technique],
   );
 
   const diagramSvg = (pid: PieceId, factor?: number): string =>
@@ -431,15 +453,14 @@ export function App(): JSX.Element {
           </Tile>
           <Tile title="Length">
             <div className="btn-row">
-              <Btn label="Crop" state="soon" />
-              <Btn label="Waist" state="soon" />
-              <Btn label="Regular" state="soon" />
-              <Btn label="Hip" state="selected" />
-              <Btn label="Thigh" state="soon" />
-              <Btn label="Above knee" state="soon" />
-              <Btn label="Knee" state="soon" />
-              <Btn label="Calf" state="soon" />
-              <Btn label="Ankle" state="soon" />
+              {BODY_LENGTHS.map((l) => (
+                <Btn
+                  key={l.id}
+                  label={l.label}
+                  state={!lengthOk(l.id) ? 'blocked' : effBodyLength === l.id ? 'selected' : 'normal'}
+                  onClick={() => setBodyLength(l.id)}
+                />
+              ))}
             </div>
           </Tile>
           <Tile title="Hem">

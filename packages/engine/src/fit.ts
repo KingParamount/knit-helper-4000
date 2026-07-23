@@ -8,8 +8,18 @@
  * back-neck scoop (neckopening.ts) opens it, solved to a comfortable stretch.
  */
 
-import type { SizeRecord, EaseStyleId, NeckStyle, BackNeckStyle, ShoulderStyle } from './data/types';
+import type {
+  SizeRecord,
+  EaseStyleId,
+  NeckStyle,
+  BackNeckStyle,
+  ShoulderStyle,
+  BodyLength,
+  GarmentOptions,
+} from './data/types';
 import { garmentWidths, MIN_UPPER_ARM_EASE_IN } from './dimensions';
+import type { Gauge } from './gauge';
+import { backPlan, BODY_LENGTHS } from './pieces/back';
 import {
   NECK_STRETCH_MAX,
   crewSuitable,
@@ -93,6 +103,34 @@ export function flatFrontAllowed(size: SizeRecord, backNeck: BackNeckStyle = 'sc
   return neckClearsHead(size, 'flat', backNeck);
 }
 
+/** Does the hem sit at or below the hip (so the tube must clear the hip on the way down)? */
+export function hemReachesHip(bodyLength: BodyLength): boolean {
+  return BODY_LENGTHS.indexOf(bodyLength) >= BODY_LENGTHS.indexOf('hip');
+}
+
+/**
+ * The body must keep at least a row pair of plain knitting between the rib and the
+ * underarm, or the "body" is shorter than its own armhole + hem and cannot be built.
+ */
+export const MIN_BODY_ROWS = 2;
+
+/**
+ * May this body length be offered at this size / gauge / shoulder? A short length must
+ * still clear the armhole and the hem rib — a crop over a deep raglan armhole can ask
+ * for a body shorter than its own top and bottom, which is unbuildable, so the UI
+ * blocks it (the same block-not-warn policy as the flat neck). Longer lengths never
+ * block: the tube just keeps going.
+ */
+export function bodyLengthAllowed(
+  size: SizeRecord,
+  style: EaseStyleId,
+  gauge: Gauge,
+  shoulder: ShoulderStyle,
+  bodyLength: BodyLength,
+): boolean {
+  return backPlan(size, style, gauge, shoulder, 'scoop', { bodyLength }).bodyRows >= MIN_BODY_ROWS;
+}
+
 // --- The full Tier-B fit sweep: does the finished garment fit a human of this size? ---
 
 /** Knit fabric stretches ~8% to pass over the hip. */
@@ -127,8 +165,10 @@ export function fitReport(
   neck: NeckStyle = 'round',
   shoulder: ShoulderStyle = 'set_in',
   backNeck: BackNeckStyle = 'scoop',
+  opts: GarmentOptions = {},
 ): FitReport {
   const w = garmentWidths(size, style, shoulder);
+  const bodyLength = opts.bodyLength ?? 'hip';
   const neckFit = neckFitVerdict(size, neck, backNeck);
   const upperArmEase = w.sleeveTop - size.upper_arm;
   const shoulderWidth = (size.back_width - size.back_neck) / 2;
@@ -161,9 +201,13 @@ export function fitReport(
     {
       // Straight body to the armholes is the standard construction (agreed), so a
       // hip wider than the chest is only tight at deliberately-snug styles. Informational.
+      // A hem above the hip never passes the hip, so the check only bites at hip length
+      // or longer.
       label: 'hip clearance',
-      ok: size.hip <= w.chest * HIP_STRETCH,
-      detail: `hip ${size.hip}" vs finished ${w.chest.toFixed(1)}"`,
+      ok: !hemReachesHip(bodyLength) || size.hip <= w.chest * HIP_STRETCH,
+      detail: hemReachesHip(bodyLength)
+        ? `hip ${size.hip}" vs finished ${w.chest.toFixed(1)}"`
+        : `n/a (hem above hip at ${bodyLength})`,
     },
   ];
 

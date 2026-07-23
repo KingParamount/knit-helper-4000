@@ -11,7 +11,7 @@
  * cast-off, then dec 1 st each end steadily — with the body and sleeve sharing the row span.
  */
 
-import type { SizeRecord, EaseStyleId, NeckStyle } from '../data/types';
+import type { SizeRecord, EaseStyleId, NeckStyle, GarmentOptions } from '../data/types';
 import { type Gauge, stitchesFor, rowsFor } from '../gauge';
 import { type Row, carriageForRow } from '../row';
 import { backPlan, armholeShaping, lowerPanelRows } from './back';
@@ -48,10 +48,15 @@ export interface RaglanPlan {
   frontNeckDecPerSide: number; // neck-edge decreases each side of the front
 }
 
-export function raglanPlan(size: SizeRecord, style: EaseStyleId, gauge: Gauge): RaglanPlan {
+export function raglanPlan(
+  size: SizeRecord,
+  style: EaseStyleId,
+  gauge: Gauge,
+  opts: GarmentOptions = {},
+): RaglanPlan {
   // backPlan at 'raglan' gives the deeper armhole (garmentWidths), so armholeRows is the
   // raglan span and bodyRows the (shorter) plain body below it.
-  const bp = backPlan(size, style, gauge, 'raglan');
+  const bp = backPlan(size, style, gauge, 'raglan', 'scoop', opts);
   const ragRows = bp.armholeRows;
   const underarmCastOff = armholeShaping(bp.bodySts, bp.upperBackSts).castOffPerSide;
   const bodyUA = bp.bodySts - 2 * underarmCastOff;
@@ -80,9 +85,14 @@ export function raglanPlan(size: SizeRecord, style: EaseStyleId, gauge: Gauge): 
  * The raglan back: plain body to the underarm, a small underarm cast-off, then dec 1 st at
  * each end steadily up to the back-neck width, which comes off on waste yarn for the band.
  */
-export function raglanBackRows(size: SizeRecord, style: EaseStyleId, gauge: Gauge): Row[] {
-  const p = raglanPlan(size, style, gauge);
-  const rows = lowerPanelRows('back', size, style, gauge, 'raglan');
+export function raglanBackRows(
+  size: SizeRecord,
+  style: EaseStyleId,
+  gauge: Gauge,
+  opts: GarmentOptions = {},
+): Row[] {
+  const p = raglanPlan(size, style, gauge, opts);
+  const rows = lowerPanelRows('back', size, style, gauge, 'raglan', opts);
   let index = rows.length;
   let stitches = p.bodySts;
   const push = (ops: Row['ops'], section: string): void => {
@@ -116,9 +126,10 @@ export function raglanFrontRows(
   style: EaseStyleId,
   gauge: Gauge,
   _neck: NeckStyle = 'round',
+  opts: GarmentOptions = {},
 ): Row[] {
-  const p = raglanPlan(size, style, gauge);
-  const rows = lowerPanelRows('front', size, style, gauge, 'raglan');
+  const p = raglanPlan(size, style, gauge, opts);
+  const rows = lowerPanelRows('front', size, style, gauge, 'raglan', opts);
   let index = rows.length;
   let stitches = p.bodySts;
   const push = (ops: Row['ops'], section: string, side?: 'left' | 'right'): void => {

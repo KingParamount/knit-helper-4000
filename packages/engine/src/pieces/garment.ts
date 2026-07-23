@@ -6,7 +6,15 @@
  * renderer (prose, schematic, device feed), which walks each piece in turn.
  */
 
-import type { SizeRecord, EaseStyleId, NeckStyle, BackNeckStyle, ShoulderStyle } from '../data/types';
+import type {
+  SizeRecord,
+  EaseStyleId,
+  NeckStyle,
+  BackNeckStyle,
+  ShoulderStyle,
+  BodyLength,
+  GarmentOptions,
+} from '../data/types';
 import type { Gauge } from '../gauge';
 import type { Row } from '../row';
 import { backRows } from './back';
@@ -23,6 +31,7 @@ export interface Garment {
   neck: NeckStyle;
   backNeck: BackNeckStyle;
   shoulder: ShoulderStyle;
+  bodyLength: BodyLength;
 }
 
 /** Every piece of the set-in pullover for one size / ease style / gauge / neck style. */
@@ -33,16 +42,19 @@ export function assembleGarment(
   neck: NeckStyle = 'round',
   shoulder: ShoulderStyle = 'set_in',
   backNeck: BackNeckStyle = 'scoop',
+  opts: GarmentOptions = {},
 ): Garment {
   const s = sleeves(size, style, gauge, shoulder);
   return {
-    back: backRows(size, style, gauge, shoulder, backNeck),
-    front: frontRows(size, style, gauge, neck, shoulder),
+    back: backRows(size, style, gauge, shoulder, backNeck, opts),
+    front: frontRows(size, style, gauge, neck, shoulder, opts),
     sleeveLeft: s.left,
     sleeveRight: s.right,
+    // The neckband is length-independent: it picks up from the neck opening only.
     neckband: neckbandRows(size, style, gauge, neck, shoulder, 'machine', backNeck),
     neck,
     backNeck,
     shoulder,
+    bodyLength: opts.bodyLength ?? 'hip',
   };
 }

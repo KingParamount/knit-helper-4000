@@ -14,7 +14,7 @@
  * Prose is ours; the geometric fact is not authored, so we check it.
  */
 
-import type { SizeRecord, EaseStyleId, NeckStyle, BackNeckStyle, ShoulderStyle } from '../data/types';
+import type { SizeRecord, EaseStyleId, NeckStyle, BackNeckStyle, ShoulderStyle, GarmentOptions } from '../data/types';
 import type { Gauge } from '../gauge';
 import { garmentWidths } from '../dimensions';
 import { backPlan, armholeShaping, lowerPanelRows, armholeOpening } from './back';
@@ -71,20 +71,21 @@ export function assemblyReport(
   neck: NeckStyle = 'round',
   shoulder: ShoulderStyle = 'set_in',
   backNeck: BackNeckStyle = 'scoop',
+  opts: GarmentOptions = {},
 ): AssemblyReport {
   // Raglan has no cap or shoulder graft — its invariants are different (the four raglan
   // seams match row-for-row and the pieces meet at the neck), so it is reported separately.
-  if (shoulder === 'raglan') return raglanAssemblyReport(size, style, gauge, neck);
+  if (shoulder === 'raglan') return raglanAssemblyReport(size, style, gauge, neck, opts);
 
-  const bp = backPlan(size, style, gauge, shoulder, backNeck);
+  const bp = backPlan(size, style, gauge, shoulder, backNeck, opts);
   const shaping = armholeShaping(bp.bodySts, bp.upperBackSts);
   const achieved = shaping.achievedSts;
   const backShoulder = Math.round((achieved - bp.backNeckSts) / 2);
-  const front = frontNeckPlan(size, style, gauge, neck, shoulder);
+  const front = frontNeckPlan(size, style, gauge, neck, shoulder, opts);
   const sleeve = sleevePlan(size, style, gauge, shoulder);
 
-  const backSide = lowerPanelRows('back', size, style, gauge, shoulder).length;
-  const frontSide = lowerPanelRows('front', size, style, gauge, shoulder).length;
+  const backSide = lowerPanelRows('back', size, style, gauge, shoulder, opts).length;
+  const frontSide = lowerPanelRows('front', size, style, gauge, shoulder, opts).length;
 
   // The sleeve↔body join. Set-in eases a fitted cap into the shaped armhole; drop
   // sews a straight sleeve top (its width) to the armhole opening (2 × depth).
@@ -164,13 +165,19 @@ export function assemblyReport(
  * neck comes off held for the band, and the front decreases close to almost nothing at the
  * top (that remainder is part of the raglan seam, not the neck).
  */
-function raglanAssemblyReport(size: SizeRecord, style: EaseStyleId, gauge: Gauge, neck: NeckStyle): AssemblyReport {
-  const rp = raglanPlan(size, style, gauge);
+function raglanAssemblyReport(
+  size: SizeRecord,
+  style: EaseStyleId,
+  gauge: Gauge,
+  neck: NeckStyle,
+  opts: GarmentOptions = {},
+): AssemblyReport {
+  const rp = raglanPlan(size, style, gauge, opts);
   const sleeve = sleevePlan(size, style, gauge, 'raglan');
-  const back = raglanBackRows(size, style, gauge);
-  const front = raglanFrontRows(size, style, gauge, neck);
-  const backLower = lowerPanelRows('back', size, style, gauge, 'raglan').length;
-  const frontLower = lowerPanelRows('front', size, style, gauge, 'raglan').length;
+  const back = raglanBackRows(size, style, gauge, opts);
+  const front = raglanFrontRows(size, style, gauge, neck, opts);
+  const backLower = lowerPanelRows('back', size, style, gauge, 'raglan', opts).length;
+  const frontLower = lowerPanelRows('front', size, style, gauge, 'raglan', opts).length;
   const backNeck = back[back.length - 1].ops.find((o) => o.kind === 'take_off')?.count ?? 0;
   // The half-end remainders are the neck-section cast-offs (NOT the underarm cast-offs,
   // which are in the armhole section, nor the centre-front cast-off).

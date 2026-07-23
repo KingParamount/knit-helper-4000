@@ -110,6 +110,33 @@ export type BackNeckStyle = 'scoop' | 'flat';
 export type ShoulderStyle = 'set_in' | 'drop' | 'saddle' | 'raglan';
 
 /**
+ * Where the body ends, from the `body_length` option vocabulary. Each value is a body
+ * landmark, not a fixed inch: the engine resolves it against the size's own length
+ * ladder (neck_to_waist / waist_to_hip / waist_to_knee / waist_to_ankle), so "knee"
+ * is that size's knee. 'hip' is the default and reproduces the original garment.
+ */
+export type BodyLength =
+  | 'crop'
+  | 'waist'
+  | 'regular'
+  | 'hip'
+  | 'thigh'
+  | 'above_knee'
+  | 'knee'
+  | 'calf'
+  | 'ankle';
+
+/**
+ * The optional style axes added after the original five positional parameters
+ * (ease, neck, back neck, shoulder, technique). Passed as one trailing bag so each
+ * new axis does not grow every signature; every field has a default that reproduces
+ * the original garment (hip length). Later batches add hem and sleeve length here.
+ */
+export interface GarmentOptions {
+  bodyLength?: BodyLength;
+}
+
+/**
  * How the garment is made. Matches the `method` option vocabulary in options.json,
  * which has carried hand/machine/crochet since the data was recovered — this is the
  * code finally using that axis.

@@ -8,7 +8,14 @@
  * (they need the sourced shaping method — see dimensions_model.md, next step).
  */
 
-import type { SizeRecord, EaseStyleId, ShoulderStyle, BackNeckStyle } from '../data/types';
+import type {
+  SizeRecord,
+  EaseStyleId,
+  ShoulderStyle,
+  BackNeckStyle,
+  BodyLength,
+  GarmentOptions,
+} from '../data/types';
 import { garmentWidths } from '../dimensions';
 import {
   type Gauge,
@@ -63,9 +70,59 @@ function neckRiseInches(size: SizeRecord): number {
   return Math.min(1.6, Math.max(0, (size.neck_depth - 1.7) * 2.3));
 }
 
-/** Hip-length body length to the SHOULDER line (nape-to-hip, less the neck/shoulder rise). */
-function bodyLengthInches(size: SizeRecord): number {
-  return size.neck_to_waist + size.waist_to_hip - neckRiseInches(size);
+/** Every body length, hem order — shortest to longest (the UI tile and fit checks share it). */
+export const BODY_LENGTHS: readonly BodyLength[] = [
+  'crop',
+  'waist',
+  'regular',
+  'hip',
+  'thigh',
+  'above_knee',
+  'knee',
+  'calf',
+  'ankle',
+] as const;
+
+/**
+ * Nape-to-hem for each body-length landmark. The anchors (waist, hip, knee, ankle) are
+ * measured columns; the in-between values interpolate:
+ *  - crop sits just below the bust — nape-to-underbust runs ~80% of nape-to-waist on
+ *    the published adult sizing tables (Craft Yarn Council / standard measurement
+ *    charts put underbust ~3" above the waist on a ~16" back-waist length), and the
+ *    same fraction degrades gracefully down the child/baby rows;
+ *  - regular is the midpoint of waist and hip ("between waist and hips", options.json);
+ *  - thigh is the midpoint of hip and knee (mid-thigh);
+ *  - above_knee stops 10% of waist-to-knee short of the knee (~2" on an adult,
+ *    scaling down for children rather than a fixed inch);
+ *  - calf is the midpoint of knee and ankle (mid-calf).
+ */
+function napeToHemInches(size: SizeRecord, bodyLength: BodyLength): number {
+  const ntw = size.neck_to_waist;
+  switch (bodyLength) {
+    case 'crop':
+      return 0.8 * ntw;
+    case 'waist':
+      return ntw;
+    case 'regular':
+      return ntw + 0.5 * size.waist_to_hip;
+    case 'hip':
+      return ntw + size.waist_to_hip;
+    case 'thigh':
+      return ntw + (size.waist_to_hip + size.waist_to_knee) / 2;
+    case 'above_knee':
+      return ntw + 0.9 * size.waist_to_knee;
+    case 'knee':
+      return ntw + size.waist_to_knee;
+    case 'calf':
+      return ntw + (size.waist_to_knee + size.waist_to_ankle) / 2;
+    case 'ankle':
+      return ntw + size.waist_to_ankle;
+  }
+}
+
+/** Body length to the SHOULDER line (nape-to-hem, less the neck/shoulder rise). */
+export function bodyLengthInches(size: SizeRecord, bodyLength: BodyLength = 'hip'): number {
+  return napeToHemInches(size, bodyLength) - neckRiseInches(size);
 }
 
 export function backPlan(
@@ -74,6 +131,7 @@ export function backPlan(
   gauge: Gauge,
   shoulder: ShoulderStyle = 'set_in',
   backNeck: BackNeckStyle = 'scoop',
+  opts: GarmentOptions = {},
 ): BackPlan {
   const w = garmentWidths(size, style, shoulder);
 
@@ -86,7 +144,7 @@ export function backPlan(
   const upperBackSts = shoulder === 'drop' ? bodySts : stitchesFor(size.back_width, gauge);
   const backNeckSts = stitchesFor(size.back_neck, gauge);
 
-  const totalRows = rowsFor(bodyLengthInches(size), gauge);
+  const totalRows = rowsFor(bodyLengthInches(size, opts.bodyLength), gauge);
   const ribRows = ribRowsFor(size.rib_body, gauge);
   const armholeRows = rowsFor(w.armholeDepth, gauge);
   const bodyRows = totalRows - armholeRows - ribRows;
@@ -163,8 +221,9 @@ export function lowerPanelRows(
   style: EaseStyleId,
   gauge: Gauge,
   shoulder: ShoulderStyle = 'set_in',
+  opts: GarmentOptions = {},
 ): Row[] {
-  const plan = backPlan(size, style, gauge, shoulder);
+  const plan = backPlan(size, style, gauge, shoulder, 'scoop', opts);
   const lastPlainRow = plan.ribRows + plan.bodyRows; // underarm
   const firstBodyRow = plan.ribRows + 1;
   const rows: Row[] = [];
@@ -193,8 +252,9 @@ export function lowerBackRows(
   style: EaseStyleId,
   gauge: Gauge,
   shoulder: ShoulderStyle = 'set_in',
+  opts: GarmentOptions = {},
 ): Row[] {
-  return lowerPanelRows('back', size, style, gauge, shoulder);
+  return lowerPanelRows('back', size, style, gauge, shoulder, opts);
 }
 
 /** One phase of the graduated decrease: `times` single decreases, one every `everyRows` rows. */
@@ -251,9 +311,10 @@ export function panelThroughArmhole(
   style: EaseStyleId,
   gauge: Gauge,
   shoulder: ShoulderStyle = 'set_in',
+  opts: GarmentOptions = {},
 ): Row[] {
-  const plan = backPlan(size, style, gauge, shoulder);
-  const rows = lowerPanelRows(piece, size, style, gauge, shoulder);
+  const plan = backPlan(size, style, gauge, shoulder, 'scoop', opts);
+  const rows = lowerPanelRows(piece, size, style, gauge, shoulder, opts);
   // A drop shoulder has no armhole shaping — the body runs straight; the armhole
   // region is just the upper part of the straight side, added above by the piece.
   if (shoulder === 'drop') return rows;
@@ -289,8 +350,9 @@ export function backThroughArmhole(
   style: EaseStyleId,
   gauge: Gauge,
   shoulder: ShoulderStyle = 'set_in',
+  opts: GarmentOptions = {},
 ): Row[] {
-  return panelThroughArmhole('back', size, style, gauge, shoulder);
+  return panelThroughArmhole('back', size, style, gauge, shoulder, opts);
 }
 
 /**
@@ -324,12 +386,13 @@ export function backRows(
   gauge: Gauge,
   shoulder: ShoulderStyle = 'set_in',
   backNeck: BackNeckStyle = 'scoop',
+  opts: GarmentOptions = {},
 ): Row[] {
   // A raglan back is a different construction (a straight diagonal to the neck, no shoulder);
   // it is built in its own module. (Runtime-only import cycle — both are called, not loaded.)
-  if (shoulder === 'raglan') return raglanBackRows(size, style, gauge);
-  const plan = backPlan(size, style, gauge, shoulder, backNeck);
-  const rows = backThroughArmhole(size, style, gauge, shoulder);
+  if (shoulder === 'raglan') return raglanBackRows(size, style, gauge, opts);
+  const plan = backPlan(size, style, gauge, shoulder, backNeck, opts);
+  const rows = backThroughArmhole(size, style, gauge, shoulder, opts);
   const achieved = rows[rows.length - 1].stitches;
   const backNeckSts = plan.backNeckSts;
   const shoulderSts = Math.round((achieved - backNeckSts) / 2);

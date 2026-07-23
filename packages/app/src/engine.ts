@@ -25,6 +25,7 @@ import type {
   NeckStyle,
   BackNeckStyle,
   ShoulderStyle,
+  BodyLength,
   Technique,
   ProseStyle,
   Pattern,
@@ -86,6 +87,8 @@ export interface BuildInput {
   backNeck?: BackNeckStyle;
   /** Shoulder / sleeve-join style; defaults to 'set_in' when omitted. */
   shoulder?: ShoulderStyle;
+  /** Where the body ends; defaults to 'hip' when omitted. */
+  bodyLength?: BodyLength;
   /** How it is made. Machine unless said otherwise. */
   technique?: Technique;
   swatch: Swatch;
@@ -108,9 +111,10 @@ export function buildPattern(input: BuildInput, style: ProseStyle): Pattern | nu
   const neck = input.neck ?? 'round';
   const backNeck = input.backNeck ?? 'scoop';
   const shoulder = input.shoulder ?? 'set_in';
+  const opts = { bodyLength: input.bodyLength ?? 'hip' };
   // Hand prose measures rather than counts, so it needs the row gauge and the
   // knitter's units; machine prose reads neither.
-  return renderPattern(assembleGarment(size, input.ease, g, neck, shoulder, backNeck), {
+  return renderPattern(assembleGarment(size, input.ease, g, neck, shoulder, backNeck, opts), {
     style,
     technique: input.technique ?? 'machine',
     gauge: g,
@@ -131,16 +135,17 @@ export function buildSchematics(input: BuildInput): Record<PieceId, PieceSchemat
   const neck = input.neck ?? 'round';
   const backNeck = input.backNeck ?? 'scoop';
   const shoulder = input.shoulder ?? 'set_in';
-  const bp = backPlan(size, input.ease, g, shoulder, backNeck);
-  const fnp = frontNeckPlan(size, input.ease, g, neck, shoulder);
+  const opts = { bodyLength: input.bodyLength ?? 'hip' };
+  const bp = backPlan(size, input.ease, g, shoulder, backNeck, opts);
+  const fnp = frontNeckPlan(size, input.ease, g, neck, shoulder, opts);
   const sp = sleevePlan(size, input.ease, g, shoulder);
   const np = neckbandPlan(size, input.ease, g, neck, shoulder, backNeck);
   // Only the band's rows differ by technique — a hand V mitres at a centred double
   // decrease, a machine one at its two ends — and the chart has to show which.
   const technique = input.technique ?? 'machine';
   return {
-    back: backSchematic(backRows(size, input.ease, g, shoulder, backNeck), bp, g),
-    front: frontSchematic(frontRows(size, input.ease, g, neck, shoulder), bp, fnp, g),
+    back: backSchematic(backRows(size, input.ease, g, shoulder, backNeck, opts), bp, g),
+    front: frontSchematic(frontRows(size, input.ease, g, neck, shoulder, opts), bp, fnp, g),
     sleeve: sleeveSchematic(sleeveRows('sleeve_l', size, input.ease, g, shoulder), sp, g),
     neckband: neckbandSchematic(neckbandRows(size, input.ease, g, neck, shoulder, technique, backNeck), np, g),
   };

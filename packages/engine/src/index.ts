@@ -18,6 +18,8 @@ export type {
   NeckStyle,
   BackNeckStyle,
   ShoulderStyle,
+  BodyLength,
+  GarmentOptions,
   Technique,
 } from './data/types';
 
@@ -46,6 +48,8 @@ export type { Row, Op, Carriage, Piece } from './row';
 
 export {
   backPlan,
+  bodyLengthInches,
+  BODY_LENGTHS,
   lowerBackRows,
   lowerPanelRows,
   armholeShaping,
@@ -86,6 +90,9 @@ export {
   neckClearsHead,
   flatBackAllowed,
   flatFrontAllowed,
+  hemReachesHip,
+  bodyLengthAllowed,
+  MIN_BODY_ROWS,
   fitReport,
   HIP_STRETCH,
   MIN_SHOULDER_IN,
