@@ -23,7 +23,6 @@ import {
   stitchesFor,
   evenStitchesFor,
   rowsFor,
-  ribRowsFor,
 } from '../gauge';
 import { type Row, type Piece, carriageForRow } from '../row';
 import { SEAM_ALLOWANCE_STS, seamEdgeLength, ARMHOLE_SECTIONS } from './seams';

@@ -6,7 +6,7 @@ import { garmentWidths, SLEEVELESS_ARMHOLE_DEEPEN_IN, SLEEVELESS_BACK_NARROW_IN 
 import { armholeBandPlan, armholeBandRows } from './armhole-band';
 import { assembleGarment } from './garment';
 import { assemblyReport } from './assembly';
-import { fitReport, sleeveStyleAllowed, MIN_SHOULDER_IN } from '../fit';
+import { fitReport, sleeveStyleAllowed } from '../fit';
 import { pickupPerRow } from './neckband';
 import { backPlan, armholeShaping } from './back';
 import { renderPattern, patternText } from '../render/prose';
