@@ -29,6 +29,7 @@
  * and no PDF library.
  */
 
+import { Fragment } from 'react';
 import type { CSSProperties, JSX, ReactNode } from 'react';
 import type { Pattern, Units } from '@knit-helper-4000/engine';
 import type { PieceId } from './engine';
@@ -67,6 +68,7 @@ export interface PrintDocProps {
   paperLabel: string;
   landscape: boolean;
   /** Heading facts: what this pattern is for. */
+  titleLabel: string;
   sizeLabel: string;
   styleLabel: string;
   gaugeLabel: string;
@@ -75,10 +77,10 @@ export interface PrintDocProps {
 }
 
 function Sheet({ children, chart = false }: { children: ReactNode; chart?: boolean }): JSX.Element {
-  // A chart sheet is a fixed-height flex column: the heading takes what it takes and
-  // the chart gets exactly the rest. That replaces three rounds of guessing heading
-  // heights in millimetres — the first sheet also carries the document header, so any
-  // fixed allowance was wrong for one sheet or the other. Measuring beats estimating.
+  // Every sheet starts a fresh page (break-BEFORE, in CSS) — one full-page item per
+  // page. A chart sheet is additionally a fixed-height flex column: the heading takes
+  // what it takes and the chart gets exactly the rest, which beats guessing heading
+  // heights in millimetres (the first sheet also carries the document header).
   return <section className={`print-sheet${chart ? ' chart-sheet' : ''}`}>{children}</section>;
 }
 
@@ -149,6 +151,7 @@ export function PrintDoc({
   handBand = false,
   paperLabel,
   landscape,
+  titleLabel,
   sizeLabel,
   styleLabel,
   gaugeLabel,
@@ -156,9 +159,9 @@ export function PrintDoc({
 }: PrintDocProps): JSX.Element {
   const head = (
     <header className="print-head">
-      <h1>Knit-Helper 4000</h1>
-      <p className="print-meta">
-        {sizeLabel} · {styleLabel} · {gaugeLabel}
+      <h1>{titleLabel}</h1>
+      <p className="print-style">
+        {styleLabel} · {gaugeLabel}
       </p>
     </header>
   );
@@ -250,60 +253,84 @@ export function PrintDoc({
       style={{ '--page-h': `${pageHeightMm}mm`, '--sheet-room': `${sheetRoomMm}mm` } as CSSProperties}
     >
       <style>{patternPageRule}</style>
-      {pattern.pieces.map((piece, i) => {
-        // Identity comes from the piece itself, not its position. The hand pattern
-        // slots a making-up block in front of the neckband so it can be worked in
-        // order, which shifts every index after it.
-        // The sleeveless armhole band occupies the 'sleeve' schematic slot, so its prose
-        // piece ('armband') looks its chart up there.
-        const id = piece.piece === 'armband' ? 'sleeve' : piece.piece;
-        // Landscape charts fit the page WIDTH and run down it in full-width bands,
-        // one per sheet. Splitting only one way means no sheet is ever a corner
-        // sliver, and a chart is read row by row anyway, so a horizontal strip is
-        // the natural unit. Portrait keeps the whole chart on one page instead.
-        const bands = mode === 'chart' && id && chartFor ? chartBandsFor?.(id) : undefined;
-        if (bands && bands.bands > 1 && id && chartFor) {
-          const svg = chartFor(id);
-          return Array.from({ length: bands.bands }, (_, b) => (
-            <Sheet key={`${piece.title}-band-${b}`}>
-              <div className="tile-head">
-                <strong>{piece.title} — knit chart</strong>
-                <span> — sheet {b + 1} of {bands.bands}, working upwards</span>
-                <div className="tile-meta">{sizeLabel} · {gaugeLabel}</div>
-              </div>
-              <div
-                className="band-window"
-                style={{ width: `${bands.widthMm}mm`, height: `${Math.min(bands.bandHeightMm, bands.heightMm - b * bands.stepMm)}mm` }}
-              >
+
+      {/* CHART mode: each piece's chart on its own sheet (banded down the page in
+          landscape, whole-chart-to-a-page in portrait). */}
+      {mode === 'chart' &&
+        pattern.pieces.map((piece, i) => {
+          // The sleeveless armhole band occupies the 'sleeve' schematic slot, so its
+          // prose piece ('armband') looks its chart up there.
+          const id = piece.piece === 'armband' ? 'sleeve' : piece.piece;
+          if (!id || !chartFor) return null;
+          const bands = chartBandsFor?.(id);
+          if (bands && bands.bands > 1) {
+            const svg = chartFor(id);
+            return Array.from({ length: bands.bands }, (_, b) => (
+              <Sheet key={`${piece.title}-band-${b}`}>
+                <div className="tile-head">
+                  <strong>{piece.title} — knit chart</strong>
+                  <span> — sheet {b + 1} of {bands.bands}, working upwards</span>
+                  <div className="tile-meta">{sizeLabel} · {gaugeLabel}</div>
+                </div>
                 <div
-                  className="band-shift"
-                  style={{ top: `${-b * bands.stepMm}mm`, width: `${bands.widthMm}mm` }}
-                  dangerouslySetInnerHTML={{ __html: svg }}
-                />
-              </div>
-            </Sheet>
-          ));
-        }
-        return (
-          <Sheet key={piece.title} chart={mode === 'chart' && !!id}>
-            {i === 0 && head}
-            <h2 className="print-piece-title">{piece.title}</h2>
-            {mode === 'chart' && id && chartFor ? (
-              // Portrait: scaled to the room under the heading, so the chart lands on
-              // its own title's page. Scaling shrinks the glyphs with the cells, which
-              // is what a chart wants — its symbols are drawn at fixed pixel sizes, so
-              // re-rendering at smaller cells would make them collide instead.
+                  className="band-window"
+                  style={{ width: `${bands.widthMm}mm`, height: `${Math.min(bands.bandHeightMm, bands.heightMm - b * bands.stepMm)}mm` }}
+                >
+                  <div
+                    className="band-shift"
+                    style={{ top: `${-b * bands.stepMm}mm`, width: `${bands.widthMm}mm` }}
+                    dangerouslySetInnerHTML={{ __html: svg }}
+                  />
+                </div>
+              </Sheet>
+            ));
+          }
+          return (
+            <Sheet key={piece.title} chart>
+              {i === 0 && head}
+              <h2 className="print-piece-title">{piece.title}</h2>
               <div className="print-chart" dangerouslySetInnerHTML={{ __html: chartFor(id) }} />
-            ) : (
-              <div className={twoColumn ? 'print-prose two-col' : 'print-prose'}>
+            </Sheet>
+          );
+        })}
+
+      {/* CONCISE prose: the WHOLE document flows through one two-column block. The reader
+          takes the entire left column of a page, then the entire right (column-fill:
+          auto); a section heading simply flows on inline — it never restarts the
+          columns. The header spans both columns at the top. */}
+      {mode === 'prose' && twoColumn && (
+        <div className="print-flow print-prose two-col">
+          {head}
+          {pattern.pieces.map((piece) => (
+            <Fragment key={piece.title}>
+              <h2 className="print-piece-title">{piece.title}</h2>
+              {piece.lines.map((line, j) => (
+                <p key={j}>{line}</p>
+              ))}
+            </Fragment>
+          ))}
+        </div>
+      )}
+
+      {/* VERBOSE prose: sections flow one after another down a single column. Each keeps
+          its heading and opening ~10 lines together (the 'lead' class), so a section
+          never begins as an orphaned heading at the foot of a page — it moves whole to
+          the next page instead. */}
+      {mode === 'prose' && !twoColumn &&
+        pattern.pieces.map((piece, i) => {
+          const LEAD_LINES = 10;
+          return (
+            <div className="print-piece" key={piece.title}>
+              {i === 0 && head}
+              <h2 className="print-piece-title">{piece.title}</h2>
+              <div className="print-prose">
                 {piece.lines.map((line, j) => (
-                  <p key={j}>{line}</p>
+                  <p key={j} className={j < LEAD_LINES ? 'lead' : undefined}>{line}</p>
                 ))}
               </div>
-            )}
-          </Sheet>
-        );
-      })}
+            </div>
+          );
+        })}
 
       {/* The blocking diagrams, gathered at the end — one to a page and as large as
           the sheet allows. They are a different act from following the instructions:
@@ -315,6 +342,8 @@ export function PrintDoc({
         // A hand knitter's neckband is picked up and worked straight onto the garment,
         // so it is never blocked as a piece — there is no shape to block it to. Saying
         // so is more use than drawing an outline nobody can act on.
+        // Each diagram is a full-page sheet; the shared break-before rule starts it on a
+        // fresh page (including the first one, after the flowing prose above).
         if (handBand && id === 'neckband') {
           return (
             <Sheet key="diagram-neckband">

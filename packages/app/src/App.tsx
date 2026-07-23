@@ -18,7 +18,8 @@ import {
 import {
   IconSweater, IconCardigan, IconSkirt, IconDog,
   IconBaby, IconChild, IconWoman, IconMan, IconCustom,
-  IconEase, IconCrew, IconVneck, IconShoulder, IconSleeve,
+  IconEase, IconNeck, IconShoulderStyle, IconSleeveLen, IconSleeveShape,
+  IconMachine, IconHand, IconLength,
   IconDocFull, IconDocShort, IconChart, IconRoller, IconPrint,
 } from './icons';
 import { PrintDoc } from './PrintDoc';
@@ -34,10 +35,14 @@ type Method = 'machine' | 'hand';
 
 // ---- small building blocks --------------------------------------------------
 
-function Section({ label, children }: { label?: string; children: ReactNode }): JSX.Element {
+function Section({ label, num, children }: { label?: string; num?: number; children: ReactNode }): JSX.Element {
   return (
     <section className="section">
-      {label && <div className="section-head">{label}</div>}
+      {label && (
+        <h2 className="section-head">
+          {num != null && <span className="section-num">{num}:</span>} {label}
+        </h2>
+      )}
       <div className="tiles">{children}</div>
     </section>
   );
@@ -126,7 +131,6 @@ function Measure({ inches, onChange, units }: { inches: number; onChange: (inche
         type="number" className="whole" min={0} step={1} value={whole}
         onChange={(e) => onChange(Math.max(0, parseInt(e.target.value) || 0) + eighths / 8)}
       />
-      <span className="unit">in</span>
       <span className="eighths">
         <span className="frac">{eighths}<span className="over">⁄8</span></span>
         <span className="stepper">
@@ -134,6 +138,7 @@ function Measure({ inches, onChange, units }: { inches: number; onChange: (inche
           <button onClick={() => setTotalEighths(whole * 8 + eighths - 1)} aria-label="down an eighth">▼</button>
         </span>
       </span>
+      <span className="unit">in</span>
     </span>
   );
 }
@@ -144,7 +149,7 @@ function Measure({ inches, onChange, units }: { inches: number; onChange: (inche
  */
 function Count({ value, onChange, min = 1 }: { value: number; onChange: (n: number) => void; min?: number }): JSX.Element {
   return (
-    <span className="numfield">
+    <span className="numfield count">
       <input
         type="number" min={min} step={1} value={value}
         onChange={(e) => onChange(Math.max(min, parseInt(e.target.value) || min))}
@@ -413,7 +418,18 @@ export function App(): JSX.Element {
     return planBands(pxToMm(m.W), pxToMm(m.H), pageW, landscape ? sheetRoomMm : Infinity);
   };
 
+  // Possessive per size category, for the printed title ("Ladies' Sweater").
+  // Ladies' / Men's are plural possessives; Child's / Baby's are singular — the
+  // register real knitting patterns use ("Child's Cardigan", "Baby's Jacket").
+  const CATEGORY_POSSESSIVE: Record<Category, string> = {
+    Woman: "Ladies'", Man: "Men's", Child: "Child's", Baby: "Baby's",
+  };
+  const titleSize = isBaby
+    ? `${sizeVal} ${units === 'cm' ? 'kg' : 'lb'}`
+    : units === 'cm' ? `${chestCm} cm` : `${chest}"`;
+
   const printLabels = {
+    titleLabel: `Knit-Helper 4000: ${CATEGORY_POSSESSIVE[category]} Sweater, ${titleSize}`,
     sizeLabel: `${category} ${sizeVal} ${sizeUnit}`,
     styleLabel: [
       method === 'hand' ? 'hand knitted' : 'machine knitted',
@@ -472,8 +488,50 @@ export function App(): JSX.Element {
           </Tile>
         </Section>
 
+        {/* 1 — technique */}
+        <Section label="Technique" num={1}>
+          <Tile title="Method">
+            <div className="btn-row">
+              <Btn icon={<IconMachine />} label="Machine" state={method === 'machine' ? 'selected' : 'normal'} onClick={() => setMethod('machine')} />
+              <Btn icon={<IconHand />} label="Hand knit" state={method === 'hand' ? 'selected' : 'normal'} onClick={() => {
+                setMethod('hand');
+                // The roller templates vanish for hand; don't leave one selected.
+                if (output === 'knitleader' || output === 'knitradar') setOutput('full');
+              }} />
+            </div>
+          </Tile>
+          {/* Construction is a hand-knitting choice. A domestic machine knits flat and
+              bottom-up — in the round needs a ribber and is not what these patterns
+              are — so offering the choice there would be offering a decision that
+              isn't one. It appears when a hand technique is selected. */}
+          {method !== 'machine' && (
+            <Tile title="Construction">
+              <div className="btn-row">
+                <Btn label="Flat, bottom-up" state="selected" />
+                <Btn label="In the round" state="soon" />
+                <Btn label="Top-down" state="soon" />
+              </div>
+            </Tile>
+          )}
+        </Section>
+
+        {/* 2 — tension */}
+        <Section label="Tension" num={2}>
+          <Tile title="Your swatch" className="full">
+            <div className="swatch">
+              My tension swatch measures{' '}
+              <Measure inches={swatch.stDist} units={units} onChange={(v) => setSwatch({ ...swatch, stDist: v })} /> across{' '}
+              <Count value={swatch.stCount} onChange={(n) => setSwatch({ ...swatch, stCount: n })} /> stitches, and{' '}
+              <Measure inches={swatch.rowDist} units={units} onChange={(v) => setSwatch({ ...swatch, rowDist: v })} /> up{' '}
+              <Count value={swatch.rowCount} onChange={(n) => setSwatch({ ...swatch, rowCount: n })} /> rows.{' '}
+              <span style={{ color: '#f0dcc6', fontWeight: 700 }}>→ {gauge.st} sts × {gauge.row} rows / {gauge.span}</span>{' '}
+              <button className="help-link" onClick={() => setHelp(true)}>How do I knit a swatch?</button>
+            </div>
+          </Tile>
+        </Section>
+
         {/* 3 — body */}
-        <Section label="Body">
+        <Section label="Body" num={3}>
           <Tile title="Ease (how roomy)">
             <div className="btn-row">
               {EASES.map((e, i) => (
@@ -483,9 +541,10 @@ export function App(): JSX.Element {
           </Tile>
           <Tile title="Length">
             <div className="btn-row">
-              {BODY_LENGTHS.map((l) => (
+              {BODY_LENGTHS.map((l, i) => (
                 <Btn
                   key={l.id}
+                  icon={<IconLength level={i} />}
                   label={l.label}
                   state={!lengthOk(l.id) ? 'blocked' : effBodyLength === l.id ? 'selected' : 'normal'}
                   onClick={() => setBodyLength(l.id)}
@@ -508,32 +567,32 @@ export function App(): JSX.Element {
         </Section>
 
         {/* 4 — neckline & collar */}
-        <Section label="Neckline &amp; collar">
+        <Section label="Neckline &amp; collar" num={4}>
           <Tile title="Front neckline">
             <div className="btn-row">
-              <Btn icon={<IconCrew />} label="Crew" state={neck === 'round' ? 'selected' : 'normal'} onClick={() => setNeck('round')} />
-              <Btn icon={<IconVneck />} label="V-neck" state={neck === 'v' ? 'selected' : 'normal'} onClick={() => setNeck('v')} />
-              <Btn icon={<IconCrew />} label="Scoop" state={neck === 'scoop' ? 'selected' : 'normal'} onClick={() => setNeck('scoop')} />
-              <Btn icon={<IconCrew />} label="High round" state="soon" />
-              <Btn icon={<IconCrew />} label="Shallow" state="soon" />
-              <Btn icon={<IconCrew />} label="Square" state="soon" />
-              <Btn icon={<IconCrew />} label="Boat" state="soon" />
-              <Btn icon={<IconCrew />} label="Ballet" state="soon" />
-              <Btn icon={<IconCrew />} label="Keyhole" state="soon" />
+              <Btn icon={<IconNeck shape="round" />} label="Crew" state={neck === 'round' ? 'selected' : 'normal'} onClick={() => setNeck('round')} />
+              <Btn icon={<IconNeck shape="v" />} label="V-neck" state={neck === 'v' ? 'selected' : 'normal'} onClick={() => setNeck('v')} />
+              <Btn icon={<IconNeck shape="scoop" />} label="Scoop" state={neck === 'scoop' ? 'selected' : 'normal'} onClick={() => setNeck('scoop')} />
+              <Btn icon={<IconNeck shape="high_round" />} label="High round" state="soon" />
+              <Btn icon={<IconNeck shape="shallow" />} label="Shallow" state="soon" />
+              <Btn icon={<IconNeck shape="square" />} label="Square" state="soon" />
+              <Btn icon={<IconNeck shape="boat" />} label="Boat" state="soon" />
+              <Btn icon={<IconNeck shape="ballet" />} label="Ballet" state="soon" />
+              <Btn icon={<IconNeck shape="keyhole" />} label="Keyhole" state="soon" />
             </div>
           </Tile>
           <Tile title="Back neckline">
             <div className="btn-row">
-              <Btn icon={<IconCrew />} label="Round" state="soon" />
-              <Btn icon={<IconCrew />} label="High round" state="soon" />
-              <Btn icon={<IconVneck />} label="V" state="soon" />
-              <Btn icon={<IconCrew />} label="Scoop" state={effBackNeck === 'scoop' ? 'selected' : 'normal'} onClick={() => setBackNeck('scoop')} />
-              <Btn icon={<IconCrew />} label="Shallow" state="soon" />
-              <Btn icon={<IconCrew />} label="Flat" state={!flatBackOk ? 'blocked' : effBackNeck === 'flat' ? 'selected' : 'normal'} onClick={() => setBackNeck('flat')} />
-              <Btn icon={<IconCrew />} label="Square" state="soon" />
-              <Btn icon={<IconCrew />} label="Boat" state="soon" />
-              <Btn icon={<IconCrew />} label="Ballet" state="soon" />
-              <Btn icon={<IconCrew />} label="Backless" state="soon" />
+              <Btn icon={<IconNeck shape="round" />} label="Round" state="soon" />
+              <Btn icon={<IconNeck shape="high_round" />} label="High round" state="soon" />
+              <Btn icon={<IconNeck shape="v" />} label="V" state="soon" />
+              <Btn icon={<IconNeck shape="scoop" />} label="Scoop" state={effBackNeck === 'scoop' ? 'selected' : 'normal'} onClick={() => setBackNeck('scoop')} />
+              <Btn icon={<IconNeck shape="shallow" />} label="Shallow" state="soon" />
+              <Btn icon={<IconNeck shape="flat" />} label="Flat" state={!flatBackOk ? 'blocked' : effBackNeck === 'flat' ? 'selected' : 'normal'} onClick={() => setBackNeck('flat')} />
+              <Btn icon={<IconNeck shape="square" />} label="Square" state="soon" />
+              <Btn icon={<IconNeck shape="boat" />} label="Boat" state="soon" />
+              <Btn icon={<IconNeck shape="ballet" />} label="Ballet" state="soon" />
+              <Btn icon={<IconNeck shape="backless" />} label="Backless" state="soon" />
             </div>
           </Tile>
           <Tile title="Collar">
@@ -553,17 +612,17 @@ export function App(): JSX.Element {
         </Section>
 
         {/* 5 — shoulders & sleeves */}
-        <Section label="Shoulders &amp; sleeves">
+        <Section label="Shoulders &amp; sleeves" num={5}>
           <Tile title="Shoulder">
             <div className="btn-row">
-              <Btn icon={<IconShoulder />} label="Set-in" state={shoulder === 'set_in' ? 'selected' : 'normal'} onClick={() => setShoulder('set_in')} />
-              <Btn icon={<IconShoulder />} label="Drop" state={shoulder === 'drop' ? 'selected' : 'normal'} onClick={() => setShoulder('drop')} />
-              <Btn icon={<IconShoulder />} label="Raglan" state={shoulder === 'raglan' ? 'selected' : 'normal'} onClick={() => setShoulder('raglan')} />
-              <Btn icon={<IconShoulder />} label="Saddle" state={shoulder === 'saddle' ? 'selected' : 'normal'} onClick={() => setShoulder('saddle')} />
+              <Btn icon={<IconShoulderStyle style="set_in" />} label="Set-in" state={shoulder === 'set_in' ? 'selected' : 'normal'} onClick={() => setShoulder('set_in')} />
+              <Btn icon={<IconShoulderStyle style="drop" />} label="Drop" state={shoulder === 'drop' ? 'selected' : 'normal'} onClick={() => setShoulder('drop')} />
+              <Btn icon={<IconShoulderStyle style="raglan" />} label="Raglan" state={shoulder === 'raglan' ? 'selected' : 'normal'} onClick={() => setShoulder('raglan')} />
+              <Btn icon={<IconShoulderStyle style="saddle" />} label="Saddle" state={shoulder === 'saddle' ? 'selected' : 'normal'} onClick={() => setShoulder('saddle')} />
 
-              <Btn icon={<IconShoulder />} label="Modified drop" state="soon" />
-              <Btn icon={<IconShoulder />} label="Drop grafted" state="soon" />
-              <Btn icon={<IconShoulder />} label="Round yoke" state="soon" />
+              <Btn icon={<IconShoulderStyle style="modified_drop" />} label="Modified drop" state="soon" />
+              <Btn icon={<IconShoulderStyle style="drop_grafted" />} label="Drop grafted" state="soon" />
+              <Btn icon={<IconShoulderStyle style="round_yoke" />} label="Round yoke" state="soon" />
             </div>
           </Tile>
           <Tile title="Sleeve length">
@@ -571,7 +630,7 @@ export function App(): JSX.Element {
               {SLEEVE_LENGTHS.map((l) => (
                 <Btn
                   key={l.id}
-                  icon={<IconSleeve />}
+                  icon={<IconSleeveLen len={l.id} />}
                   label={l.label}
                   state={!sleeveOk(l.id) ? 'blocked' : effSleeveLength === l.id ? 'selected' : 'normal'}
                   onClick={() => setSleeveLength(l.id)}
@@ -581,61 +640,19 @@ export function App(): JSX.Element {
           </Tile>
           <Tile title="Sleeve style">
             <div className="btn-row">
-              <Btn icon={<IconSleeve />} label="Taper" state="selected" />
-              <Btn icon={<IconSleeve />} label="Narrow taper" state="soon" />
-              <Btn icon={<IconSleeve />} label="Lantern" state="soon" />
-              <Btn icon={<IconSleeve />} label="Modified lantern" state="soon" />
-              <Btn icon={<IconSleeve />} label="Bishop" state="soon" />
-              <Btn icon={<IconSleeve />} label="Bell" state="soon" />
-              <Btn icon={<IconSleeve />} label="Dolman" state="soon" />
+              <Btn icon={<IconSleeveShape style="moderate_taper" />} label="Taper" state="selected" />
+              <Btn icon={<IconSleeveShape style="narrow_taper" />} label="Narrow taper" state="soon" />
+              <Btn icon={<IconSleeveShape style="lantern" />} label="Lantern" state="soon" />
+              <Btn icon={<IconSleeveShape style="modified_lantern" />} label="Modified lantern" state="soon" />
+              <Btn icon={<IconSleeveShape style="bishop" />} label="Bishop" state="soon" />
+              <Btn icon={<IconSleeveShape style="bell" />} label="Bell" state="soon" />
+              <Btn icon={<IconSleeveShape style="dolman" />} label="Dolman" state="soon" />
             </div>
           </Tile>
         </Section>
 
-        {/* 4 — tension */}
-        <Section label="Tension">
-          <Tile title="Your swatch" className="full">
-            <div className="swatch">
-              My tension swatch measures{' '}
-              <Measure inches={swatch.stDist} units={units} onChange={(v) => setSwatch({ ...swatch, stDist: v })} /> across{' '}
-              <Count value={swatch.stCount} onChange={(n) => setSwatch({ ...swatch, stCount: n })} /> stitches, and{' '}
-              <Measure inches={swatch.rowDist} units={units} onChange={(v) => setSwatch({ ...swatch, rowDist: v })} /> up{' '}
-              <Count value={swatch.rowCount} onChange={(n) => setSwatch({ ...swatch, rowCount: n })} /> rows.{' '}
-              <span style={{ color: '#f0dcc6', fontWeight: 700 }}>→ {gauge.st} sts × {gauge.row} rows / {gauge.span}</span>{' '}
-              <button className="help-link" onClick={() => setHelp(true)}>How do I knit a swatch?</button>
-            </div>
-          </Tile>
-        </Section>
-
-        {/* 5 — technique */}
-        <Section label="Technique">
-          <Tile title="Method">
-            <div className="btn-row">
-              <Btn label="Machine" state={method === 'machine' ? 'selected' : 'normal'} onClick={() => setMethod('machine')} />
-              <Btn label="Hand knit" state={method === 'hand' ? 'selected' : 'normal'} onClick={() => {
-                setMethod('hand');
-                // The roller templates vanish for hand; don't leave one selected.
-                if (output === 'knitleader' || output === 'knitradar') setOutput('full');
-              }} />
-            </div>
-          </Tile>
-          {/* Construction is a hand-knitting choice. A domestic machine knits flat and
-              bottom-up — in the round needs a ribber and is not what these patterns
-              are — so offering the choice there would be offering a decision that
-              isn't one. It appears when a hand technique is selected. */}
-          {method !== 'machine' && (
-            <Tile title="Construction">
-              <div className="btn-row">
-                <Btn label="Flat, bottom-up" state="selected" />
-                <Btn label="In the round" state="soon" />
-                <Btn label="Top-down" state="soon" />
-              </div>
-            </Tile>
-          )}
-        </Section>
-
-        {/* 6 — output choice */}
-        <Section label="Output">
+        {/* output choice */}
+        <Section label="Output" num={6}>
           <Tile title="What do you want to see?" className="full">
             <div className="btn-row">
               <Btn icon={<IconDocFull />} label="Full written" state={output === 'full' ? 'selected' : 'normal'} onClick={() => setOutput('full')} />
@@ -654,16 +671,18 @@ export function App(): JSX.Element {
         </Section>
 
         {/* 7 — the pattern */}
-        <Section label="Your pattern">
+        <Section label="Your pattern" num={7}>
           {!schematics || !patternText ? (
             <Tile className="full"><div className="notice err">Couldn’t find that size. Try another.</div></Tile>
           ) : (
-            <div style={{ width: '100%' }}>
-              <div className="piece-tabs">
-                {PIECES.map((p) => (
-                  <Btn key={p.id} label={p.label} state={piece === p.id ? 'selected' : 'normal'} onClick={() => setPiece(p.id)} />
-                ))}
-              </div>
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <Tile title="Which piece?" className="full">
+                <div className="piece-tabs">
+                  {PIECES.map((p) => (
+                    <Btn key={p.id} label={p.label} state={piece === p.id ? 'selected' : 'normal'} onClick={() => setPiece(p.id)} />
+                  ))}
+                </div>
+              </Tile>
               {templateOnly ? (
                 <>
                   <div className="diagram" dangerouslySetInnerHTML={{ __html: diagramSvg(piece, scaleFactor) }} />
@@ -687,7 +706,7 @@ export function App(): JSX.Element {
         </Section>
 
         {/* 8 — print */}
-        <Section label="Print">
+        <Section label="Print" num={8}>
           <Tile className="full">
             <div className="btn-row">
               <Btn
@@ -765,6 +784,7 @@ export function App(): JSX.Element {
           paperLabel={paperRec.label}
           landscape={landscape}
           svgFor={(pid) => printDiagramSvg(pid, scaleFactor)}
+          titleLabel={printLabels.titleLabel}
           sizeLabel={printLabels.sizeLabel}
           styleLabel={printLabels.styleLabel}
           gaugeLabel={printLabels.gaugeLabel}

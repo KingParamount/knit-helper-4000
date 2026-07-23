@@ -54,11 +54,14 @@ body {
 
 /* ---- sections & tiles ---- */
 .page { max-width: 1120px; margin: 0 auto; padding: 18px 20px 60px; }
-.section { margin: 20px 0; }
+.section { margin: 26px 0; }
 .section-head {
-  font-size: 12px; letter-spacing: .16em; text-transform: uppercase;
-  color: var(--ink-soft); margin: 0 0 9px 4px; font-weight: 700;
+  margin: 0 0 14px 2px;
+  font-family: var(--serif); font-weight: 700;
+  font-size: 1.55rem; line-height: 1.1; letter-spacing: 0;
+  color: var(--navy);
 }
+.section-num { color: var(--copper); font-variant-numeric: tabular-nums; }
 .tiles { display: flex; gap: 16px; flex-wrap: wrap; }
 .tile {
   background: var(--navy);
@@ -82,14 +85,22 @@ body {
   background: var(--powder);
   border-radius: var(--radius);
   box-shadow: 0 3px 0 var(--powder-dim);
-  padding: 10px 12px;
-  display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
-  min-height: 64px; min-width: 74px; padding-top: 14px;
+  padding: 12px 8px;
+  /* Fill the grid cell so every button in a tile is the same width, and stretch to
+     the tallest in its row so a two-line label never leaves neighbours short. */
+  width: 100%; height: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  min-height: 64px;
   transition: transform .05s, background .12s, box-shadow .12s;
 }
 .btn .ico { display: block; }
 .btn .ico svg { display: block; width: 34px; height: 34px; }
-.btn .lbl { font-size: .82rem; line-height: 1.15; text-align: center; }
+.btn .lbl {
+  font-size: .82rem; line-height: 1.15; text-align: center;
+  /* Wrap a multi-word label at its space ("Narrow taper" → two lines), and only break
+     inside a word if a single word can't fit — never hyphenate. */
+  overflow-wrap: break-word;
+}
 .btn:hover { background: #e2ecf9; }
 .btn:active { transform: translateY(3px); box-shadow: 0 0 0 var(--powder-dim); }
 .btn:focus-visible { outline: 3px solid var(--copper); outline-offset: 2px; }
@@ -110,7 +121,14 @@ body {
 .btn.soon .badge { position: absolute; top: 4px; right: 7px; font-size: .62rem; letter-spacing: .04em; opacity: .8; }
 .btn.blocked { background: #d8cfca; color: #9a8b82; box-shadow: 0 3px 0 #c6bcb5; cursor: not-allowed; }
 
-.btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+/* Equal-width cells that wrap: every button in a tile is the same size, tidily gridded,
+   and each grid row stretches its buttons to a common height. */
+.btn-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 10px;
+  align-items: stretch;
+}
 
 /* segmented / pill buttons (units toggle, output type) */
 .seg { display: inline-flex; gap: 6px; background: rgba(255,255,255,.12); padding: 5px; border-radius: 12px; }
@@ -143,6 +161,7 @@ body {
   border-radius: 9px; box-shadow: 0 2px 0 #c3cbdb; overflow: hidden; vertical-align: middle; margin: 0 3px;
 }
 .numfield input { width: 3.4rem; border: none; font: inherit; font-weight: 700; text-align: right; padding: 6px 4px; color: var(--ink); }
+.numfield.count input { text-align: center; }
 .numfield.inch input.whole { width: 2.4rem; }
 .numfield input:focus { outline: none; }
 .numfield input[type=number] { -moz-appearance: textfield; appearance: textfield; }
@@ -174,7 +193,8 @@ body {
 }
 .diagram svg { max-width: 100%; height: auto; }
 
-.piece-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+/* Same square, un-stretched buttons as every other tile (section 6 etc.). */
+.piece-tabs { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px; align-items: stretch; }
 
 .notice { border-radius: 10px; padding: 10px 14px; font-size: .9rem; margin-top: 10px; }
 .notice.warn { background: #fbf1da; color: #7a5c14; border: 1px solid #ecd9a6; }
@@ -203,22 +223,33 @@ footer.foot { text-align: center; color: var(--ink-soft); font-size: .8rem; padd
     /* Paper is not a screen — drop the tinted ground and let the ink be ink. */
   }
 
-  .print-sheet {
-    break-after: page;
-    page-break-after: always; /* older engines */
-  }
-  .print-sheet:last-child { break-after: auto; page-break-after: auto; }
+  /* One full-page item per sheet, using break-BEFORE (not after): consecutive sheets
+     then land one-per-page with nothing doubled, and the first blocking diagram gets a
+     fresh page after the flowing prose (which no longer forces a break of its own). A
+     break-before on the very first sheet would be a leading blank page, so suppress it. */
+  .print-sheet { break-before: page; page-break-before: always; }
+  .print-sheet:first-child { break-before: avoid; page-break-before: avoid; }
 
-  /* A compact running header — it shares the first sheet with a piece heading and
-     its content, so it earns its height in millimetres, not in presence. */
-  .print-head { margin-bottom: 5mm; border-bottom: 1pt solid #000; padding-bottom: 2mm; }
-  .print-head h1 { font-family: var(--serif); font-size: 13pt; margin: 0; display: inline; }
-  .print-meta { font-size: 9pt; margin: 1mm 0 0; }
+  /* The document header: the garment title on its own line, the shaping details and
+     gauge larger beneath it. */
+  .print-head { margin-bottom: 5mm; border-bottom: 1pt solid #000; padding-bottom: 2.5mm; }
+  .print-head h1 { font-family: var(--serif); font-size: 18pt; margin: 0; line-height: 1.1; }
+  .print-style { font-size: 12pt; margin: 1.5mm 0 0; color: #222; }
+
+  /* Prose sections FLOW down the page rather than taking a sheet each. */
+  .print-piece { margin: 0; }
+  .print-piece + .print-piece,
+  .print-piece:not(:first-child) { margin-top: 6mm; }
 
   .print-piece-title {
     font-family: var(--serif); font-size: 15pt; margin: 0 0 4mm;
     break-after: avoid; page-break-after: avoid; /* never orphan a heading */
   }
+  /* A section's opening lines stay with its heading: no page break after the heading
+     or after any of the first ~10 lines, so a section that cannot show a real opening
+     on the current page moves whole to the next rather than starting as a lone heading
+     at the foot of the page. */
+  .print-prose p.lead { break-after: avoid; page-break-after: avoid; }
 
   /* Blocking diagrams get their own sheets at the end of the document, one apiece,
      as big as the page allows — they are blocked against, not read alongside the
@@ -241,8 +272,17 @@ footer.foot { text-align: center; color: var(--ink-soft); font-size: .8rem; padd
   .print-prose { font-size: 10pt; line-height: 1.45; }
   .print-prose p { margin: 0 0 1.8mm; break-inside: avoid; page-break-inside: avoid; }
 
-  /* Concise in two columns — the shorter document that choosing concise implies. */
-  .print-prose.two-col { columns: 2; column-gap: 10mm; column-fill: auto; }
+  /* Concise: the WHOLE document is one two-column flow, not a fresh pair of columns per
+     section. column-fill: auto fills the entire left column of a page before the right,
+     so the reader takes the whole left side then the whole right — section headings just
+     flow on inline. The header spans both columns as a title bar at the very top. */
+  .print-flow.two-col { columns: 2; column-gap: 10mm; column-fill: auto; }
+  .print-flow.two-col .print-head { column-span: all; }
+  /* A section heading in the flow keeps with the line under it (never the last thing in
+     a column) but otherwise the columns run continuously. */
+  .print-flow .print-piece-title { margin-top: 3mm; }
+  .print-flow > .print-head + .print-piece-title,
+  .print-flow .print-piece-title:first-of-type { margin-top: 0; }
 
   /* The knit chart takes the place of the prose, so it gets the full width — and a
      height cap, which is what keeps it on the same page as its own title. Without
