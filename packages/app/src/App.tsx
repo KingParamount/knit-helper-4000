@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
 import { availableChests, schematicMetrics, flatBackAllowed, highRoundFrontAllowed, highRoundBackAllowed, boatAllowed, bodyLengthAllowed, hemAllowed, sleeveStyleAllowed, sleeveShapeAllowed, collarAllowed, collarForcesFlatNeck } from '@knit-helper-4000/engine';
 import type { Category, Units, NeckStyle, BackNeckStyle, ShoulderStyle, BodyLength, HemStyle, SleeveLength, SleeveStyle, CollarStyle } from '@knit-helper-4000/engine';
@@ -58,17 +58,94 @@ function Tile({ title, className = '', children }: { title?: string; className?:
 }
 
 type BtnState = 'normal' | 'selected' | 'soon' | 'blocked';
+
+/** A blocked button, when pressed, explains what to change to unlock it. Supplied by App. */
+const BlockedContext = createContext<(label: string, reason: string) => void>(() => {});
+
 function Btn({
-  icon, label, state = 'normal', onClick,
-}: { icon?: JSX.Element; label: string; state?: BtnState; onClick?: () => void }): JSX.Element {
+  icon, label, state = 'normal', onClick, reason,
+}: { icon?: JSX.Element; label: string; state?: BtnState; onClick?: () => void; reason?: string }): JSX.Element {
+  const explain = useContext(BlockedContext);
   const cls = state === 'selected' ? 'selected' : state === 'soon' ? 'soon' : state === 'blocked' ? 'blocked' : '';
-  const disabled = state === 'soon' || state === 'blocked';
+  // 'soon' is a not-built-yet feature — inert. 'blocked' is a legal-combination clash:
+  // it stays clickable and, when a reason is given, explains how to unlock itself.
+  const blocked = state === 'blocked';
+  const handleClick = state === 'soon' ? undefined : blocked ? (reason ? () => explain(label, reason) : undefined) : onClick;
   return (
-    <button className={`btn ${cls}`} onClick={disabled ? undefined : onClick} aria-pressed={state === 'selected'} disabled={disabled}>
+    <button
+      className={`btn ${cls}`}
+      onClick={handleClick}
+      aria-pressed={state === 'selected'}
+      disabled={state === 'soon' || (blocked && !reason)}
+      title={blocked && reason ? 'Not available with your current choices — tap to see why' : undefined}
+    >
       {icon && <span className="ico">{icon}</span>}
       <span className="lbl">{label}</span>
       {state === 'soon' && <span className="badge">soon</span>}
+      {blocked && reason && <span className="badge info" aria-hidden="true">?</span>}
     </button>
+  );
+}
+
+// --- Why a legal-combination button is blocked, and the one thing to change to unlock it.
+// These reproduce the engine's fit/collarAllowed rules as plain-English guidance.
+
+function collarBlockReason(c: CollarStyle, neck: NeckStyle, backNeck: BackNeckStyle): string {
+  if (neck === 'boat')
+    return 'A boat neck finishes its own straight top with an integral band, so it takes a single band only. Pick a different front neckline to use this collar.';
+  if (c === 'turtleneck') {
+    const frontOk = neck === 'round' || neck === 'flat';
+    const backOk = backNeck === 'flat';
+    if (!frontOk && !backOk)
+      return 'A turtleneck needs a round (crew) or flat front and a flat back. Set the front neckline to Crew and the back neckline to Flat.';
+    if (!frontOk) return 'A turtleneck needs a round (crew) or flat front neckline. Set the front neckline to Crew.';
+    return 'A turtleneck needs a flat back neckline. Set the back neckline to Flat.';
+  }
+  return '';
+}
+
+const BOAT_SHOULDER_REASON =
+  'A boat neck is butt-seamed across a straight top — a raglan seam or a saddle strap needs a shaped shoulder to grow from, which a boat has not. Pick a different front neckline (not Boat) to use this shoulder.';
+
+function sleeveLengthBlockReason(sl: SleeveLength, boat: boolean): string {
+  if (sl === 'cap')
+    return 'A cap sleeve is a set-in cap shortened to sit on the shoulder, so it needs a set-in shoulder. Set the shoulder to Set-in.';
+  if (sl === 'sleeveless') {
+    if (boat)
+      return 'A boat neck is seamed to the top of a sleeve, so it cannot go sleeveless. Pick a different front neckline to leave the sleeves off.';
+    return 'Sleeveless finishes the armhole with a picked-up band, but a raglan seam or a saddle strap IS the sleeve — take it away and the shoulder has nothing to build from. Set the shoulder to Set-in or Drop.';
+  }
+  return '';
+}
+
+function sleeveShapeBlockReason(sleeveLength: SleeveLength): string {
+  if (sleeveLength === 'cap' || sleeveLength === 'sleeveless')
+    return `A shaped sleeve works down the length below the cap, but a ${sleeveLength === 'cap' ? 'cap' : 'sleeveless'} sleeve has none to shape. Set the sleeve length to Full or ¾ for this shape.`;
+  return 'A bell or bishop flare only reads at full or three-quarter length. Set the sleeve length to Full or ¾.';
+}
+
+function headClearReason(part: 'front-high' | 'back-high' | 'back-flat'): string {
+  if (part === 'back-flat')
+    return 'At this size a flat back neck has no scoop depth to open over the head, so the garment will not pull on. Choose a larger size, or set the back neckline to Scoop.';
+  const where = part === 'front-high' ? 'front' : 'back';
+  return `At this size a high-round ${where} sits too shallow to pull over the head. Choose a larger size, or a deeper neckline (Crew, or Scoop on the back).`;
+}
+
+function BlockedModal({ label, reason, onClose }: { label: string; reason: string; onClose: () => void }): JSX.Element {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  // Matches the swatch-help overlay: a fixed dark backdrop over a 'tile plain' card.
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(8,20,45,.6)', display: 'grid', placeItems: 'center', padding: 20, zIndex: 50 }} onClick={onClose}>
+      <div className="tile plain" role="dialog" aria-modal="true" aria-label={`${label} is not available`} style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+        <div className="tile-title">Not available with your current choices</div>
+        <p style={{ marginTop: 0 }}><strong>{label}.</strong> {reason}</p>
+        <button className="ghost-btn" style={{ background: 'var(--navy)' }} onClick={onClose} autoFocus>Got it</button>
+      </div>
+    </div>
   );
 }
 
@@ -212,6 +289,8 @@ export function App(): JSX.Element {
   const [output, setOutput] = useState<OutputId>('full');
   const [piece, setPiece] = useState<PieceId>('back');
   const [help, setHelp] = useState(false);
+  // When a blocked (illegal-combination) button is pressed, this holds the modal it opens.
+  const [blockedInfo, setBlockedInfo] = useState<{ label: string; reason: string } | null>(null);
   const [method, setMethod] = useState<Method>('machine');
   const [paper, setPaper] = useState<PaperId>('a4');
   const [landscape, setLandscape] = useState(false);
@@ -491,7 +570,7 @@ export function App(): JSX.Element {
   };
 
   return (
-    <>
+    <BlockedContext.Provider value={(label, reason) => setBlockedInfo({ label, reason })}>
       <header className="masthead">
         <div className="masthead-in">
           <h1 className="wordmark">Knit-Helper <span className="four">4000</span></h1>
@@ -621,7 +700,7 @@ export function App(): JSX.Element {
               <Btn icon={<IconNeck shape="round" />} label="Crew" state={neck === 'round' ? 'selected' : 'normal'} onClick={() => setNeck('round')} />
               <Btn icon={<IconNeck shape="v" />} label="V-neck" state={neck === 'v' ? 'selected' : 'normal'} onClick={() => setNeck('v')} />
               <Btn icon={<IconNeck shape="scoop" />} label="Scoop" state={neck === 'scoop' ? 'selected' : 'normal'} onClick={() => setNeck('scoop')} />
-              <Btn icon={<IconNeck shape="high_round" />} label="High round" state={!highRoundFrontOk ? 'blocked' : effNeck === 'high_round' ? 'selected' : 'normal'} onClick={() => setNeck('high_round')} />
+              <Btn icon={<IconNeck shape="high_round" />} label="High round" state={!highRoundFrontOk ? 'blocked' : effNeck === 'high_round' ? 'selected' : 'normal'} reason={headClearReason('front-high')} onClick={() => setNeck('high_round')} />
               <Btn icon={<IconNeck shape="shallow" />} label="Shallow" state="soon" />
               <Btn icon={<IconNeck shape="square" />} label="Square" state={neck === 'square' ? 'selected' : 'normal'} onClick={() => setNeck('square')} />
               {/* A boat is a whole-neck mode: selecting it makes front and back the same piece. */}
@@ -636,11 +715,11 @@ export function App(): JSX.Element {
           <Tile title="Back neckline">
             <div className="btn-row">
               <Btn icon={<IconNeck shape="round" />} label="Round" state="soon" />
-              <Btn icon={<IconNeck shape="high_round" />} label="High round" state={!highRoundBackOk ? 'blocked' : effBackNeck === 'high_round' ? 'selected' : 'normal'} onClick={() => pickBack('high_round')} />
+              <Btn icon={<IconNeck shape="high_round" />} label="High round" state={!highRoundBackOk ? 'blocked' : effBackNeck === 'high_round' ? 'selected' : 'normal'} reason={headClearReason('back-high')} onClick={() => pickBack('high_round')} />
               <Btn icon={<IconNeck shape="v" />} label="V" state="soon" />
               <Btn icon={<IconNeck shape="scoop" />} label="Scoop" state={effBackNeck === 'scoop' ? 'selected' : 'normal'} onClick={() => pickBack('scoop')} />
               <Btn icon={<IconNeck shape="shallow" />} label="Shallow" state="soon" />
-              <Btn icon={<IconNeck shape="flat" />} label="Flat" state={!flatBackOk ? 'blocked' : effBackNeck === 'flat' ? 'selected' : 'normal'} onClick={() => pickBack('flat')} />
+              <Btn icon={<IconNeck shape="flat" />} label="Flat" state={!flatBackOk ? 'blocked' : effBackNeck === 'flat' ? 'selected' : 'normal'} reason={headClearReason('back-flat')} onClick={() => pickBack('flat')} />
               <Btn icon={<IconNeck shape="square" />} label="Square" state={effBackNeck === 'square' ? 'selected' : 'normal'} onClick={() => pickBack('square')} />
               {/* A boat locks front and back together — selecting it here sets the whole neck. */}
               <Btn icon={<IconNeck shape="boat" />} label="Boat" state={effBackNeck === 'boat' ? 'selected' : 'normal'} onClick={() => setNeck('boat')} />
@@ -651,11 +730,11 @@ export function App(): JSX.Element {
           <Tile title="Collar">
             <div className="btn-row">
               <Btn label="Single band" state={effCollar === 'single_band' ? 'selected' : 'normal'} onClick={() => setCollarStyle('single_band')} />
-              <Btn label="Double band" state={!collarOk('double_band') ? 'blocked' : effCollar === 'double_band' ? 'selected' : 'normal'} onClick={() => setCollarStyle('double_band')} />
-              <Btn label="Turtleneck" state={!collarOk('turtleneck') ? 'blocked' : effCollar === 'turtleneck' ? 'selected' : 'normal'} onClick={() => setCollarStyle('turtleneck')} />
-              <Btn label="Cowl" state={!collarOk('cowl') ? 'blocked' : effCollar === 'cowl' ? 'selected' : 'normal'} onClick={() => setCollarStyle('cowl')} />
-              <Btn label="Funnel" state={!collarOk('funnel') ? 'blocked' : effCollar === 'funnel' ? 'selected' : 'normal'} onClick={() => setCollarStyle('funnel')} />
-              <Btn label="Rolled edge" state={!collarOk('rolled_edge') ? 'blocked' : effCollar === 'rolled_edge' ? 'selected' : 'normal'} onClick={() => setCollarStyle('rolled_edge')} />
+              <Btn label="Double band" state={!collarOk('double_band') ? 'blocked' : effCollar === 'double_band' ? 'selected' : 'normal'} reason={collarBlockReason('double_band', neck, backNeck)} onClick={() => setCollarStyle('double_band')} />
+              <Btn label="Turtleneck" state={!collarOk('turtleneck') ? 'blocked' : effCollar === 'turtleneck' ? 'selected' : 'normal'} reason={collarBlockReason('turtleneck', neck, backNeck)} onClick={() => setCollarStyle('turtleneck')} />
+              <Btn label="Cowl" state={!collarOk('cowl') ? 'blocked' : effCollar === 'cowl' ? 'selected' : 'normal'} reason={collarBlockReason('cowl', neck, backNeck)} onClick={() => setCollarStyle('cowl')} />
+              <Btn label="Funnel" state={!collarOk('funnel') ? 'blocked' : effCollar === 'funnel' ? 'selected' : 'normal'} reason={collarBlockReason('funnel', neck, backNeck)} onClick={() => setCollarStyle('funnel')} />
+              <Btn label="Rolled edge" state={!collarOk('rolled_edge') ? 'blocked' : effCollar === 'rolled_edge' ? 'selected' : 'normal'} reason={collarBlockReason('rolled_edge', neck, backNeck)} onClick={() => setCollarStyle('rolled_edge')} />
               <Btn label="Shirt" state="soon" />
               <Btn label="Shawl" state="soon" />
               <Btn label="Hood" state="soon" />
@@ -676,8 +755,8 @@ export function App(): JSX.Element {
             <div className="btn-row">
               <Btn icon={<IconShoulderStyle style="set_in" />} label="Set-in" state={effShoulder === 'set_in' ? 'selected' : 'normal'} onClick={() => setShoulder('set_in')} />
               <Btn icon={<IconShoulderStyle style="drop" />} label="Drop" state={effShoulder === 'drop' ? 'selected' : 'normal'} onClick={() => setShoulder('drop')} />
-              <Btn icon={<IconShoulderStyle style="raglan" />} label="Raglan" state={boat ? 'blocked' : shoulder === 'raglan' ? 'selected' : 'normal'} onClick={() => setShoulder('raglan')} />
-              <Btn icon={<IconShoulderStyle style="saddle" />} label="Saddle" state={boat ? 'blocked' : shoulder === 'saddle' ? 'selected' : 'normal'} onClick={() => setShoulder('saddle')} />
+              <Btn icon={<IconShoulderStyle style="raglan" />} label="Raglan" state={boat ? 'blocked' : shoulder === 'raglan' ? 'selected' : 'normal'} reason={BOAT_SHOULDER_REASON} onClick={() => setShoulder('raglan')} />
+              <Btn icon={<IconShoulderStyle style="saddle" />} label="Saddle" state={boat ? 'blocked' : shoulder === 'saddle' ? 'selected' : 'normal'} reason={BOAT_SHOULDER_REASON} onClick={() => setShoulder('saddle')} />
 
               <Btn icon={<IconShoulderStyle style="modified_drop" />} label="Modified drop" state="soon" />
               <Btn icon={<IconShoulderStyle style="drop_grafted" />} label="Drop grafted" state="soon" />
@@ -692,6 +771,7 @@ export function App(): JSX.Element {
                   icon={<IconSleeveLen len={l.id} />}
                   label={l.label}
                   state={!sleeveOk(l.id) ? 'blocked' : effSleeveLength === l.id ? 'selected' : 'normal'}
+                  reason={sleeveLengthBlockReason(l.id, boat)}
                   onClick={() => setSleeveLength(l.id)}
                 />
               ))}
@@ -700,11 +780,11 @@ export function App(): JSX.Element {
           <Tile title="Sleeve style">
             <div className="btn-row">
               <Btn icon={<IconSleeveShape style="moderate_taper" />} label="Taper" state={effSleeveStyle === 'moderate_taper' ? 'selected' : 'normal'} onClick={() => setSleeveStyle('moderate_taper')} />
-              <Btn icon={<IconSleeveShape style="narrow_taper" />} label="Narrow taper" state={!shapeOk('narrow_taper') ? 'blocked' : effSleeveStyle === 'narrow_taper' ? 'selected' : 'normal'} onClick={() => setSleeveStyle('narrow_taper')} />
-              <Btn icon={<IconSleeveShape style="lantern" />} label="Lantern" state={!shapeOk('lantern') ? 'blocked' : effSleeveStyle === 'lantern' ? 'selected' : 'normal'} onClick={() => setSleeveStyle('lantern')} />
-              <Btn icon={<IconSleeveShape style="modified_lantern" />} label="Modified lantern" state={!shapeOk('modified_lantern') ? 'blocked' : effSleeveStyle === 'modified_lantern' ? 'selected' : 'normal'} onClick={() => setSleeveStyle('modified_lantern')} />
-              <Btn icon={<IconSleeveShape style="bishop" />} label="Bishop" state={!shapeOk('bishop') ? 'blocked' : effSleeveStyle === 'bishop' ? 'selected' : 'normal'} onClick={() => setSleeveStyle('bishop')} />
-              <Btn icon={<IconSleeveShape style="bell" />} label="Bell" state={!shapeOk('bell') ? 'blocked' : effSleeveStyle === 'bell' ? 'selected' : 'normal'} onClick={() => setSleeveStyle('bell')} />
+              <Btn icon={<IconSleeveShape style="narrow_taper" />} label="Narrow taper" state={!shapeOk('narrow_taper') ? 'blocked' : effSleeveStyle === 'narrow_taper' ? 'selected' : 'normal'} reason={sleeveShapeBlockReason(effSleeveLength)} onClick={() => setSleeveStyle('narrow_taper')} />
+              <Btn icon={<IconSleeveShape style="lantern" />} label="Lantern" state={!shapeOk('lantern') ? 'blocked' : effSleeveStyle === 'lantern' ? 'selected' : 'normal'} reason={sleeveShapeBlockReason(effSleeveLength)} onClick={() => setSleeveStyle('lantern')} />
+              <Btn icon={<IconSleeveShape style="modified_lantern" />} label="Modified lantern" state={!shapeOk('modified_lantern') ? 'blocked' : effSleeveStyle === 'modified_lantern' ? 'selected' : 'normal'} reason={sleeveShapeBlockReason(effSleeveLength)} onClick={() => setSleeveStyle('modified_lantern')} />
+              <Btn icon={<IconSleeveShape style="bishop" />} label="Bishop" state={!shapeOk('bishop') ? 'blocked' : effSleeveStyle === 'bishop' ? 'selected' : 'normal'} reason={sleeveShapeBlockReason(effSleeveLength)} onClick={() => setSleeveStyle('bishop')} />
+              <Btn icon={<IconSleeveShape style="bell" />} label="Bell" state={!shapeOk('bell') ? 'blocked' : effSleeveStyle === 'bell' ? 'selected' : 'normal'} reason={sleeveShapeBlockReason(effSleeveLength)} onClick={() => setSleeveStyle('bell')} />
               <Btn icon={<IconSleeveShape style="dolman" />} label="Dolman" state="soon" />
             </div>
           </Tile>
@@ -920,6 +1000,10 @@ export function App(): JSX.Element {
           </div>
         </div>
       )}
-    </>
+
+      {blockedInfo && (
+        <BlockedModal label={blockedInfo.label} reason={blockedInfo.reason} onClose={() => setBlockedInfo(null)} />
+      )}
+    </BlockedContext.Provider>
   );
 }

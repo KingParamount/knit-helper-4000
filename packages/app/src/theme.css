@@ -119,7 +119,17 @@ body {
 .btn.soon { background: #c8cfdb; color: #7b8498; box-shadow: 0 3px 0 #b3bccb; cursor: not-allowed; }
 .btn.soon:hover { background: #c8cfdb; }
 .btn.soon .badge { position: absolute; top: 4px; right: 7px; font-size: .62rem; letter-spacing: .04em; opacity: .8; }
-.btn.blocked { background: #d8cfca; color: #9a8b82; box-shadow: 0 3px 0 #c6bcb5; cursor: not-allowed; }
+/* Blocked = an illegal combination. Unlike 'soon' it is clickable: pressing it opens a
+   modal explaining what to change. The help cursor and a lift on hover signal that. */
+.btn.blocked { background: #d8cfca; color: #9a8b82; box-shadow: 0 3px 0 #c6bcb5; cursor: help; }
+.btn.blocked:hover { background: #e0d6d0; }
+.btn.blocked .badge.info {
+  position: absolute; top: 4px; right: 7px;
+  width: 15px; height: 15px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .68rem; font-weight: 700; line-height: 1;
+  background: #9a8b82; color: #f3ede9;
+}
 
 /* Equal-width cells that wrap: every button in a tile is the same size, tidily gridded,
    and each grid row stretches its buttons to a common height. */
