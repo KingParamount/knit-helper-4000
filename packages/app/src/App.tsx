@@ -617,7 +617,7 @@ export function App(): JSX.Element {
         {/* 4 — neckline & collar */}
         <Section label="Neckline &amp; collar" num={4}>
           <Tile title="Front neckline">
-            <div className="btn-row">
+            <div className="btn-row" style={flatFromCollar ? { opacity: 0.45, pointerEvents: 'none' } : undefined}>
               <Btn icon={<IconNeck shape="round" />} label="Crew" state={neck === 'round' ? 'selected' : 'normal'} onClick={() => setNeck('round')} />
               <Btn icon={<IconNeck shape="v" />} label="V-neck" state={neck === 'v' ? 'selected' : 'normal'} onClick={() => setNeck('v')} />
               <Btn icon={<IconNeck shape="scoop" />} label="Scoop" state={neck === 'scoop' ? 'selected' : 'normal'} onClick={() => setNeck('scoop')} />
@@ -629,6 +629,9 @@ export function App(): JSX.Element {
               <Btn icon={<IconNeck shape="ballet" />} label="Ballet" state="soon" />
               <Btn icon={<IconNeck shape="keyhole" />} label="Keyhole" state="soon" />
             </div>
+            {flatFromCollar && (
+              <div style={{ fontSize: '.82rem', color: 'var(--ink-soft)', marginTop: 8 }}>Set to a flat neckline by the {effCollar} collar.</div>
+            )}
           </Tile>
           <Tile title="Back neckline">
             <div className="btn-row">

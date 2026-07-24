@@ -21,6 +21,8 @@ export type {
   BodyLength,
   HemStyle,
   SleeveLength,
+  SleeveStyle,
+  CollarStyle,
   GarmentOptions,
   Technique,
 } from './data/types';
