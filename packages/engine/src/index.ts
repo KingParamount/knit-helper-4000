@@ -110,6 +110,8 @@ export {
   highRoundBackAllowed,
   boatAllowed,
   sleeveShapeAllowed,
+  collarAllowed,
+  collarForcesFlatNeck,
   hemReachesHip,
   bodyLengthAllowed,
   hemAllowed,

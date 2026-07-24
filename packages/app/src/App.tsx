@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
-import { availableChests, schematicMetrics, flatBackAllowed, highRoundFrontAllowed, highRoundBackAllowed, boatAllowed, bodyLengthAllowed, hemAllowed, sleeveStyleAllowed, sleeveShapeAllowed } from '@knit-helper-4000/engine';
-import type { Category, Units, NeckStyle, BackNeckStyle, ShoulderStyle, BodyLength, HemStyle, SleeveLength, SleeveStyle } from '@knit-helper-4000/engine';
+import { availableChests, schematicMetrics, flatBackAllowed, highRoundFrontAllowed, highRoundBackAllowed, boatAllowed, bodyLengthAllowed, hemAllowed, sleeveStyleAllowed, sleeveShapeAllowed, collarAllowed, collarForcesFlatNeck } from '@knit-helper-4000/engine';
+import type { Category, Units, NeckStyle, BackNeckStyle, ShoulderStyle, BodyLength, HemStyle, SleeveLength, SleeveStyle, CollarStyle } from '@knit-helper-4000/engine';
 import {
   DEFAULT_SWATCH,
   buildPattern,
@@ -203,6 +203,7 @@ export function App(): JSX.Element {
   const [neck, setNeck] = useState<NeckStyle>('round');
   const [backNeck, setBackNeck] = useState<BackNeckStyle>('scoop');
   const [shoulder, setShoulder] = useState<ShoulderStyle>('set_in');
+  const [collarStyle, setCollarStyle] = useState<CollarStyle>('single_band');
   const [bodyLength, setBodyLength] = useState<BodyLength>('hip');
   const [hem, setHem] = useState<HemStyle>('ribbing');
   const [sleeveLength, setSleeveLength] = useState<SleeveLength>('full');
@@ -252,16 +253,24 @@ export function App(): JSX.Element {
   // set-in or drop shoulder (saddle/raglan have no straight top to band) and a real sleeve
   // (its top is not an inset armhole band). Those are forced here, block-not-warn.
   const boat = neck === 'boat';
+  // Collar: a boat allows a single band only; a turtleneck needs a compatible neck (round/flat
+  // front + flat back) or it falls back to a single band. Funnel and cowl COERCE a flat front +
+  // flat back (the tall collar clears the head, so the parked flat front is fine under it).
+  const collarOk = (c: CollarStyle): boolean => collarAllowed(c, neck, backNeck);
+  const effCollar: CollarStyle = boat ? 'single_band' : collarOk(collarStyle) ? collarStyle : 'single_band';
+  const flatFromCollar = collarForcesFlatNeck(effCollar);
   const effBackNeck: BackNeckStyle = boat
     ? 'boat'
-    : backNeck === 'flat' && !flatBackOk
-      ? 'scoop'
-      : backNeck === 'high_round' && !highRoundBackOk
+    : flatFromCollar
+      ? 'flat'
+      : backNeck === 'flat' && !flatBackOk
         ? 'scoop'
-        : backNeck;
+        : backNeck === 'high_round' && !highRoundBackOk
+          ? 'scoop'
+          : backNeck;
   const effShoulder: ShoulderStyle = boat && !boatAllowed(shoulder) ? 'set_in' : shoulder;
   const highRoundFrontOk = sizeRec ? highRoundFrontAllowed(sizeRec, effBackNeck) : true;
-  const effNeck: NeckStyle = neck === 'high_round' && !highRoundFrontOk ? 'round' : neck;
+  const effNeck: NeckStyle = flatFromCollar ? 'flat' : neck === 'high_round' && !highRoundFrontOk ? 'round' : neck;
   // Choosing a specific back neck leaves boat mode (boat locks front = back), so it also
   // resets the front to a crew. Selecting a plain back on a boat otherwise does nothing.
   const pickBack = (bn: BackNeckStyle): void => {
@@ -299,18 +308,18 @@ export function App(): JSX.Element {
 
   const input = {
     category, chest, units, ease, neck: effNeck, backNeck: effBackNeck, shoulder: effShoulder,
-    bodyLength: effBodyLength, hem: effHem, sleeveLength: effSleeveLength, sleeveStyle: effSleeveStyle, swatch, technique,
+    bodyLength: effBodyLength, hem: effHem, sleeveLength: effSleeveLength, sleeveStyle: effSleeveStyle, collarStyle: effCollar, swatch, technique,
   };
   const gauge = gaugeReadout(gaugeFromSwatch(swatch), units);
 
   // Live outputs — the engine is pure and fast, so this runs every render.
   const patternText = useMemo(
     () => buildPatternText(input, output === 'concise' ? 'abbreviated' : 'verbose'),
-    [category, chest, ease, effNeck, effBackNeck, effShoulder, effBodyLength, effHem, effSleeveLength, effSleeveStyle, swatch, output, technique],
+    [category, chest, ease, effNeck, effBackNeck, effShoulder, effBodyLength, effHem, effSleeveLength, effSleeveStyle, effCollar, swatch, output, technique],
   );
   const schematics = useMemo(
     () => buildSchematics(input),
-    [category, chest, ease, effNeck, effBackNeck, effShoulder, effBodyLength, effHem, effSleeveLength, effSleeveStyle, swatch, technique],
+    [category, chest, ease, effNeck, effBackNeck, effShoulder, effBodyLength, effHem, effSleeveLength, effSleeveStyle, effCollar, swatch, technique],
   );
 
   const diagramSvg = (pid: PieceId, factor?: number): string =>
@@ -402,11 +411,13 @@ export function App(): JSX.Element {
   // band, so it drops the separate Front and Neckband tabs; a sleeveless garment shows
   // armhole bands rather than sleeves. Clamp the open tab so it always points at a real one.
   const isBoat = effNeck === 'boat';
+  // No band tab for a boat (integral band) or 'no collar'.
+  const noBand = isBoat || effCollar === 'none';
   const pieceTabs: { id: PieceId; label: string }[] = [
     { id: 'back', label: isBoat ? 'Back & front' : 'Back' },
     ...(isBoat ? [] : [{ id: 'front' as PieceId, label: 'Front' }]),
     { id: 'sleeve', label: effSleeveLength === 'sleeveless' ? 'Armhole bands' : 'Sleeves' },
-    ...(isBoat ? [] : [{ id: 'neckband' as PieceId, label: 'Neckband' }]),
+    ...(noBand ? [] : [{ id: 'neckband' as PieceId, label: 'Collar' }]),
   ];
   const shownPiece: PieceId = pieceTabs.some((t) => t.id === piece) ? piece : 'back';
 
@@ -414,7 +425,7 @@ export function App(): JSX.Element {
   // every piece regardless of which tab is open on screen. Concise stays concise.
   const printPattern = useMemo(
     () => buildPattern(input, output === 'concise' ? 'abbreviated' : 'verbose'),
-    [category, chest, ease, effNeck, effBackNeck, effShoulder, effBodyLength, effHem, effSleeveLength, effSleeveStyle, swatch, technique, output],
+    [category, chest, ease, effNeck, effBackNeck, effShoulder, effBodyLength, effHem, effSleeveLength, effSleeveStyle, effCollar, swatch, technique, output],
   );
   // How each template gets cut across sheets. Measured from the drawing's true size,
   // which the engine computes without building the SVG (schematicMetrics).
@@ -636,17 +647,23 @@ export function App(): JSX.Element {
           </Tile>
           <Tile title="Collar">
             <div className="btn-row">
-              <Btn label="Single band" state="selected" />
-              <Btn label="Double band" state="soon" />
-              <Btn label="Turtleneck" state="soon" />
-              <Btn label="Cowl" state="soon" />
-              <Btn label="Funnel" state="soon" />
-              <Btn label="Rolled edge" state="soon" />
+              <Btn label="Single band" state={effCollar === 'single_band' ? 'selected' : 'normal'} onClick={() => setCollarStyle('single_band')} />
+              <Btn label="Double band" state={!collarOk('double_band') ? 'blocked' : effCollar === 'double_band' ? 'selected' : 'normal'} onClick={() => setCollarStyle('double_band')} />
+              <Btn label="Turtleneck" state={!collarOk('turtleneck') ? 'blocked' : effCollar === 'turtleneck' ? 'selected' : 'normal'} onClick={() => setCollarStyle('turtleneck')} />
+              <Btn label="Cowl" state={!collarOk('cowl') ? 'blocked' : effCollar === 'cowl' ? 'selected' : 'normal'} onClick={() => setCollarStyle('cowl')} />
+              <Btn label="Funnel" state={!collarOk('funnel') ? 'blocked' : effCollar === 'funnel' ? 'selected' : 'normal'} onClick={() => setCollarStyle('funnel')} />
+              <Btn label="Rolled edge" state={!collarOk('rolled_edge') ? 'blocked' : effCollar === 'rolled_edge' ? 'selected' : 'normal'} onClick={() => setCollarStyle('rolled_edge')} />
               <Btn label="Shirt" state="soon" />
               <Btn label="Shawl" state="soon" />
               <Btn label="Hood" state="soon" />
-              <Btn label="No collar" state="soon" />
+              <Btn label="No collar" state={effCollar === 'none' ? 'selected' : 'normal'} onClick={() => setCollarStyle('none')} />
             </div>
+            {flatFromCollar && (
+              <div style={{ fontSize: '.82rem', color: 'var(--ink-soft)', marginTop: 8 }}>A {effCollar} collar sets a flat neckline (it clears the head).</div>
+            )}
+            {neck === 'boat' && (
+              <div style={{ fontSize: '.82rem', color: 'var(--ink-soft)', marginTop: 8 }}>A boat neck takes a single band only.</div>
+            )}
           </Tile>
         </Section>
 
@@ -815,7 +832,7 @@ export function App(): JSX.Element {
           twoColumn={output === 'concise'}
           chartFor={chartSvg}
           handBand={technique === 'hand'}
-          omitPieces={isBoat ? ['front', 'neckband'] : []}
+          omitPieces={isBoat ? ['front', 'neckband'] : effCollar === 'none' ? ['neckband'] : []}
           tilePlanFor={tilePlanFor}
           sheetRoomMm={sheetRoomMm}
           pageHeightMm={pageHeightMm}

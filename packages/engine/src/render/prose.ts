@@ -25,7 +25,7 @@
  */
 
 import type { Row, Op, Carriage } from '../row';
-import type { NeckStyle, BackNeckStyle, ShoulderStyle, Technique, Units } from '../data/types';
+import type { NeckStyle, BackNeckStyle, ShoulderStyle, Technique, Units, CollarStyle } from '../data/types';
 import type { Gauge } from '../gauge';
 import { HEM_SECTIONS, HEM_END_SECTIONS } from '../pieces/hem';
 
@@ -1100,7 +1100,8 @@ export function renderPiece(
       // worth saying is that the edge will roll.
       {
         const sec = row.section ?? '';
-        if (sec === 'body' || sec === 'taper') say(v.noHemNote());
+        // A stocking-stitch collar (rolled edge / cowl) casts on at main tension and rolls.
+        if (sec === 'body' || sec === 'taper' || sec === 'stocking') say(v.noHemNote());
         else if (HEM_SECTIONS.has(sec) && sec !== 'rib') say(v.hemTension(sec));
         else say(v.ribTension());
       }
@@ -1515,6 +1516,7 @@ function handMakingUpProse(
   style: ProseStyle,
   sleeveless = false,
   backNeck: BackNeckStyle = 'scoop',
+  collar: CollarStyle = 'single_band',
 ): PieceProse {
   const verbose = style !== 'abbreviated';
   const lines: string[] = [];
@@ -1620,12 +1622,22 @@ function handMakingUpProse(
     lines.push('');
   }
 
-  // The second shoulder, closing the band with it.
-  lines.push(
-    verbose
-      ? 'Join the second shoulder in the same way, taking the seam straight through the ends of the neckband so the band closes with it.'
-      : 'Join the second shoulder, through the band ends.',
-  );
+  // The second shoulder, closing the band with it. 'none' has no band — the neck edge is just
+  // finished; every other collar closes with the second shoulder, then takes its own finish.
+  if (collar === 'none') {
+    lines.push(
+      verbose
+        ? 'Join the second shoulder. There is no collar — finish the neck edge neatly (a row of single crochet or a tidy edge) so it does not stretch.'
+        : 'Join the second shoulder. No collar — finish the neck edge neatly.',
+    );
+  } else {
+    lines.push(
+      verbose
+        ? 'Join the second shoulder in the same way, taking the seam straight through the ends of the collar so the band closes with it.'
+        : 'Join the second shoulder, through the band ends.',
+    );
+    for (const l of collarFinishLines(collar, verbose)) lines.push(l);
+  }
 
   // 4 — sleeves (skipped for sleeveless; the bands are picked up after the sides close).
   if (!sleeveless) {
@@ -1675,6 +1687,42 @@ function handMakingUpProse(
   return { title: 'Making Up', lines };
 }
 
+/**
+ * Collar-specific finishing lines, appended after the band is sewn on: a double band folds
+ * to the inside, a rolled edge / cowl rolls, a turtleneck must clear the head. Single band and
+ * the flat-necked funnel need nothing extra. ('none' is handled before the band step.)
+ */
+function collarFinishLines(collar: CollarStyle, verbose: boolean): string[] {
+  switch (collar) {
+    case 'double_band':
+      return [
+        verbose
+          ? 'Fold the doubled band to the inside and stitch its live edge down to the neckline, enclosing a firm double-thickness band.'
+          : 'Fold the doubled band inside; stitch the live edge to the neckline.',
+      ];
+    case 'rolled_edge':
+      return [
+        verbose
+          ? 'The rolled collar is stocking stitch — leave it to roll to the outside (purl side out), or tack it lightly in place.'
+          : 'Rolled collar: let it roll (purl side out), or tack lightly.',
+      ];
+    case 'cowl':
+      return [
+        verbose
+          ? 'The cowl is a loose stocking drape — leave it to roll and fall softly; a looser gauge drapes more, a tighter one sits closer.'
+          : 'Cowl: let it drape and roll; gauge sets how loose it falls.',
+      ];
+    case 'turtleneck':
+      return [
+        verbose
+          ? 'Before you close the collar seam, check the turtleneck stretches easily over the head — cast off very loosely if it does not — then seam it, and it folds down when worn.'
+          : 'Check the turtleneck clears the head (cast off loosely), then seam; it folds down.',
+      ];
+    default:
+      return [];
+  }
+}
+
 export function makingUpProse(
   neck: NeckStyle,
   shoulder: ShoulderStyle,
@@ -1682,8 +1730,9 @@ export function makingUpProse(
   technique: Technique = 'machine',
   sleeveless = false,
   backNeck: BackNeckStyle = 'scoop',
+  collar: CollarStyle = 'single_band',
 ): PieceProse {
-  if (technique === 'hand') return handMakingUpProse(neck, shoulder, style, sleeveless, backNeck);
+  if (technique === 'hand') return handMakingUpProse(neck, shoulder, style, sleeveless, backNeck, collar);
   const verbose = style !== 'abbreviated';
   const lines: string[] = [];
   const stretchy = verbose ? 'a stretchy join (e.g. mattress stitch)' : 'stretchy join (e.g. mattress stitch)';
@@ -1839,20 +1888,30 @@ export function makingUpProse(
       : 'Join left shoulder (front-left to back-left). Leave the right shoulder open.',
   );
 
-  // 2 — the neckband, in from the open shoulder and back to it.
+  // 2 — the neckband, in from the open shoulder and back to it. 'none' has no band — the neck
+  // edge is just finished neatly.
   lines.push('');
-  if (neck === 'v') {
+  if (collar === 'none') {
     lines.push(
       verbose
-        ? 'Seam the neckband’s two mitred ends together at the centre front, forming the point of the V.'
-        : 'Seam the band’s mitred ends at centre front (the V point).',
+        ? 'No collar: finish the neck edge neatly — a row of single crochet or a tidy cast-off keeps it from stretching.'
+        : 'No collar: finish the neck edge neatly (single crochet or a tidy cast-off).',
     );
+  } else {
+    if (neck === 'v') {
+      lines.push(
+        verbose
+          ? 'Seam the neckband’s two mitred ends together at the centre front, forming the point of the V.'
+          : 'Seam the band’s mitred ends at centre front (the V point).',
+      );
+    }
+    lines.push(
+      verbose
+        ? `Sew the collar on. Starting at the open right shoulder, ease the band’s live edge onto the neckline all the way round and back to the start, matching each marker to its seam. Use ${stretchy} so the neck still stretches over the head.`
+        : `Sew the collar on from the open right shoulder, round and back to it, markers to seams. ${cap(stretchy)}.`,
+    );
+    for (const l of collarFinishLines(collar, verbose)) lines.push(l);
   }
-  lines.push(
-    verbose
-      ? `Sew the neckband on. Starting at the open right shoulder, ease the band’s live edge onto the neckline all the way round and back to the start, matching each marker to its seam. Use ${stretchy} so the neck still stretches over the head.`
-      : `Sew the band on from the open right shoulder, round and back to it, markers to seams. ${cap(stretchy)}.`,
-  );
 
   // A square neck turns right-angle corners the straight band cannot follow on its own —
   // mitre each corner in the seam so it turns squarely and lies flat. (Front square = 2
@@ -1867,12 +1926,16 @@ export function makingUpProse(
     );
   }
 
-  // 3 — close the last (right) shoulder, shutting the band’s ends.
+  // 3 — close the last (right) shoulder, shutting the band’s ends (no band ends for 'none').
   lines.push('');
   lines.push(
-    verbose
-      ? 'Join the right shoulder: seam the front-right shoulder to the back-right shoulder, closing the ends of the neckband.'
-      : 'Join right shoulder (front-right to back-right); closes the band ends.',
+    collar === 'none'
+      ? verbose
+        ? 'Join the right shoulder: seam the front-right shoulder to the back-right shoulder.'
+        : 'Join right shoulder (front-right to back-right).'
+      : verbose
+        ? 'Join the right shoulder: seam the front-right shoulder to the back-right shoulder, closing the ends of the collar.'
+        : 'Join right shoulder (front-right to back-right); closes the band ends.',
   );
 
   // 4 — the sleeves into the armholes (the set-in vs drop difference lives here). A
@@ -2022,6 +2085,24 @@ export function abbreviationsProse(pieces: PieceProse[], style: ProseStyle = 've
   return { title: 'Abbreviations', lines };
 }
 
+/** The heading a collar's piece is given — named for what the knitter recognises. */
+function collarTitle(collar: CollarStyle): string {
+  switch (collar) {
+    case 'turtleneck':
+      return 'The Turtleneck';
+    case 'funnel':
+      return 'The Funnel Collar';
+    case 'cowl':
+      return 'The Cowl';
+    case 'rolled_edge':
+      return 'The Rolled Collar';
+    case 'double_band':
+      return 'The Neckband (doubled)';
+    default:
+      return 'Neckband';
+  }
+}
+
 export function renderPattern(
   garment: {
     back: Row[];
@@ -2032,6 +2113,7 @@ export function renderPattern(
     neck: NeckStyle;
     backNeck?: BackNeckStyle;
     shoulder: ShoulderStyle;
+    collar?: CollarStyle;
   },
   styleOrOpts: ProseStyle | PieceOpts = 'verbose',
 ): Pattern {
@@ -2055,13 +2137,15 @@ export function renderPattern(
           ? renderPiece(garment.armholeBand!, 'The Armhole Bands (make 2)', o)
           : renderPiece(garment.sleeveLeft, 'The Sleeves (make 2)', o),
       ];
-  const makingUp = makingUpProse(garment.neck, garment.shoulder, style, technique, sleeveless, garment.backNeck);
+  const collar = garment.collar ?? 'single_band';
+  const makingUp = makingUpProse(garment.neck, garment.shoulder, style, technique, sleeveless, garment.backNeck, collar);
   // A hand knitter picks the band up off a neckline that only exists once a shoulder is
   // joined, so that join has to precede the band for the pattern to be workable in
   // order. A machine band is a separate strip, so all of its making-up waits to the end.
-  // A boat has no separate band at all — the band is part of each piece.
-  const band = boat ? null : renderPiece(garment.neckband, 'Neckband', o);
-  const pieces = boat
+  // A boat has no separate band at all, and 'none' has no band either — an empty neckband.
+  const noBand = boat || garment.neckband.length === 0;
+  const band = noBand ? null : renderPiece(garment.neckband, collarTitle(collar), o);
+  const pieces = noBand
     ? [...body, makingUp]
     : technique === 'hand'
       ? [...body, handBeforeBandProse(style, garment.shoulder), band!, makingUp]

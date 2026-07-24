@@ -200,6 +200,32 @@ export type SleeveStyle =
   | 'bell';
 
 /**
+ * Collar / neckband treatment, from the `collar` vocabulary. All are variations on the one
+ * band we pick up around the neck &mdash; depth, stitch and finish &mdash; not new pieces
+ * (shawl / hood / shirt are their own construction, deferred). Calibrated to the 2026-07-24
+ * harvest (each depth reads off KW's "Collar Length"):
+ *  - 'single_band'  &mdash; the default: a shallow rib band (~rib_neck), cast off. Byte-unchanged.
+ *  - 'double_band'  &mdash; a rib band knit to twice the depth, folded to the inside and sewn.
+ *  - 'rolled_edge'  &mdash; a stocking-stitch band (~2.5&times; rib_neck) that rolls (purl side out).
+ *  - 'funnel'       &mdash; a taller band (~2&times; rib_neck) that stands up; forces a flat neck.
+ *  - 'turtleneck'   &mdash; a tall rib band (~0.37&times; the neck) that folds over; round or flat
+ *    front + flat back only (never backless).
+ *  - 'cowl'         &mdash; a very tall, loose stocking drape (~2.25&times; a turtleneck); forces a
+ *    flat neck. Its drape is height + a loose gauge, not width.
+ *  - 'none'         &mdash; no band; the neck edge is finished plain.
+ * funnel/cowl force a flat front + flat back (the tall collar clears the head, so the parked flat
+ * front is fine under it); a boat allows a single band only.
+ */
+export type CollarStyle =
+  | 'single_band'
+  | 'double_band'
+  | 'turtleneck'
+  | 'funnel'
+  | 'cowl'
+  | 'rolled_edge'
+  | 'none';
+
+/**
  * The optional style axes added after the original five positional parameters
  * (ease, neck, back neck, shoulder, technique). Passed as one trailing bag so each
  * new axis does not grow every signature; every field has a default that reproduces
@@ -210,6 +236,7 @@ export interface GarmentOptions {
   hem?: HemStyle;
   sleeveLength?: SleeveLength;
   sleeveStyle?: SleeveStyle;
+  collarStyle?: CollarStyle;
 }
 
 /**

@@ -137,7 +137,7 @@ describe('Making Up — order, style-specific seams, stretchy only where it matt
   it('runs shoulders → band → last shoulder → sleeves → sides → ends', () => {
     const { lines } = makingUpProse('round', 'set_in');
     const left = idx(lines, 'Join the left shoulder');
-    const band = idx(lines, 'Sew the neckband on');
+    const band = idx(lines, 'Sew the collar on');
     const right = idx(lines, 'Join the right shoulder');
     const sleeves = idx(lines, 'Set in the sleeves');
     const sides = idx(lines, 'Join the sides');

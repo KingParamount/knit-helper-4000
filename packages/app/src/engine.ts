@@ -34,6 +34,7 @@ import type {
   HemStyle,
   SleeveLength,
   SleeveStyle,
+  CollarStyle,
   Technique,
   ProseStyle,
   Pattern,
@@ -103,6 +104,8 @@ export interface BuildInput {
   sleeveLength?: SleeveLength;
   /** Sleeve shape below the cap; defaults to 'moderate_taper' when omitted. */
   sleeveStyle?: SleeveStyle;
+  /** Collar / neckband treatment; defaults to 'single_band' when omitted. */
+  collarStyle?: CollarStyle;
   /** How it is made. Machine unless said otherwise. */
   technique?: Technique;
   swatch: Swatch;
@@ -125,7 +128,7 @@ export function buildPattern(input: BuildInput, style: ProseStyle): Pattern | nu
   const neck = input.neck ?? 'round';
   const backNeck = input.backNeck ?? 'scoop';
   const shoulder = input.shoulder ?? 'set_in';
-  const opts = { bodyLength: input.bodyLength ?? 'hip', hem: input.hem ?? 'ribbing', sleeveLength: input.sleeveLength ?? 'full', sleeveStyle: input.sleeveStyle ?? 'moderate_taper' } as const;
+  const opts = { bodyLength: input.bodyLength ?? 'hip', hem: input.hem ?? 'ribbing', sleeveLength: input.sleeveLength ?? 'full', sleeveStyle: input.sleeveStyle ?? 'moderate_taper', collarStyle: input.collarStyle ?? 'single_band' } as const;
   // Hand prose measures rather than counts, so it needs the row gauge and the
   // knitter's units; machine prose reads neither.
   return renderPattern(assembleGarment(size, input.ease, g, neck, shoulder, backNeck, opts), {
@@ -149,11 +152,12 @@ export function buildSchematics(input: BuildInput): Record<PieceId, PieceSchemat
   const neck = input.neck ?? 'round';
   const backNeck = input.backNeck ?? 'scoop';
   const shoulder = input.shoulder ?? 'set_in';
-  const opts = { bodyLength: input.bodyLength ?? 'hip', hem: input.hem ?? 'ribbing', sleeveLength: input.sleeveLength ?? 'full', sleeveStyle: input.sleeveStyle ?? 'moderate_taper' } as const;
+  const opts = { bodyLength: input.bodyLength ?? 'hip', hem: input.hem ?? 'ribbing', sleeveLength: input.sleeveLength ?? 'full', sleeveStyle: input.sleeveStyle ?? 'moderate_taper', collarStyle: input.collarStyle ?? 'single_band' } as const;
   const bp = backPlan(size, input.ease, g, shoulder, backNeck, opts);
   const fnp = frontNeckPlan(size, input.ease, g, neck, shoulder, opts);
   const sp = sleevePlan(size, input.ease, g, shoulder, opts);
-  const np = neckbandPlan(size, input.ease, g, neck, shoulder, backNeck);
+  const collar = opts.collarStyle;
+  const np = collar === 'none' ? null : neckbandPlan(size, input.ease, g, neck, shoulder, backNeck, collar);
   // Only the band's rows differ by technique — a hand V mitres at a centred double
   // decrease, a machine one at its two ends — and the chart has to show which.
   const technique = input.technique ?? 'machine';
@@ -171,11 +175,16 @@ export function buildSchematics(input: BuildInput): Record<PieceId, PieceSchemat
     const bs = boatSchematic(boatPieceRows('back', size, input.ease, g, shoulder, opts), { ...bp, bandRows: bplan.bandRows, openingSts: bplan.openingSts }, g);
     return { back: bs, front: bs, sleeve: sleeveOrBand, neckband: bs };
   }
+  const backSch = backSchematic(backRows(size, input.ease, g, shoulder, backNeck, opts), bp, g);
   return {
-    back: backSchematic(backRows(size, input.ease, g, shoulder, backNeck, opts), bp, g),
+    back: backSch,
     front: frontSchematic(frontRows(size, input.ease, g, neck, shoulder, opts), bp, fnp, g),
     sleeve: sleeveOrBand,
-    neckband: neckbandSchematic(neckbandRows(size, input.ease, g, neck, shoulder, technique, backNeck), np, g),
+    // 'none' has no band to draw; the app hides that tab, so reuse the back outline to keep
+    // the Record complete. Otherwise the band strip is drawn at the collar's depth.
+    neckband: np
+      ? neckbandSchematic(neckbandRows(size, input.ease, g, neck, shoulder, technique, backNeck, collar), np, g)
+      : backSch,
   };
 }
 

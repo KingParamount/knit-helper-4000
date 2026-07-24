@@ -18,6 +18,7 @@ import type {
   HemStyle,
   SleeveLength,
   SleeveStyle,
+  CollarStyle,
   GarmentOptions,
 } from './data/types';
 import { garmentWidths, MIN_UPPER_ARM_EASE_IN } from './dimensions';
@@ -158,6 +159,27 @@ export function sleeveShapeAllowed(shape: SleeveStyle, sleeveLength: SleeveLengt
   if (sleeveLength === 'cap' || sleeveLength === 'sleeveless') return shape === 'moderate_taper';
   if (shape === 'bell' || shape === 'bishop') return sleeveLength === 'full' || sleeveLength === 'three_quarter';
   return true;
+}
+
+/**
+ * May this collar be offered with this neckline? A boat allows a single band only. A
+ * turtleneck needs a round or flat front and a flat back (never backless — "a literal
+ * turtle", King) — blocked otherwise, so the knitter picks a compatible neck. Funnel and
+ * cowl also need a flat neck, but they COERCE it (the caller forces the neck to flat, since
+ * the flat front is parked and cannot be picked directly), so they are always offerable.
+ * The mild bands (single, double, rolled, none) go with any neckline.
+ */
+export function collarAllowed(collar: CollarStyle, neck: NeckStyle, backNeck: BackNeckStyle): boolean {
+  if (neck === 'boat') return collar === 'single_band';
+  if (collar === 'turtleneck') {
+    return (neck === 'round' || neck === 'flat') && backNeck === 'flat';
+  }
+  return true;
+}
+
+/** Does this collar force a flat front + flat back (funnel and cowl)? */
+export function collarForcesFlatNeck(collar: CollarStyle): boolean {
+  return collar === 'funnel' || collar === 'cowl';
 }
 
 /** Is this a sleeveless garment (no sleeve pieces; a picked-up armhole band instead)? */

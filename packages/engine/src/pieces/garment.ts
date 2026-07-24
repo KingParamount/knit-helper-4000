@@ -15,6 +15,7 @@ import type {
   BodyLength,
   HemStyle,
   SleeveLength,
+  CollarStyle,
   GarmentOptions,
 } from '../data/types';
 import type { Gauge } from '../gauge';
@@ -41,6 +42,7 @@ export interface Garment {
   bodyLength: BodyLength;
   hem: HemStyle;
   sleeveLength: SleeveLength;
+  collar: CollarStyle;
 }
 
 /** Every piece of the set-in pullover for one size / ease style / gauge / neck style. */
@@ -60,22 +62,30 @@ export function assembleGarment(
   // with an integral band, no neck/shoulder shaping and NO separate neckband. Selecting a
   // boat front forces the back to a boat too (they are the same piece).
   const boat = neck === 'boat';
-  const effBackNeck: BackNeckStyle = boat ? 'boat' : backNeck;
+  // The collar can force the neckline: funnel and cowl need a flat front + flat back (the tall
+  // collar clears the head, so the parked flat front is fine under it); a boat allows a single
+  // band only. Force here so the engine is self-consistent whatever the caller passes.
+  const collarIn = opts.collarStyle ?? 'single_band';
+  const collar: CollarStyle = boat ? 'single_band' : collarIn;
+  const flatCollar = collar === 'funnel' || collar === 'cowl';
+  const effNeck: NeckStyle = boat ? neck : flatCollar ? 'flat' : neck;
+  const effBackNeck: BackNeckStyle = boat ? 'boat' : flatCollar ? 'flat' : backNeck;
   return {
-    back: boat ? boatPieceRows('back', size, style, gauge, shoulder, opts) : backRows(size, style, gauge, shoulder, backNeck, opts),
-    front: boat ? boatPieceRows('front', size, style, gauge, shoulder, opts) : frontRows(size, style, gauge, neck, shoulder, opts),
+    back: boat ? boatPieceRows('back', size, style, gauge, shoulder, opts) : backRows(size, style, gauge, shoulder, effBackNeck, opts),
+    front: boat ? boatPieceRows('front', size, style, gauge, shoulder, opts) : frontRows(size, style, gauge, effNeck, shoulder, opts),
     sleeveLeft: s.left,
     sleeveRight: s.right,
     ...(sleeveless ? { armholeBand: armholeBandRows(size, style, gauge, shoulder) } : {}),
-    // The neckband is length- and hem-independent: it picks up from the neck opening
-    // only, and its depth is the separate rib_neck measurement. A boat has none (the
-    // band is integral to the front and back pieces).
-    neckband: boat ? [] : neckbandRows(size, style, gauge, neck, shoulder, 'machine', backNeck),
-    neck,
+    // The neckband is length- and hem-independent: it picks up from the neck opening only, and
+    // its depth is the collar. A boat has none (the band is integral to the pieces); 'none' has
+    // none either (neckbandRows returns []).
+    neckband: boat ? [] : neckbandRows(size, style, gauge, effNeck, shoulder, 'machine', effBackNeck, collar),
+    neck: effNeck,
     backNeck: effBackNeck,
     shoulder,
     bodyLength: opts.bodyLength ?? 'hip',
     hem: opts.hem ?? 'ribbing',
     sleeveLength: opts.sleeveLength ?? 'full',
+    collar,
   };
 }

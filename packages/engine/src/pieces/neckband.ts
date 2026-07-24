@@ -15,8 +15,38 @@
  * front centre), ~3 sts per 4 rows along the shaped side edges. Depth from the neck rib.
  */
 
-import type { SizeRecord, EaseStyleId, NeckStyle, BackNeckStyle, ShoulderStyle, Technique } from '../data/types';
-import { type Gauge, evenStitchesFor, ribRowsFor } from '../gauge';
+import type { SizeRecord, EaseStyleId, NeckStyle, BackNeckStyle, ShoulderStyle, Technique, CollarStyle } from '../data/types';
+import { type Gauge, evenStitchesFor, ribRowsFor, rowsFor } from '../gauge';
+
+// --- Collar depths & finish (below the pickup; calibrated to the 2026-07-24 harvest) --------
+/** turtleneck depth as a fraction of the neck circumference (W36 5.0", W50 6.3"). */
+const TURTLE_NECK_FACTOR = 0.37;
+/** cowl depth as a multiple of the turtleneck (the harvest read 2.25× at both sizes). */
+const COWL_TURTLE_RATIO = 2.25;
+
+/** Band depth (inches) for a collar. The short bands scale with rib_neck; turtle/cowl with neck. */
+export function collarDepthIn(size: SizeRecord, collar: CollarStyle): number {
+  switch (collar) {
+    case 'none':
+      return 0;
+    case 'single_band':
+      return size.rib_neck;
+    case 'double_band': // knit to twice the finished depth, folded to the inside
+    case 'funnel':
+      return 2 * size.rib_neck;
+    case 'rolled_edge':
+      return 2.5 * size.rib_neck;
+    case 'turtleneck':
+      return TURTLE_NECK_FACTOR * size.neck;
+    case 'cowl':
+      return COWL_TURTLE_RATIO * TURTLE_NECK_FACTOR * size.neck;
+  }
+}
+
+/** A collar's stitch: rib holds its shape (bands, turtleneck); stocking rolls (rolled edge, cowl). */
+export function collarStitch(collar: CollarStyle): 'rib' | 'stocking' {
+  return collar === 'rolled_edge' || collar === 'cowl' ? 'stocking' : 'rib';
+}
 import { type Row, carriageForRow } from '../row';
 import { backPlan } from './back';
 import { frontNeckPlan } from './front';
@@ -54,10 +84,13 @@ export interface NeckbandPlan {
   frontSidePickup: number; // each shaped front side edge
   strapEndSts: number; // saddle only: each strap end at the neck (0 otherwise)
   pickupTotal: number; // stitches the neck opening needs = the band cast-on
-  bandRows: number; // band depth in rows
+  bandRows: number; // band depth in rows (per the collar)
   mitreRows: number; // V only: rows of end-mitre shaping (0 for a crew)
   finalSts: number; // live stitches taken off on waste yarn (cast-on − the mitres)
   waypoints: number[]; // stitch positions (in the final row) where the band meets a seam
+  collar: CollarStyle;
+  stitch: 'rib' | 'stocking'; // rib holds its shape; stocking rolls
+  fold: boolean; // double band: knit twice the depth and fold to the inside
 }
 
 export function neckbandPlan(
@@ -67,11 +100,12 @@ export function neckbandPlan(
   neck: NeckStyle = 'round',
   shoulder: ShoulderStyle = 'set_in',
   backNeck: BackNeckStyle = 'scoop',
+  collar: CollarStyle = 'single_band',
 ): NeckbandPlan {
   // A raglan neckline is different: the back neck (held) + each sleeve top (its little
   // crown) + the front neck. The sleeve crowns sit between the back and front at the
   // raglan seams, so both count in the band. There is no scooped side on the held back.
-  if (shoulder === 'raglan') return raglanNeckbandPlan(size, style, gauge);
+  if (shoulder === 'raglan') return raglanNeckbandPlan(size, style, gauge, collar);
 
   const bp = backPlan(size, style, gauge, shoulder, backNeck);
   const backCentreSts = bp.backNeckCentreSts; // centre cast-off (full width for a flat/square back)
@@ -94,7 +128,10 @@ export function neckbandPlan(
   const raw = backCentreSts + 2 * backSidePickup + frontCentreSts + 2 * frontSidePickup + 2 * strapEndSts;
   const pickupTotal = raw % 2 === 0 ? raw + 1 : raw;
 
-  const bandRows = ribRowsFor(size.rib_neck, gauge);
+  const stitch = collarStitch(collar);
+  const depthIn = collarDepthIn(size, collar);
+  // Rib holds its row gauge (tighter); a stocking band takes the body row gauge.
+  const bandRows = stitch === 'rib' ? ribRowsFor(depthIn, gauge) : rowsFor(depthIn, gauge);
   // The V mitre eats a triangle at each end over the band depth (a ~45° corner for
   // square gauge); a crew has no mitre. Clamp so it never runs past the front-side edge.
   const mitreRows =
@@ -126,6 +163,9 @@ export function neckbandPlan(
     mitreRows,
     finalSts,
     waypoints,
+    collar,
+    stitch,
+    fold: collar === 'double_band',
   };
 }
 
@@ -134,7 +174,7 @@ export function neckbandPlan(
  * (centre held + a shaped side each way). The sleeve crowns sit at the raglan seams between
  * the back and the front, so both count. The band eases to the four raglan seams.
  */
-function raglanNeckbandPlan(size: SizeRecord, style: EaseStyleId, gauge: Gauge): NeckbandPlan {
+function raglanNeckbandPlan(size: SizeRecord, style: EaseStyleId, gauge: Gauge, collar: CollarStyle = 'single_band'): NeckbandPlan {
   const rp = raglanPlan(size, style, gauge);
   const sleeve = sleevePlan(size, style, gauge, 'raglan');
   const backCentreSts = rp.backNeckSts; // held flat, picked up 1:1
@@ -143,7 +183,8 @@ function raglanNeckbandPlan(size: SizeRecord, style: EaseStyleId, gauge: Gauge):
   const sleeveTopPickup = Math.max(1, Math.round(sleeve.capTopSts / 2)); // each crown, into the neck
   const raw = backCentreSts + frontCentreSts + 2 * frontSidePickup + 2 * sleeveTopPickup;
   const pickupTotal = raw % 2 === 0 ? raw + 1 : raw;
-  const bandRows = ribRowsFor(size.rib_neck, gauge);
+  const stitch = collarStitch(collar);
+  const bandRows = stitch === 'rib' ? ribRowsFor(collarDepthIn(size, collar), gauge) : rowsFor(collarDepthIn(size, collar), gauge);
   const finalSts = pickupTotal;
   const clamp = (n: number): number => Math.max(1, Math.min(finalSts - 1, n));
   // Waypoints at the four raglan seams, in pickup order: back, L sleeve, front, R sleeve.
@@ -162,6 +203,9 @@ function raglanNeckbandPlan(size: SizeRecord, style: EaseStyleId, gauge: Gauge):
     mitreRows: 0,
     finalSts,
     waypoints: [clamp(p1), clamp(p2), clamp(p3), clamp(p4)],
+    collar,
+    stitch,
+    fold: collar === 'double_band',
   };
 }
 
@@ -173,8 +217,11 @@ export function neckbandRows(
   shoulder: ShoulderStyle = 'set_in',
   technique: Technique = 'machine',
   backNeck: BackNeckStyle = 'scoop',
+  collar: CollarStyle = 'single_band',
 ): Row[] {
-  const p = neckbandPlan(size, style, gauge, neck, shoulder, backNeck);
+  // 'none' has no band at all — the neck edge is finished plain in making up.
+  if (collar === 'none') return [];
+  const p = neckbandPlan(size, style, gauge, neck, shoulder, backNeck, collar);
   const rows: Row[] = [];
   let index = 0;
   let stitches = 0;
@@ -188,7 +235,9 @@ export function neckbandRows(
     rows.push({ index, piece: 'collar', stitches, carriage: carriageForRow(index), ops, section });
   };
 
-  push([{ kind: 'cast_on', count: p.pickupTotal }], 'cast_on');
+  // Rib collars keep the historical 'cast_on' section (rib tension); a stocking collar (rolled
+  // edge / cowl) casts on at main tension and rolls, so its cast-on is tagged 'stocking'.
+  push([{ kind: 'cast_on', count: p.pickupTotal }], p.stitch === 'stocking' ? 'stocking' : 'cast_on');
   // Band body: a V mitres BOTH ends (edge decrease each end, every row); a crew is plain.
   // Leaves two rows spare — one for the marker row (penultimate), one for the take-off.
   const bodyRows = Math.max(0, p.bandRows - 2);
@@ -207,7 +256,7 @@ export function neckbandRows(
         'mitre',
       );
     }
-    else push([], neck === 'v' ? 'mitre' : 'rib');
+    else push([], neck === 'v' ? 'mitre' : p.stitch);
   }
   // Penultimate row: hang the waypoint markers.
   push([{ kind: 'mark', positions: p.waypoints }], 'mark');
