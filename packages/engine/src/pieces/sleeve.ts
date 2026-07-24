@@ -16,6 +16,7 @@ import type {
   ShoulderStyle,
   HemStyle,
   SleeveLength,
+  SleeveStyle,
   GarmentOptions,
 } from '../data/types';
 import { garmentWidths } from '../dimensions';
@@ -114,6 +115,18 @@ const MIN_CROWN_IN = 1.5;
 /** Decreases worked every row at each end of the cap (the fast bell ends). */
 const CAP_FAST_EACH_END = 3;
 
+// --- Sleeve-shape constants (below the cap; calibrated to the 2026-07-24 harvest) --------
+/** narrow_taper slims the sleeve top to this fraction of the standard (less bicep ease). */
+const NARROW_TOP_FACTOR = 0.91;
+/** bell casts on a wide ribbed cuff this many times the sleeve top, decreasing up (matched
+ *  Knitware at 1.40 for both Woman 36 and Woman 50). */
+const BELL_CUFF_FACTOR = 1.4;
+/** modified_lantern blooms to this fraction of the top just above the cuff, then gently tapers up. */
+const MODIFIED_BLOOM_FACTOR = 0.89;
+/** bishop blouses this many inches WIDER than the sleeve top, then decreases up to the top.
+ *  The harvest showed ~+3" over the (eased) top, near-constant across ease. */
+const BISHOP_BLOOM_IN = 3.0;
+
 export interface SleevePlan {
   hem: HemStyle; // cuff hem style (shared with the body)
   sleeveLength: SleeveLength;
@@ -122,7 +135,12 @@ export interface SleevePlan {
   ribRows: number; // rows in the cuff hem section (whatever the hem style)
   hemDepthIn: number; // resolved cuff hem depth (shallows with the sleeve length)
   taperRows: number;
-  incPerSide: number;
+  incPerSide: number; // legacy: the moderate-taper increase (== max(0, shapePerSide))
+  // --- sleeve shape (below the cap) ---
+  sleeveStyle: SleeveStyle;
+  bloomSts: number; // sleeve body width just above the cuff (after the gather) = "Sleeve Bottom"
+  gatherSts: number; // even increase-across from the cuff to the bloom (0 unless gathered)
+  shapePerSide: number; // taper from bloom to top, per side: + increase, − decrease, 0 straight
   sleeveTopSts: number; // achieved at the underarm
   underarmCastOff: number; // matches the body armhole
   capHeightRows: number; // fills ≈ CAP_FILL of the armhole depth
@@ -147,14 +165,21 @@ export function sleevePlan(
   // already carries the fit ease) and increases less, and 'full' lands exactly on
   // wrist + CUFF_EASE_IN — the original garment, unchanged.
   const sleeveLength = opts.sleeveLength ?? 'full';
+  const sleeveStyle = opts.sleeveStyle ?? 'moderate_taper';
   const frac = SLEEVE_LENGTH_FRACTION[sleeveLength];
   const lengthIn = (size.arm_length + size.ease_arml) * frac;
   const fullCuffIn = size.wrist + CUFF_EASE_IN;
-  const hemWidthIn = w.sleeveTop + frac * (fullCuffIn - w.sleeveTop);
+  const wristCuffIn = w.sleeveTop + frac * (fullCuffIn - w.sleeveTop);
+  // A bell casts on a WIDE ribbed cuff (~1.4× the sleeve top) and decreases up; every other
+  // shape casts on that wrist cuff and shapes above it. The TOP and cap are always derived
+  // from the wrist cuff (below), so a bell's wide cuff never drags the sleeve top — and the
+  // armhole join it must fit — out with it.
+  const hemWidthIn = sleeveStyle === 'bell' ? w.sleeveTop * BELL_CUFF_FACTOR : wristCuffIn;
 
   // One underarm seam, eating a stitch from each of the sleeve's two edges — cut it
   // wider at both cuff and top so the sewn tube measures what it should.
   const bodyCuffSts = evenStitchesFor(hemWidthIn, gauge) + 2 * SEAM_ALLOWANCE_STS; // even
+  const wristCuffSts = evenStitchesFor(wristCuffIn, gauge) + 2 * SEAM_ALLOWANCE_STS; // == bodyCuffSts unless bell
   const hemDepthIn = Math.min(size.rib_body, MAX_HEM_FRACTION * lengthIn);
   const hp = hemPlan(size, gauge, opts.hem ?? 'ribbing', bodyCuffSts, hemDepthIn);
   const ribCastOnSts = hp.castOnSts;
@@ -182,9 +207,32 @@ export function sleevePlan(
   const exactTopSts = (w.sleeveTop * gauge.bodySt) / 4;
   // Clamped at zero: a short sleeve's even-rounded cast-on can land a stitch above
   // the exact top target (two baby sizes at chunky gauge), and a sleeve that
-  // "increases minus one" is a nonsense — it just knits straight, top = cast-on.
-  const incPerSide = Math.max(0, Math.round((exactTopSts - bodyCuffSts) / 2));
-  const sleeveTopSts = bodyCuffSts + 2 * incPerSide; // even
+  // "increases minus one" is a nonsense — it just knits straight, top = cast-on. The top
+  // is derived from the WRIST cuff (not the actual cast-on) so a bell's wide cuff keeps the
+  // moderate top; narrow_taper slims the top itself (~0.91×), for less bicep ease.
+  const incPerSide = Math.max(0, Math.round((exactTopSts - wristCuffSts) / 2)); // legacy = moderate taper
+  const narrowIncPerSide = Math.max(0, Math.round(((exactTopSts * NARROW_TOP_FACTOR) - wristCuffSts) / 2));
+  // narrow_taper slims the top for a set-in sleeve (the cap re-fits the same armhole). A drop
+  // top IS the armhole opening and a raglan/saddle top feeds its seam/strap, so the top can't
+  // be slimmed there — narrow_taper falls back to the standard top for those.
+  const slimTop = sleeveStyle === 'narrow_taper' && shoulder === 'set_in';
+  const sleeveTopSts = wristCuffSts + 2 * (slimTop ? narrowIncPerSide : incPerSide); // even
+
+  // The sleeve shape below the cap: a gather (even increase-across from the cuff to a
+  // bloom just above it) then a taper (bloom → top). Most shapes have no gather (bloom =
+  // cuff) and a plain increase-taper; a bell/bishop DECREASE bloom → top; a lantern is
+  // straight (bloom = top, no taper). See the SleeveStyle doc for the per-shape recipe.
+  const bloomTargetSts =
+    sleeveStyle === 'lantern'
+      ? sleeveTopSts
+      : sleeveStyle === 'modified_lantern'
+        ? evenStitchesFor(w.sleeveTop * MODIFIED_BLOOM_FACTOR, gauge) + 2 * SEAM_ALLOWANCE_STS
+        : sleeveStyle === 'bishop'
+          ? sleeveTopSts + evenStitchesFor(BISHOP_BLOOM_IN, gauge)
+          : bodyCuffSts; // moderate, narrow, bell — no gather
+  const gatherSts = Math.max(0, bloomTargetSts - bodyCuffSts);
+  const bloomSts = bodyCuffSts + gatherSts; // effective bloom (never below the cuff)
+  const shapePerSide = Math.round((sleeveTopSts - bloomSts) / 2); // + increase / − decrease / 0 straight
 
   // A drop sleeve has no cap: it tapers to the top and binds off straight. The whole
   // top width becomes the sewn edge (capTopSts), the cap-shaping fields are 0.
@@ -198,6 +246,10 @@ export function sleevePlan(
       ribRows,
       taperRows,
       incPerSide,
+      sleeveStyle,
+      bloomSts,
+      gatherSts,
+      shapePerSide,
       sleeveTopSts,
       underarmCastOff: 0,
       capHeightRows: 0,
@@ -224,6 +276,10 @@ export function sleevePlan(
       ribRows,
       taperRows,
       incPerSide,
+      sleeveStyle,
+      bloomSts,
+      gatherSts,
+      shapePerSide,
       sleeveTopSts,
       underarmCastOff: rp.underarmCastOff,
       capHeightRows: rp.ragRows, // the raglan span (row-for-row with the body)
@@ -265,6 +321,10 @@ export function sleevePlan(
     ribRows,
     taperRows,
     incPerSide,
+    sleeveStyle,
+    bloomSts,
+    gatherSts,
+    shapePerSide,
     sleeveTopSts,
     underarmCastOff,
     capHeightRows,
@@ -310,19 +370,28 @@ export function sleeveRows(
     push([{ kind: 'cast_on', count: p.ribCastOnSts }], 'taper');
   }
 
-  // Taper: the first stocking row carries the hem's change ops (the rib drops its odd
-  // extra stitch on the right; a frill gathers across); then increase 1 st each end on
-  // evenly spread rows. With no hem the cast-on row IS taper row 1, so the increases
-  // spread over the remaining rows instead.
+  // Taper / shape. The first stocking row carries the hem's change ops (the rib drops its
+  // odd extra stitch) plus, for a gathered shape (bishop / lantern / modified), an even
+  // increase-ACROSS from the cuff out to the bloom. Then the taper runs bloom → top over the
+  // remaining rows: a plain increase for the tapered shapes, a DECREASE for a bell/bishop
+  // (wider at the bottom), or nothing for a straight lantern. With no hem the cast-on row IS
+  // taper row 1. A plain moderate taper (no gather, increase) reduces to the original loop.
   const firstTaper = hp.pieceRows > 0 ? 1 : 2;
-  const incAt = new Set(evenRows(p.incPerSide, p.taperRows - (firstTaper - 1)));
+  const shaping = Math.abs(p.shapePerSide);
+  const shapeOp: Row['ops'] =
+    p.shapePerSide >= 0
+      ? [{ kind: 'increase', count: 1, side: 'both' }]
+      : [{ kind: 'decrease', count: 1, side: 'both' }];
+  const shapeAt = new Set(evenRows(shaping, p.taperRows - (firstTaper - 1)));
   for (let t = firstTaper; t <= p.taperRows; t++) {
-    if (t === firstTaper && hp.firstBodyOps.length > 0) push(hp.firstBodyOps, 'taper');
-    else
-      push(
-        incAt.has(t - (firstTaper - 1)) ? [{ kind: 'increase', count: 1, side: 'both' }] : [],
-        'taper',
-      );
+    const r = t - (firstTaper - 1); // 1-based within the taper
+    if (r === 1 && (hp.firstBodyOps.length > 0 || p.gatherSts > 0)) {
+      const ops: Row['ops'] = [...hp.firstBodyOps];
+      if (p.gatherSts > 0) ops.push({ kind: 'increase', count: p.gatherSts, side: 'across' });
+      push(ops, 'taper');
+    } else {
+      push(shapeAt.has(r) ? shapeOp : [], 'taper');
+    }
   }
 
   // Drop shoulder: no cap — the whole straight top comes off on waste yarn (it sews

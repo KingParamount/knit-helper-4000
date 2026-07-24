@@ -109,6 +109,7 @@ export {
   highRoundFrontAllowed,
   highRoundBackAllowed,
   boatAllowed,
+  sleeveShapeAllowed,
   hemReachesHip,
   bodyLengthAllowed,
   hemAllowed,

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
-import { availableChests, schematicMetrics, flatBackAllowed, highRoundFrontAllowed, highRoundBackAllowed, boatAllowed, bodyLengthAllowed, hemAllowed, sleeveStyleAllowed } from '@knit-helper-4000/engine';
-import type { Category, Units, NeckStyle, BackNeckStyle, ShoulderStyle, BodyLength, HemStyle, SleeveLength } from '@knit-helper-4000/engine';
+import { availableChests, schematicMetrics, flatBackAllowed, highRoundFrontAllowed, highRoundBackAllowed, boatAllowed, bodyLengthAllowed, hemAllowed, sleeveStyleAllowed, sleeveShapeAllowed } from '@knit-helper-4000/engine';
+import type { Category, Units, NeckStyle, BackNeckStyle, ShoulderStyle, BodyLength, HemStyle, SleeveLength, SleeveStyle } from '@knit-helper-4000/engine';
 import {
   DEFAULT_SWATCH,
   buildPattern,
@@ -206,6 +206,7 @@ export function App(): JSX.Element {
   const [bodyLength, setBodyLength] = useState<BodyLength>('hip');
   const [hem, setHem] = useState<HemStyle>('ribbing');
   const [sleeveLength, setSleeveLength] = useState<SleeveLength>('full');
+  const [sleeveStyle, setSleeveStyle] = useState<SleeveStyle>('moderate_taper');
   const [swatch, setSwatch] = useState<Swatch>(DEFAULT_SWATCH);
   const [output, setOutput] = useState<OutputId>('full');
   const [piece, setPiece] = useState<PieceId>('back');
@@ -291,20 +292,25 @@ export function App(): JSX.Element {
     sleeveStyleAllowed(effShoulder, sl) && !(boat && sl === 'sleeveless');
   const effSleeveLength: SleeveLength = sleeveOk(sleeveLength) ? sleeveLength : 'full';
 
+  // A sleeve SHAPE needs room below the cap: a bell/bishop only reads at full or ¾ length,
+  // and a cap/sleeveless has no taper to shape. Blocked-not-warned; falls back to the taper.
+  const shapeOk = (sh: SleeveStyle): boolean => sleeveShapeAllowed(sh, effSleeveLength);
+  const effSleeveStyle: SleeveStyle = shapeOk(sleeveStyle) ? sleeveStyle : 'moderate_taper';
+
   const input = {
     category, chest, units, ease, neck: effNeck, backNeck: effBackNeck, shoulder: effShoulder,
-    bodyLength: effBodyLength, hem: effHem, sleeveLength: effSleeveLength, swatch, technique,
+    bodyLength: effBodyLength, hem: effHem, sleeveLength: effSleeveLength, sleeveStyle: effSleeveStyle, swatch, technique,
   };
   const gauge = gaugeReadout(gaugeFromSwatch(swatch), units);
 
   // Live outputs — the engine is pure and fast, so this runs every render.
   const patternText = useMemo(
     () => buildPatternText(input, output === 'concise' ? 'abbreviated' : 'verbose'),
-    [category, chest, ease, effNeck, effBackNeck, effShoulder, effBodyLength, effHem, effSleeveLength, swatch, output, technique],
+    [category, chest, ease, effNeck, effBackNeck, effShoulder, effBodyLength, effHem, effSleeveLength, effSleeveStyle, swatch, output, technique],
   );
   const schematics = useMemo(
     () => buildSchematics(input),
-    [category, chest, ease, effNeck, effBackNeck, effShoulder, effBodyLength, effHem, effSleeveLength, swatch, technique],
+    [category, chest, ease, effNeck, effBackNeck, effShoulder, effBodyLength, effHem, effSleeveLength, effSleeveStyle, swatch, technique],
   );
 
   const diagramSvg = (pid: PieceId, factor?: number): string =>
@@ -408,7 +414,7 @@ export function App(): JSX.Element {
   // every piece regardless of which tab is open on screen. Concise stays concise.
   const printPattern = useMemo(
     () => buildPattern(input, output === 'concise' ? 'abbreviated' : 'verbose'),
-    [category, chest, ease, effNeck, effBackNeck, effShoulder, effBodyLength, effHem, effSleeveLength, swatch, technique, output],
+    [category, chest, ease, effNeck, effBackNeck, effShoulder, effBodyLength, effHem, effSleeveLength, effSleeveStyle, swatch, technique, output],
   );
   // How each template gets cut across sheets. Measured from the drawing's true size,
   // which the engine computes without building the SVG (schematicMetrics).
@@ -673,12 +679,12 @@ export function App(): JSX.Element {
           </Tile>
           <Tile title="Sleeve style">
             <div className="btn-row">
-              <Btn icon={<IconSleeveShape style="moderate_taper" />} label="Taper" state="selected" />
-              <Btn icon={<IconSleeveShape style="narrow_taper" />} label="Narrow taper" state="soon" />
-              <Btn icon={<IconSleeveShape style="lantern" />} label="Lantern" state="soon" />
-              <Btn icon={<IconSleeveShape style="modified_lantern" />} label="Modified lantern" state="soon" />
-              <Btn icon={<IconSleeveShape style="bishop" />} label="Bishop" state="soon" />
-              <Btn icon={<IconSleeveShape style="bell" />} label="Bell" state="soon" />
+              <Btn icon={<IconSleeveShape style="moderate_taper" />} label="Taper" state={effSleeveStyle === 'moderate_taper' ? 'selected' : 'normal'} onClick={() => setSleeveStyle('moderate_taper')} />
+              <Btn icon={<IconSleeveShape style="narrow_taper" />} label="Narrow taper" state={!shapeOk('narrow_taper') ? 'blocked' : effSleeveStyle === 'narrow_taper' ? 'selected' : 'normal'} onClick={() => setSleeveStyle('narrow_taper')} />
+              <Btn icon={<IconSleeveShape style="lantern" />} label="Lantern" state={!shapeOk('lantern') ? 'blocked' : effSleeveStyle === 'lantern' ? 'selected' : 'normal'} onClick={() => setSleeveStyle('lantern')} />
+              <Btn icon={<IconSleeveShape style="modified_lantern" />} label="Modified lantern" state={!shapeOk('modified_lantern') ? 'blocked' : effSleeveStyle === 'modified_lantern' ? 'selected' : 'normal'} onClick={() => setSleeveStyle('modified_lantern')} />
+              <Btn icon={<IconSleeveShape style="bishop" />} label="Bishop" state={!shapeOk('bishop') ? 'blocked' : effSleeveStyle === 'bishop' ? 'selected' : 'normal'} onClick={() => setSleeveStyle('bishop')} />
+              <Btn icon={<IconSleeveShape style="bell" />} label="Bell" state={!shapeOk('bell') ? 'blocked' : effSleeveStyle === 'bell' ? 'selected' : 'normal'} onClick={() => setSleeveStyle('bell')} />
               <Btn icon={<IconSleeveShape style="dolman" />} label="Dolman" state="soon" />
             </div>
           </Tile>

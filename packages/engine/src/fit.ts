@@ -17,6 +17,7 @@ import type {
   BodyLength,
   HemStyle,
   SleeveLength,
+  SleeveStyle,
   GarmentOptions,
 } from './data/types';
 import { garmentWidths, MIN_UPPER_ARM_EASE_IN } from './dimensions';
@@ -143,6 +144,20 @@ export function sleeveStyleAllowed(shoulder: ShoulderStyle, sleeveLength: Sleeve
  */
 export function boatAllowed(shoulder: ShoulderStyle): boolean {
   return shoulder === 'set_in' || shoulder === 'drop';
+}
+
+/**
+ * May this sleeve SHAPE be built at this sleeve length? The shape lives below the cap, so
+ * it needs a real sleeve with room to shape: a cap (almost all cap, no taper) and sleeveless
+ * (no sleeve at all) take the plain taper only. A bell/bishop is a wrist-length statement —
+ * its flare/blouse only reads at full or three-quarter length, so a short bell is blocked
+ * (block-not-warn; falls back to the moderate taper). The mild shapes (narrow, lantern,
+ * modified) go with any sleeved length.
+ */
+export function sleeveShapeAllowed(shape: SleeveStyle, sleeveLength: SleeveLength): boolean {
+  if (sleeveLength === 'cap' || sleeveLength === 'sleeveless') return shape === 'moderate_taper';
+  if (shape === 'bell' || shape === 'bishop') return sleeveLength === 'full' || sleeveLength === 'three_quarter';
+  return true;
 }
 
 /** Is this a sleeveless garment (no sleeve pieces; a picked-up armhole band instead)? */

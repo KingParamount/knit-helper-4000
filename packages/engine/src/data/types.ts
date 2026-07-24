@@ -173,6 +173,33 @@ export type HemStyle = 'ribbing' | 'moss_band' | 'garter_band' | 'folded_band' |
 export type SleeveLength = 'full' | 'three_quarter' | 'half' | 'short' | 'cap' | 'sleeveless';
 
 /**
+ * Sleeve SHAPE, from the `sleeve_style` vocabulary — the silhouette below the cap. The
+ * sleeve TOP is pinned to the armhole (it carries the fit ease and the cap sews to it), so
+ * every shape but 'narrow_taper' keeps the same top and cap; the shape only changes the
+ * cuff and the run up to the top. Calibrated to the 2026-07-24 Knitware harvest:
+ *  - 'moderate_taper' — the default: a wrist cuff tapering up to the sleeve top.
+ *  - 'narrow_taper'   — a slimmer sleeve: the top is narrowed (~0.91×), so less bicep ease;
+ *    the cap re-fits the same armhole.
+ *  - 'lantern'        — straight: a wrist rib, then increase across in one row to the sleeve
+ *    top and knit straight (a column gathered into the cuff).
+ *  - 'modified_lantern' — a near-straight sleeve: a wrist rib, a smaller across-increase, then
+ *    a gentle taper up to the top.
+ *  - 'bishop'         — full and bloused: a wrist rib, a big across-increase to a blouse wider
+ *    than the top (~+3"), then a decrease up to the top. The cuff gathers the fullness in.
+ *  - 'bell'           — flared: a WIDE ribbed cuff (~1.4× the top), decreasing up to the top.
+ *    No gather — the wide part is the open cuff itself. Full/¾ length only (as bishop).
+ * 'dolman' is deliberately absent — a batwing is a different construction (cut in with the
+ * body, no set-in armhole), a separate future feature, not a variation on the sleeve piece.
+ */
+export type SleeveStyle =
+  | 'moderate_taper'
+  | 'narrow_taper'
+  | 'lantern'
+  | 'modified_lantern'
+  | 'bishop'
+  | 'bell';
+
+/**
  * The optional style axes added after the original five positional parameters
  * (ease, neck, back neck, shoulder, technique). Passed as one trailing bag so each
  * new axis does not grow every signature; every field has a default that reproduces
@@ -182,6 +209,7 @@ export interface GarmentOptions {
   bodyLength?: BodyLength;
   hem?: HemStyle;
   sleeveLength?: SleeveLength;
+  sleeveStyle?: SleeveStyle;
 }
 
 /**

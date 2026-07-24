@@ -35,7 +35,14 @@ export type Op =
    * the doubled cast-on at most adult sizes).
    */
   | { kind: 'decrease'; count: number; side: 'L' | 'R' | 'both' | 'center' | 'across' }
-  | { kind: 'increase'; count: number; side: 'L' | 'R' | 'both' }
+  /**
+   * `side: 'across'` is the mirror of the decrease-across gather: an even increase spread
+   * over the whole row (make/increase `count` stitches evenly across), which flares a narrow
+   * cuff out to a fuller sleeve above it — the gathered cuff of a bishop or a lantern.
+   * `count` is the stitches ADDED, so the running total is `+count` (a single event, not per
+   * edge). Hand: "inc N sts evenly across"; on a machine, make the stitches across the bed.
+   */
+  | { kind: 'increase'; count: number; side: 'L' | 'R' | 'both' | 'across' }
   | { kind: 'hold'; count: number; side: 'L' | 'R' }
   | { kind: 'take_off'; count: number } // off the machine on waste yarn; stitches stay live
   | { kind: 'mark'; positions: number[] }; // hang contrast markers at these stitches

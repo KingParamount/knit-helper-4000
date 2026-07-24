@@ -465,6 +465,12 @@ function trackBodyEdges(
           marks.push({ kind: 'dec', x: -leftSts + 0.5, y: cy, lean: -1 });
         }
       } else if (op.kind === 'increase') {
+        if (op.side === 'across') {
+          // A gathered sleeve cuff: the width springs out symmetrically in one row (the
+          // mirror of the frill's gather-in). No edge glyph — nothing happens at an edge.
+          rightSts += Math.ceil(op.count / 2);
+          leftSts += Math.floor(op.count / 2);
+        }
         if (op.side === 'R' || op.side === 'both') {
           rightSts += op.count;
           marks.push({ kind: 'inc', x: rightSts - 0.5, y: cy });
@@ -532,10 +538,17 @@ export function sleeveSchematic(
         rightSts = Math.ceil(op.count / 2);
         leftSts = Math.floor(op.count / 2);
       } else if (op.kind === 'increase') {
-        rightSts += op.count;
-        leftSts += op.count;
-        marks.push({ kind: 'inc', x: rightSts - 0.5, y: cy });
-        marks.push({ kind: 'inc', x: -leftSts + 0.5, y: cy });
+        if (op.side === 'across') {
+          // A gathered sleeve cuff (bishop/lantern): the width springs out symmetrically
+          // in one row — the mirror of the frill gather, no edge glyph.
+          rightSts += Math.ceil(op.count / 2);
+          leftSts += Math.floor(op.count / 2);
+        } else {
+          rightSts += op.count;
+          leftSts += op.count;
+          marks.push({ kind: 'inc', x: rightSts - 0.5, y: cy });
+          marks.push({ kind: 'inc', x: -leftSts + 0.5, y: cy });
+        }
       } else if (op.kind === 'bind_off') {
         if (op.side === 'R') {
           rightSts -= op.count;

@@ -124,6 +124,8 @@ interface Vocab {
   foldedJoin(n: number): string;
   /** A frill's gather: knit two together all the way across. */
   frillGather(removed: number, remaining: number): string;
+  /** A gathered sleeve cuff (bishop/lantern): increase evenly across to the fuller width. */
+  bloomAcross(total: number): string;
   /** Hem 'none': the cast-on edge will roll, and the pattern should say so once. */
   noHemNote(): string;
   resetToStocking(drop: Carriage | undefined, carriage: Carriage): string;
@@ -229,6 +231,8 @@ const VERBOSE: Vocab = {
     `Pick the cast-on edge up onto the needles — one loop onto each of the ${n} needles — and knit 1 row through loop and stitch together, closing the hem.`,
   frillGather: (removed, remaining) =>
     `Transfer every second stitch onto its neighbour and knit 1 row: ${sts(removed + remaining)} become ${remaining}.`,
+  bloomAcross: (total) =>
+    `Increase evenly across the row to ${sts(total)} — the fuller sleeve springs from the cuff here; the ribbed cuff gathers it back in.`,
   noHemNote: () =>
     'There is no hem band; the stocking stitch edge will roll. Steam it flat when you block, or keep the roll as the finish.',
   resetToStocking: (drop, carriage) =>
@@ -345,6 +349,7 @@ const TERSE: Vocab = {
   foldedJoin: (n) => `PU cast-on edge, 1 loop per needle (${n} N), kn 1 row through both — hem closed.`,
   frillGather: (removed, remaining) =>
     `Transfer every 2nd st to neighbour, kn 1 row: ${removed + remaining} st → ${remaining} st.`,
+  bloomAcross: (total) => `Inc evenly across to ${total} st (fuller sleeve; cuff gathers it in).`,
   noHemNote: () => 'No hem band; st st edge rolls. Steam flat at blocking, or keep the roll.',
   resetToStocking: (drop, carriage) =>
     'RC to 000, change to st st, set to MT' +
@@ -534,6 +539,10 @@ function handVocab(style: ProseStyle, units: Units): Vocab {
       terse
         ? `K2tog across: ${removed + remaining} st → ${remaining} st.`
         : `Knit 2 together all the way across the row: ${sts(removed + remaining)} become ${sts(remaining)}.`,
+    bloomAcross: (total) =>
+      terse
+        ? `Inc evenly across to ${total} st (full sleeve; cuff gathers in).`
+        : `Increase evenly across the row to ${sts(total)} stitches — the fuller sleeve springs from the cuff, and the ribbed cuff gathers it in.`,
     noHemNote: () =>
       terse
         ? 'No hem; st st edge rolls. Steam at blocking, or keep the roll.'
@@ -1033,6 +1042,16 @@ export function renderPiece(
       if (row.side === 'right') say(v.rejoinRight());
       baseline = (prev as Row).index;
       prevCounter = 0;
+      // A gathered sleeve cuff blooms on this row: a big increase-across to the fuller
+      // sleeve (the rib's own odd-stitch drop is folded into the same row's count).
+      const bloom = stocking && row.ops.some((o) => o.kind === 'increase' && o.side === 'across');
+      if (bloom) {
+        say(v.bloomAcross(row.stitches));
+        say(v.stitchCount(row.stitches, false));
+        pending = { section: row.section, last: row };
+        i += 1;
+        continue;
+      }
       if (drop) {
         say(v.stitchCount(row.stitches, true));
         pending = { section: row.section, last: row }; // the drop is stated; body lead-in
