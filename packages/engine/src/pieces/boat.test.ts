@@ -6,6 +6,8 @@ import { type Gauge, DEFAULT_GAUGE } from '../gauge';
 import { boatPlan, boatPieceRows } from './boat';
 import { assemblyReport } from './assembly';
 import { boatAllowed } from '../fit';
+import { backPlan } from './back';
+import { boatSchematic } from '../render/schematic';
 
 const G = DEFAULT_GAUGE;
 const G2 = { bodySt: 18, bodyRow: (28 * 4) / 5, ribSt: 0, ribRow: 0 };
@@ -65,6 +67,22 @@ describe('boat: a whole-garment straight-topped construction', () => {
     expect(boatAllowed('drop')).toBe(true);
     expect(boatAllowed('saddle')).toBe(false);
     expect(boatAllowed('raglan')).toBe(false);
+  });
+});
+
+describe('boat schematic: a straight-topped piece, not a back-neck notch', () => {
+  it('draws a flat top and marks the band + opening (no neck cutout)', () => {
+    const bp = backPlan(W36, 'moderate', KW, 'set_in', 'flat');
+    const bplan = boatPlan(W36, 'moderate', KW);
+    const s = boatSchematic(boatPieceRows('back', W36, 'moderate', KW), { ...bp, bandRows: bplan.bandRows, openingSts: bplan.openingSts }, KW);
+    // Two outline points share the top y — a flat top edge, symmetric about centre.
+    const top = s.outline.filter((p) => p.y === s.heightRows).map((p) => p.x).sort((a, b) => a - b);
+    expect(top.length).toBeGreaterThanOrEqual(2);
+    expect(top[0]).toBeCloseTo(-top[top.length - 1], 5);
+    // The band and the neck opening are both dimensioned; there is no 'back neck' notch.
+    expect(s.measures.some((m) => m.label === 'band')).toBe(true);
+    expect(s.measures.some((m) => m.label === 'neck open' && m.sts === bplan.openingSts)).toBe(true);
+    expect(s.measures.some((m) => m.label === 'neck depth')).toBe(false);
   });
 });
 

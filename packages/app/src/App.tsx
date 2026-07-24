@@ -194,12 +194,6 @@ const SLEEVE_LENGTHS: { id: SleeveLength; label: string }[] = [
   { id: 'cap', label: 'Cap' },
   { id: 'sleeveless', label: 'Sleeveless' },
 ];
-const PIECES: { id: PieceId; label: string }[] = [
-  { id: 'back', label: 'Back' },
-  { id: 'front', label: 'Front' },
-  { id: 'sleeve', label: 'Sleeves' },
-  { id: 'neckband', label: 'Neckband' },
-];
 
 export function App(): JSX.Element {
   const [units, setUnits] = useState<Units>('in');
@@ -397,6 +391,18 @@ export function App(): JSX.Element {
 
   const scaleFactor = output === 'knitleader' ? 0.5 : output === 'knitradar' ? 0.25 : undefined;
   const templateOnly = output === 'knitleader' || output === 'knitradar';
+
+  // The piece tabs follow the garment: a boat is one piece (front == back) with an integral
+  // band, so it drops the separate Front and Neckband tabs; a sleeveless garment shows
+  // armhole bands rather than sleeves. Clamp the open tab so it always points at a real one.
+  const isBoat = effNeck === 'boat';
+  const pieceTabs: { id: PieceId; label: string }[] = [
+    { id: 'back', label: isBoat ? 'Back & front' : 'Back' },
+    ...(isBoat ? [] : [{ id: 'front' as PieceId, label: 'Front' }]),
+    { id: 'sleeve', label: effSleeveLength === 'sleeveless' ? 'Armhole bands' : 'Sleeves' },
+    ...(isBoat ? [] : [{ id: 'neckband' as PieceId, label: 'Neckband' }]),
+  ];
+  const shownPiece: PieceId = pieceTabs.some((t) => t.id === piece) ? piece : 'back';
 
   // The printed sheet is its own document over the same engine output, so it carries
   // every piece regardless of which tab is open on screen. Concise stays concise.
@@ -705,14 +711,14 @@ export function App(): JSX.Element {
             <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
               <Tile title="Which piece?" className="full">
                 <div className="piece-tabs">
-                  {PIECES.map((p) => (
-                    <Btn key={p.id} label={p.label} state={piece === p.id ? 'selected' : 'normal'} onClick={() => setPiece(p.id)} />
+                  {pieceTabs.map((p) => (
+                    <Btn key={p.id} label={p.label} state={shownPiece === p.id ? 'selected' : 'normal'} onClick={() => setPiece(p.id)} />
                   ))}
                 </div>
               </Tile>
               {templateOnly ? (
                 <>
-                  <div className="diagram" dangerouslySetInnerHTML={{ __html: diagramSvg(piece, scaleFactor) }} />
+                  <div className="diagram" dangerouslySetInnerHTML={{ __html: diagramSvg(shownPiece, scaleFactor) }} />
                   <p style={{ fontSize: '.85rem', color: 'var(--ink-soft)', marginTop: 10 }}>
                     Print at 100% (no scaling) and feed through the {output === 'knitleader' ? 'KnitLeader (½ scale)' : 'KnitRadar (¼ scale)'}. The 10&nbsp;cm calibration line checks your print came out true.
                   </p>
@@ -720,11 +726,11 @@ export function App(): JSX.Element {
               ) : (
                 <div className="output-cols">
                   {output === 'chart'
-                    ? <div className="diagram" dangerouslySetInnerHTML={{ __html: chartSvg(piece) }} />
+                    ? <div className="diagram" dangerouslySetInnerHTML={{ __html: chartSvg(shownPiece) }} />
                     : <div className="pattern">{patternText}</div>}
                   <FittedDiagram
-                    metrics={screenMetrics(piece)}
-                    svgAt={(f) => screenDiagramSvg(piece, f)}
+                    metrics={screenMetrics(shownPiece)}
+                    svgAt={(f) => screenDiagramSvg(shownPiece, f)}
                   />
                 </div>
               )}
@@ -803,6 +809,7 @@ export function App(): JSX.Element {
           twoColumn={output === 'concise'}
           chartFor={chartSvg}
           handBand={technique === 'hand'}
+          omitPieces={isBoat ? ['front', 'neckband'] : []}
           tilePlanFor={tilePlanFor}
           sheetRoomMm={sheetRoomMm}
           pageHeightMm={pageHeightMm}

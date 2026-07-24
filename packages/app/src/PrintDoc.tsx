@@ -64,6 +64,8 @@ export interface PrintDocProps {
   blockingSvgFor?: (piece: PieceId) => string;
   /** Hand knitting: the band is worked in place, so it has no blocking shape. */
   handBand?: boolean;
+  /** Pieces to leave out entirely (a boat has no separate front or neckband). */
+  omitPieces?: PieceId[];
   /** Paper the document is laid out for; @page is emitted to match. */
   paperLabel: string;
   landscape: boolean;
@@ -149,6 +151,7 @@ export function PrintDoc({
   chartBandsFor,
   blockingSvgFor,
   handBand = false,
+  omitPieces = [],
   paperLabel,
   landscape,
   titleLabel,
@@ -157,6 +160,7 @@ export function PrintDoc({
   gaugeLabel,
   templateLabel,
 }: PrintDocProps): JSX.Element {
+  const pieceIds = PIECE_ORDER.filter((id) => !omitPieces.includes(id));
   const head = (
     <header className="print-head">
       <h1>{titleLabel}</h1>
@@ -173,11 +177,11 @@ export function PrintDoc({
     // @page cannot be set from an inline style, and it must agree with the paper the
     // tiles were planned for — otherwise the browser pages at one size while we cut
     // at another. One <style> element keeps the two in step.
-    const firstPlan = tilePlanFor?.(PIECE_ORDER[0]);
+    const firstPlan = tilePlanFor?.(pieceIds[0]);
     const pageRule = firstPlan
       ? `@page { size: ${firstPlan.paper.label} ${firstPlan.landscape ? 'landscape' : 'portrait'}; margin: ${MARGIN_MM}mm; }`
       : '';
-    const anyTiled = PIECE_ORDER.some((id) => !(tilePlanFor?.(id)?.single ?? true));
+    const anyTiled = pieceIds.some((id) => !(tilePlanFor?.(id)?.single ?? true));
     return (
       <div className="printdoc templates" aria-hidden="true">
         <style>{pageRule}</style>
@@ -189,7 +193,7 @@ export function PrintDoc({
           {templateLabel && <p className="print-note">{templateLabel}</p>}
           <h2 className="print-piece-title">What to print</h2>
           <ul className="cover-list">
-            {PIECE_ORDER.map((id, i) => {
+            {pieceIds.map((id, i) => {
               const plan = tilePlanFor?.(id);
               if (!plan) return null;
               return (
@@ -220,7 +224,7 @@ export function PrintDoc({
             </>
           )}
         </Sheet>
-        {PIECE_ORDER.map((id, i) => {
+        {pieceIds.map((id, i) => {
           const plan = tilePlanFor?.(id);
           if (!plan) return null;
           return (
@@ -337,7 +341,7 @@ export function PrintDoc({
           you knit from the words, then block the finished piece against the drawing,
           so they are worth more as full-page references than as thumbnails wedged
           above the text they were competing with. */}
-      {PIECE_ORDER.map((id) => {
+      {pieceIds.map((id) => {
         const title = pattern.pieces.find((p) => p.piece === id)?.title ?? '';
         // A hand knitter's neckband is picked up and worked straight onto the garment,
         // so it is never blocked as a piece — there is no shape to block it to. Saying

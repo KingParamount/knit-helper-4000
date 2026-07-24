@@ -8,6 +8,7 @@ import {
   backRows,
   frontRows,
   boatPieceRows,
+  boatPlan,
   frontNeckPlan,
   sleevePlan,
   sleeveRows,
@@ -15,6 +16,7 @@ import {
   neckbandRows,
   backSchematic,
   frontSchematic,
+  boatSchematic,
   sleeveSchematic,
   neckbandSchematic,
   armholeBandPlan,
@@ -157,10 +159,13 @@ export function buildSchematics(input: BuildInput): Record<PieceId, PieceSchemat
     opts.sleeveLength === 'sleeveless'
       ? armholeBandSchematic(armholeBandPlan(size, input.ease, g, shoulder), g)
       : sleeveSchematic(sleeveRows('sleeve_l', size, input.ease, g, shoulder, opts), sp, g);
-  // A boat draws as one straight-topped piece (front and back alike) with no separate
-  // neckband; the 'neckband' slot reuses that outline so every piece tab has something.
+  // A boat draws as one straight-topped piece (front and back alike) with an integral band
+  // and no separate neckband. Both body slots show that one piece; the 'neckband' slot has
+  // no piece to draw (the app hides that tab for a boat) — reuse the same outline so the
+  // Record stays complete.
   if (neck === 'boat') {
-    const bs = backSchematic(boatPieceRows('back', size, input.ease, g, shoulder, opts), bp, g);
+    const bplan = boatPlan(size, input.ease, g, shoulder, opts);
+    const bs = boatSchematic(boatPieceRows('back', size, input.ease, g, shoulder, opts), { ...bp, bandRows: bplan.bandRows, openingSts: bplan.openingSts }, g);
     return { back: bs, front: bs, sleeve: sleeveOrBand, neckband: bs };
   }
   return {

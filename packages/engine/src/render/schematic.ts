@@ -207,6 +207,64 @@ export function backSchematic(
 }
 
 // ---------------------------------------------------------------------------
+// The Boat — one straight-topped piece (front == back): body + armhole, then a
+// straight top finished with an integral rib band. No neck notch, no shoulder slope;
+// the opening is made by butt-seaming only part way in from each armhole.
+// ---------------------------------------------------------------------------
+
+export function boatSchematic(
+  rows: Row[],
+  plan: {
+    bodySts: number;
+    ribRows: number;
+    totalRows: number;
+    pieceTotalRows?: number;
+    armholeRows: number;
+    hem?: string;
+    bandRows: number;
+    openingSts: number;
+  },
+  gauge: Gauge,
+): PieceSchematic {
+  const bodyHalf = plan.bodySts / 2;
+  const topY = plan.pieceTotalRows ?? plan.totalRows;
+  // Track the body + armhole edges up to the top; above the last armhole change the
+  // side runs straight, so extend it to the top to close a flat top edge.
+  const { rightPts, leftPts, underarmY, marks } = trackBodyEdges(rows, bodyHalf, topY);
+  const upperHalf = rightPts[rightPts.length - 1].x;
+  rightPts.push({ x: upperHalf, y: topY });
+  leftPts.push({ x: -upperHalf, y: topY });
+  const outline = [...rightPts, ...leftPts.reverse()];
+
+  const openHalf = plan.openingSts / 2;
+  const bandStartY = topY - plan.bandRows;
+  // The whole top casts off in rib (the integral band edge).
+  marks.push({ kind: 'castoff', x: 0, y: topY - 0.5, span: upperHalf * 2, centre: true });
+  // A set-in body steps in at the underarm (underarmY > 0); a drop runs straight, so read
+  // the armhole depth from the plan instead.
+  const armholeStartY = underarmY > 0 ? underarmY : topY - plan.armholeRows;
+  const measures: Measure[] = [
+    { kind: 'width', label: 'width', sts: plan.bodySts, at: 0, from: -bodyHalf, to: bodyHalf },
+    { kind: 'width', label: 'neck open', sts: plan.openingSts, at: topY, from: -openHalf, to: openHalf },
+    { kind: 'height', label: 'length', rows: topY, at: 0, from: 0, to: topY },
+    { kind: 'height', label: 'armhole', rows: topY - armholeStartY, at: 0, from: armholeStartY, to: topY },
+    { kind: 'height', label: 'band', rows: plan.bandRows, at: 0, from: bandStartY, to: topY },
+  ];
+  return {
+    piece: 'back',
+    title: 'The Back and Front (make 2 alike)',
+    outline,
+    widthSts: plan.bodySts,
+    heightRows: topY,
+    ribRows: plan.ribRows,
+    hemLabel: plan.hem ? HEM_LABELS[plan.hem] : undefined,
+    gauge,
+    measures,
+    marks,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // The Front — body + armhole as the back, then a scooped neck between the shoulders.
 // ---------------------------------------------------------------------------
 

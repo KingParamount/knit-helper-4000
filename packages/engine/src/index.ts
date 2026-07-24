@@ -137,6 +137,7 @@ export type { PieceProse, Pattern, ProseStyle } from './render/prose';
 export {
   backSchematic,
   frontSchematic,
+  boatSchematic,
   sleeveSchematic,
   neckbandSchematic,
   armholeBandSchematic,
