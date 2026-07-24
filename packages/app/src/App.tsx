@@ -124,6 +124,18 @@ function sleeveShapeBlockReason(sleeveLength: SleeveLength): string {
   return 'A bell or bishop flare only reads at full or three-quarter length. Set the sleeve length to Full or ¾.';
 }
 
+function hemBlockReason(): string {
+  return 'A frill casts on double and gathers back — a hand row that outruns a machine bed, so it is hand-knitting only for now. Set Method to “By hand” to use a frill.';
+}
+
+function bodyLengthBlockReason(label: string): string {
+  return `At this size and gauge a ${label.toLowerCase()} body is shorter than its own armhole plus hem, so there is no plain body left to knit. Choose a longer length — or free up rows with a shallower hem (or none), or a set-in shoulder (a deep raglan armhole uses the most length).`;
+}
+
+function printBlockReason(): string {
+  return 'There is no pattern to print yet. Choose a standard size that maps to a garment (custom sizing is coming soon) and the pattern will appear.';
+}
+
 function headClearReason(part: 'front-high' | 'back-high' | 'back-flat'): string {
   if (part === 'back-flat')
     return 'At this size a flat back neck has no scoop depth to open over the head, so the garment will not pull on. Choose a larger size, or set the back neckline to Scoop.';
@@ -674,6 +686,7 @@ export function App(): JSX.Element {
                   icon={<IconLength level={i} />}
                   label={l.label}
                   state={!lengthOk(l.id) ? 'blocked' : effBodyLength === l.id ? 'selected' : 'normal'}
+                  reason={bodyLengthBlockReason(l.label)}
                   onClick={() => setBodyLength(l.id)}
                 />
               ))}
@@ -686,6 +699,7 @@ export function App(): JSX.Element {
                   key={h.id}
                   label={h.label}
                   state={!hemOk(h.id) ? 'blocked' : effHem === h.id ? 'selected' : 'normal'}
+                  reason={hemBlockReason()}
                   onClick={() => setHem(h.id)}
                 />
               ))}
@@ -852,6 +866,7 @@ export function App(): JSX.Element {
                 icon={<IconPrint />}
                 label={templateOnly ? 'Print the templates' : output === 'chart' ? 'Print the charts' : 'Print the pattern'}
                 state={printPattern ? 'normal' : 'blocked'}
+                reason={printBlockReason()}
                 onClick={() => window.print()}
               />
             </div>
