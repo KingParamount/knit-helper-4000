@@ -3,8 +3,9 @@
  * vocabulary applies one choice to both.
  *
  * Depth rules follow the recovered source's defaults, which match ordinary practice:
- * ribbing takes the size's own rib depth; a moss or garter band takes HALF that (a
- * flat band reads heavier than rib, so it runs shallower); a folded band is knit to
+ * ribbing takes the size's own rib depth; a moss or garter band runs a little shallower
+ * (a flat band reads heavier than rib) — ~0.7× the rib depth, matching the harvested
+ * Knitware output (rib 1.8" → moss/garter 1.3"), not half; a folded band is knit to
  * TWICE its finished depth (the facing folds inside); a frill is short — half the
  * rib depth — and starts with two garter rows so its free edge does not curl.
  *
@@ -38,6 +39,14 @@ export interface HemPlan {
 
 const NO_OPS: Row['ops'] = [];
 
+/**
+ * A moss or garter band's depth as a fraction of the rib depth. Knitware's generated
+ * patterns run these at ~0.72× the rib (rib 1.8" → moss/garter 1.3"), not half; 0.7 is
+ * the round value that reproduces it. A flat textured band reads heavier than rib, so it
+ * still sits a little shallower than a full rib depth.
+ */
+export const MOSS_GARTER_DEPTH_FACTOR = 0.7;
+
 export function hemPlan(
   size: SizeRecord,
   gauge: Gauge,
@@ -64,7 +73,7 @@ export function hemPlan(
     }
     case 'moss_band':
     case 'garter_band': {
-      const rows = Math.max(2, ribRowsFor(depthIn / 2, gauge));
+      const rows = Math.max(2, ribRowsFor(depthIn * MOSS_GARTER_DEPTH_FACTOR, gauge));
       return {
         hem,
         castOnSts: panelSts,

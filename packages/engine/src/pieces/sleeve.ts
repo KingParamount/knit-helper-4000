@@ -39,7 +39,11 @@ export const SLEEVE_LENGTH_FRACTION: Record<SleeveLength, number> = {
   full: 1,
   three_quarter: 0.75,
   half: 0.5,
-  short: 0.25,
+  // 0.3, not a strict quarter: the harvested Knitware short ran ~0.3 of the arm (5.0" on a
+  // Woman 36's 16.8" arm; 0.25× undershoots at 4.2"). As a fraction it scales down cleanly
+  // for children/babies rather than a fixed floor swallowing a small arm. Half & ¾ matched
+  // Knitware exactly — left as they are.
+  short: 0.3,
   // A cap is almost all cap: a sliver of straight sleeve below the armhole, then the
   // bell. Its taper is floored (MIN_CAP_TAPER_ROWS) so the cuff is a real band, not a
   // rounding artefact.

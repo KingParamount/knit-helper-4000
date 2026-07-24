@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { sizes, findSize } from '../data/sizes';
 import type { HemStyle, ShoulderStyle } from '../data/types';
 import { DEFAULT_GAUGE, ribRowsFor } from '../gauge';
-import { hemPlan, HEM_SECTIONS, HEM_END_SECTIONS } from './hem';
+import { hemPlan, HEM_SECTIONS, HEM_END_SECTIONS, MOSS_GARTER_DEPTH_FACTOR } from './hem';
 import { backPlan, backRows, lowerPanelRows } from './back';
 import { frontRows } from './front';
 import { sleevePlan, sleeveRows } from './sleeve';
@@ -33,14 +33,14 @@ describe('hemPlan — cast-on widths and depths per style', () => {
     }
   });
 
-  it('depths: moss/garter run half the rib depth; folded knits double; none is zero', () => {
+  it('depths: moss/garter run ~0.7× the rib depth; folded knits double; none is zero', () => {
     for (const s of inSizes)
       for (const g of GAUGES) {
         const rib = hemPlan(s, g, 'ribbing', 100);
         const moss = hemPlan(s, g, 'moss_band', 100);
         const folded = hemPlan(s, g, 'folded_band', 100);
         expect(rib.pieceRows).toBe(ribRowsFor(s.rib_body, g));
-        expect(moss.pieceRows).toBe(Math.max(2, ribRowsFor(s.rib_body / 2, g)));
+        expect(moss.pieceRows).toBe(Math.max(2, ribRowsFor(s.rib_body * MOSS_GARTER_DEPTH_FACTOR, g)));
         expect(folded.pieceRows).toBe(2 * folded.lengthRows); // facing + outer
         expect(hemPlan(s, g, 'none', 100).pieceRows).toBe(0);
         // Only the folded band's piece outruns its hanging length.
