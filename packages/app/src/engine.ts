@@ -7,6 +7,7 @@ import {
   backPlan,
   backRows,
   frontRows,
+  boatPieceRows,
   frontNeckPlan,
   sleevePlan,
   sleeveRows,
@@ -156,6 +157,12 @@ export function buildSchematics(input: BuildInput): Record<PieceId, PieceSchemat
     opts.sleeveLength === 'sleeveless'
       ? armholeBandSchematic(armholeBandPlan(size, input.ease, g, shoulder), g)
       : sleeveSchematic(sleeveRows('sleeve_l', size, input.ease, g, shoulder, opts), sp, g);
+  // A boat draws as one straight-topped piece (front and back alike) with no separate
+  // neckband; the 'neckband' slot reuses that outline so every piece tab has something.
+  if (neck === 'boat') {
+    const bs = backSchematic(boatPieceRows('back', size, input.ease, g, shoulder, opts), bp, g);
+    return { back: bs, front: bs, sleeve: sleeveOrBand, neckband: bs };
+  }
   return {
     back: backSchematic(backRows(size, input.ease, g, shoulder, backNeck, opts), bp, g),
     front: frontSchematic(frontRows(size, input.ease, g, neck, shoulder, opts), bp, fnp, g),

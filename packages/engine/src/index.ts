@@ -92,6 +92,8 @@ export type { ArmholeBandPlan } from './pieces/armhole-band';
 
 export { assembleGarment } from './pieces/garment';
 export type { Garment } from './pieces/garment';
+export { boatPlan, boatPieceRows, BOAT_OPENING_FRACTION, BOAT_SHOULDER_SEAM_FRACTION } from './pieces/boat';
+export type { BoatPlan } from './pieces/boat';
 
 export {
   NECK_OPENING_STRETCH,
@@ -106,6 +108,7 @@ export {
   flatFrontAllowed,
   highRoundFrontAllowed,
   highRoundBackAllowed,
+  boatAllowed,
   hemReachesHip,
   bodyLengthAllowed,
   hemAllowed,

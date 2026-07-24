@@ -22,6 +22,7 @@ import { frontNeckPlan } from './front';
 import { sleevePlan, sleeveRows } from './sleeve';
 import { raglanPlan, raglanBackRows, raglanFrontRows } from './raglan';
 import { armholeBandPlan } from './armhole-band';
+import { boatPlan, boatPieceRows } from './boat';
 import { pickupPerRow } from './neckband';
 import { seamEdgeLength, CAP_SECTIONS } from './seams';
 
@@ -80,6 +81,9 @@ export function assemblyReport(
   if (shoulder === 'raglan') return raglanAssemblyReport(size, style, gauge, neck, opts);
   // Sleeveless has no sleeve join at all — an armhole band round each armhole instead.
   if (opts.sleeveLength === 'sleeveless') return sleevelessAssemblyReport(size, style, gauge, neck, shoulder, backNeck, opts);
+  // A boat has no neck shaping, no shoulder graft and no separate neckband — its top is a
+  // straight edge with an integral band, butt-seamed part way in from each armhole.
+  if (neck === 'boat') return boatAssemblyReport(size, style, gauge, shoulder, opts);
 
   const bp = backPlan(size, style, gauge, shoulder, backNeck, opts);
   const shaping = armholeShaping(bp.bodySts, bp.upperBackSts);
@@ -273,6 +277,59 @@ function sleevelessAssemblyReport(
       ok: Math.abs(band.pickupTotal - expected) <= 1,
       detail: `band ${band.pickupTotal} ≈ armhole ${expected} sts`,
     },
+  ];
+  return { size: `${size.category} ${size.chest}"`, invariants, allOk: invariants.every((i) => i.ok) };
+}
+
+/**
+ * Boat assembly: the front and back are the same straight-topped piece, so there is no
+ * shoulder graft and no neckband. What must hold: the two pieces match, the sleeve fits
+ * the armhole (as for any set-in/drop), and the butt-seam leaves a real, positive opening.
+ */
+function boatAssemblyReport(
+  size: SizeRecord,
+  style: EaseStyleId,
+  gauge: Gauge,
+  shoulder: ShoulderStyle,
+  opts: GarmentOptions,
+): AssemblyReport {
+  const boat = boatPlan(size, style, gauge, shoulder, opts);
+  const sleeve = sleevePlan(size, style, gauge, shoulder, opts);
+  const backLen = boatPieceRows('back', size, style, gauge, shoulder, opts).length;
+  const frontLen = boatPieceRows('front', size, style, gauge, shoulder, opts).length;
+
+  // The sleeve↔armhole join is exactly as for a shaped-neck set-in / drop.
+  let join: Invariant;
+  if (shoulder === 'drop') {
+    const sleeveTopIn = sleeve.sleeveTopSts * (4 / gauge.bodySt);
+    const armholeOpenIn = 2 * garmentWidths(size, style, 'drop').armholeDepth;
+    const dPct = ((sleeveTopIn - armholeOpenIn) / armholeOpenIn) * 100;
+    join = {
+      label: 'sleeve top fits armhole',
+      ok: Math.abs(dPct) <= 4,
+      detail: `sleeve top ${sleeveTopIn.toFixed(1)}" ≈ armhole ${armholeOpenIn.toFixed(1)}"`,
+    };
+  } else {
+    const fill = (sleeve.capHeightRows * (4 / gauge.bodyRow)) / garmentWidths(size, style, 'set_in').armholeDepth;
+    join = {
+      label: 'cap fits armhole',
+      ok: fill >= 0.78 && fill <= 0.95,
+      detail: `cap fills ${(fill * 100).toFixed(0)}% of the armhole`,
+    };
+  }
+
+  const invariants: Invariant[] = [
+    {
+      label: 'front and back match',
+      ok: backLen === frontLen,
+      detail: `back ${backLen} = front ${frontLen} rows (worked alike)`,
+    },
+    {
+      label: 'butt-seam leaves an opening',
+      ok: boat.shoulderSeamSts > 0 && boat.openingSts > 0 && boat.openingSts < boat.upperSts,
+      detail: `seam ${boat.shoulderSeamSts} each, centre ${boat.openingSts} open of ${boat.upperSts}`,
+    },
+    join,
   ];
   return { size: `${size.category} ${size.chest}"`, invariants, allOk: invariants.every((i) => i.ok) };
 }

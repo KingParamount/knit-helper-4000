@@ -135,6 +135,16 @@ export function sleeveStyleAllowed(shoulder: ShoulderStyle, sleeveLength: Sleeve
   return true;
 }
 
+/**
+ * May a boat neck be built with this shoulder? A boat's top is a straight edge finished
+ * with an integral band and butt-seamed; a set-in or drop armhole leaves such a top, but a
+ * saddle's strap and a raglan's diagonal ARE the top — there is no straight edge to band.
+ * So a boat is set-in or drop only (block, don't warn), like the sleeveless rule.
+ */
+export function boatAllowed(shoulder: ShoulderStyle): boolean {
+  return shoulder === 'set_in' || shoulder === 'drop';
+}
+
 /** Is this a sleeveless garment (no sleeve pieces; a picked-up armhole band instead)? */
 export function isSleeveless(sleeveLength: SleeveLength | undefined): boolean {
   return sleeveLength === 'sleeveless';
@@ -227,9 +237,11 @@ export function fitReport(
   const chestEase = w.chest - size.chest;
 
   const checks: FitCheck[] = [
-    // A crew must clear the head; a V is open, so head-clearance does not apply.
-    neck === 'v'
-      ? { label: 'neck clears head', ok: true, detail: 'n/a (open V)' }
+    // A crew must clear the head; a V is open and a boat is a wide slit, so head-clearance
+    // does not apply to either (a boat's opening is ~0.69 of the body width, far wider than
+    // the back_neck the ellipse would assume).
+    neck === 'v' || neck === 'boat'
+      ? { label: 'neck clears head', ok: true, detail: neck === 'boat' ? 'n/a (wide boat)' : 'n/a (open V)' }
       : {
           label: 'neck clears head',
           ok: !crewSuitable(size) || neckFit.fit.fits,

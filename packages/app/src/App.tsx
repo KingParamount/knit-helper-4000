@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
-import { availableChests, schematicMetrics, flatBackAllowed, highRoundFrontAllowed, highRoundBackAllowed, bodyLengthAllowed, hemAllowed, sleeveStyleAllowed } from '@knit-helper-4000/engine';
+import { availableChests, schematicMetrics, flatBackAllowed, highRoundFrontAllowed, highRoundBackAllowed, boatAllowed, bodyLengthAllowed, hemAllowed, sleeveStyleAllowed } from '@knit-helper-4000/engine';
 import type { Category, Units, NeckStyle, BackNeckStyle, ShoulderStyle, BodyLength, HemStyle, SleeveLength } from '@knit-helper-4000/engine';
 import {
   DEFAULT_SWATCH,
@@ -253,14 +253,26 @@ export function App(): JSX.Element {
   // head — same block-not-warn policy as the flat back. The head-solving scoop back rescues
   // a shallow front, so a blocked selection falls back (front → crew, back → scoop).
   const highRoundBackOk = sizeRec ? highRoundBackAllowed(sizeRec, neck) : true;
-  const effBackNeck: BackNeckStyle =
-    backNeck === 'flat' && !flatBackOk
+  // A boat is a whole-neck mode: it forces the back to match (front = back) and needs a
+  // set-in or drop shoulder (saddle/raglan have no straight top to band) and a real sleeve
+  // (its top is not an inset armhole band). Those are forced here, block-not-warn.
+  const boat = neck === 'boat';
+  const effBackNeck: BackNeckStyle = boat
+    ? 'boat'
+    : backNeck === 'flat' && !flatBackOk
       ? 'scoop'
       : backNeck === 'high_round' && !highRoundBackOk
         ? 'scoop'
         : backNeck;
+  const effShoulder: ShoulderStyle = boat && !boatAllowed(shoulder) ? 'set_in' : shoulder;
   const highRoundFrontOk = sizeRec ? highRoundFrontAllowed(sizeRec, effBackNeck) : true;
   const effNeck: NeckStyle = neck === 'high_round' && !highRoundFrontOk ? 'round' : neck;
+  // Choosing a specific back neck leaves boat mode (boat locks front = back), so it also
+  // resets the front to a crew. Selecting a plain back on a boat otherwise does nothing.
+  const pickBack = (bn: BackNeckStyle): void => {
+    if (boat) setNeck('round');
+    setBackNeck(bn);
+  };
 
   // Method maps straight onto the engine's Technique (machine | hand).
   const technique = method === 'hand' ? ('hand' as const) : ('machine' as const);
@@ -275,16 +287,18 @@ export function App(): JSX.Element {
   // flat back; a blocked selection falls back to hip so the pattern stays buildable.
   // The hem feeds in: a shallow band or no hem frees rows and can unblock crop.
   const lengthOk = (bl: BodyLength): boolean =>
-    sizeRec ? bodyLengthAllowed(sizeRec, ease, gaugeFromSwatch(swatch), shoulder, bl, effHem) : true;
+    sizeRec ? bodyLengthAllowed(sizeRec, ease, gaugeFromSwatch(swatch), effShoulder, bl, effHem) : true;
   const effBodyLength: BodyLength = lengthOk(bodyLength) ? bodyLength : 'hip';
 
-  // A cap needs a set-in shoulder (it is the cap bell shortened); a blocked pick falls
-  // back to a full sleeve so the pattern stays buildable. Same block-not-warn policy.
-  const sleeveOk = (sl: SleeveLength): boolean => sleeveStyleAllowed(shoulder, sl);
+  // A cap needs a set-in shoulder (it is the cap bell shortened); a boat needs a real
+  // sleeve (its straight top is not an inset armhole band, so sleeveless is out). A blocked
+  // pick falls back to a full sleeve so the pattern stays buildable. Block-not-warn.
+  const sleeveOk = (sl: SleeveLength): boolean =>
+    sleeveStyleAllowed(effShoulder, sl) && !(boat && sl === 'sleeveless');
   const effSleeveLength: SleeveLength = sleeveOk(sleeveLength) ? sleeveLength : 'full';
 
   const input = {
-    category, chest, units, ease, neck: effNeck, backNeck: effBackNeck, shoulder,
+    category, chest, units, ease, neck: effNeck, backNeck: effBackNeck, shoulder: effShoulder,
     bodyLength: effBodyLength, hem: effHem, sleeveLength: effSleeveLength, swatch, technique,
   };
   const gauge = gaugeReadout(gaugeFromSwatch(swatch), units);
@@ -292,11 +306,11 @@ export function App(): JSX.Element {
   // Live outputs — the engine is pure and fast, so this runs every render.
   const patternText = useMemo(
     () => buildPatternText(input, output === 'concise' ? 'abbreviated' : 'verbose'),
-    [category, chest, ease, effNeck, effBackNeck, shoulder, effBodyLength, effHem, effSleeveLength, swatch, output, technique],
+    [category, chest, ease, effNeck, effBackNeck, effShoulder, effBodyLength, effHem, effSleeveLength, swatch, output, technique],
   );
   const schematics = useMemo(
     () => buildSchematics(input),
-    [category, chest, ease, effNeck, effBackNeck, shoulder, effBodyLength, effHem, effSleeveLength, swatch, technique],
+    [category, chest, ease, effNeck, effBackNeck, effShoulder, effBodyLength, effHem, effSleeveLength, swatch, technique],
   );
 
   const diagramSvg = (pid: PieceId, factor?: number): string =>
@@ -388,7 +402,7 @@ export function App(): JSX.Element {
   // every piece regardless of which tab is open on screen. Concise stays concise.
   const printPattern = useMemo(
     () => buildPattern(input, output === 'concise' ? 'abbreviated' : 'verbose'),
-    [category, chest, ease, effNeck, effBackNeck, shoulder, effBodyLength, effHem, effSleeveLength, swatch, technique, output],
+    [category, chest, ease, effNeck, effBackNeck, effShoulder, effBodyLength, effHem, effSleeveLength, swatch, technique, output],
   );
   // How each template gets cut across sheets. Measured from the drawing's true size,
   // which the engine computes without building the SVG (schematicMetrics).
@@ -587,8 +601,8 @@ export function App(): JSX.Element {
               <Btn icon={<IconNeck shape="high_round" />} label="High round" state={!highRoundFrontOk ? 'blocked' : effNeck === 'high_round' ? 'selected' : 'normal'} onClick={() => setNeck('high_round')} />
               <Btn icon={<IconNeck shape="shallow" />} label="Shallow" state="soon" />
               <Btn icon={<IconNeck shape="square" />} label="Square" state={neck === 'square' ? 'selected' : 'normal'} onClick={() => setNeck('square')} />
-              {/* Boat stays 'soon' until the neckline harvest settles the neck-width / shoulder-graft fork. */}
-              <Btn icon={<IconNeck shape="boat" />} label="Boat" state="soon" />
+              {/* A boat is a whole-neck mode: selecting it makes front and back the same piece. */}
+              <Btn icon={<IconNeck shape="boat" />} label="Boat" state={neck === 'boat' ? 'selected' : 'normal'} onClick={() => setNeck('boat')} />
               <Btn icon={<IconNeck shape="ballet" />} label="Ballet" state="soon" />
               <Btn icon={<IconNeck shape="keyhole" />} label="Keyhole" state="soon" />
             </div>
@@ -596,14 +610,14 @@ export function App(): JSX.Element {
           <Tile title="Back neckline">
             <div className="btn-row">
               <Btn icon={<IconNeck shape="round" />} label="Round" state="soon" />
-              <Btn icon={<IconNeck shape="high_round" />} label="High round" state={!highRoundBackOk ? 'blocked' : effBackNeck === 'high_round' ? 'selected' : 'normal'} onClick={() => setBackNeck('high_round')} />
+              <Btn icon={<IconNeck shape="high_round" />} label="High round" state={!highRoundBackOk ? 'blocked' : effBackNeck === 'high_round' ? 'selected' : 'normal'} onClick={() => pickBack('high_round')} />
               <Btn icon={<IconNeck shape="v" />} label="V" state="soon" />
-              <Btn icon={<IconNeck shape="scoop" />} label="Scoop" state={effBackNeck === 'scoop' ? 'selected' : 'normal'} onClick={() => setBackNeck('scoop')} />
+              <Btn icon={<IconNeck shape="scoop" />} label="Scoop" state={effBackNeck === 'scoop' ? 'selected' : 'normal'} onClick={() => pickBack('scoop')} />
               <Btn icon={<IconNeck shape="shallow" />} label="Shallow" state="soon" />
-              <Btn icon={<IconNeck shape="flat" />} label="Flat" state={!flatBackOk ? 'blocked' : effBackNeck === 'flat' ? 'selected' : 'normal'} onClick={() => setBackNeck('flat')} />
-              <Btn icon={<IconNeck shape="square" />} label="Square" state={effBackNeck === 'square' ? 'selected' : 'normal'} onClick={() => setBackNeck('square')} />
-              {/* Boat stays 'soon' until the neckline harvest settles the neck-width / shoulder-graft fork. */}
-              <Btn icon={<IconNeck shape="boat" />} label="Boat" state="soon" />
+              <Btn icon={<IconNeck shape="flat" />} label="Flat" state={!flatBackOk ? 'blocked' : effBackNeck === 'flat' ? 'selected' : 'normal'} onClick={() => pickBack('flat')} />
+              <Btn icon={<IconNeck shape="square" />} label="Square" state={effBackNeck === 'square' ? 'selected' : 'normal'} onClick={() => pickBack('square')} />
+              {/* A boat locks front and back together — selecting it here sets the whole neck. */}
+              <Btn icon={<IconNeck shape="boat" />} label="Boat" state={effBackNeck === 'boat' ? 'selected' : 'normal'} onClick={() => setNeck('boat')} />
               <Btn icon={<IconNeck shape="ballet" />} label="Ballet" state="soon" />
               <Btn icon={<IconNeck shape="backless" />} label="Backless" state="soon" />
             </div>
@@ -628,10 +642,10 @@ export function App(): JSX.Element {
         <Section label="Shoulders &amp; sleeves" num={5}>
           <Tile title="Shoulder">
             <div className="btn-row">
-              <Btn icon={<IconShoulderStyle style="set_in" />} label="Set-in" state={shoulder === 'set_in' ? 'selected' : 'normal'} onClick={() => setShoulder('set_in')} />
-              <Btn icon={<IconShoulderStyle style="drop" />} label="Drop" state={shoulder === 'drop' ? 'selected' : 'normal'} onClick={() => setShoulder('drop')} />
-              <Btn icon={<IconShoulderStyle style="raglan" />} label="Raglan" state={shoulder === 'raglan' ? 'selected' : 'normal'} onClick={() => setShoulder('raglan')} />
-              <Btn icon={<IconShoulderStyle style="saddle" />} label="Saddle" state={shoulder === 'saddle' ? 'selected' : 'normal'} onClick={() => setShoulder('saddle')} />
+              <Btn icon={<IconShoulderStyle style="set_in" />} label="Set-in" state={effShoulder === 'set_in' ? 'selected' : 'normal'} onClick={() => setShoulder('set_in')} />
+              <Btn icon={<IconShoulderStyle style="drop" />} label="Drop" state={effShoulder === 'drop' ? 'selected' : 'normal'} onClick={() => setShoulder('drop')} />
+              <Btn icon={<IconShoulderStyle style="raglan" />} label="Raglan" state={boat ? 'blocked' : shoulder === 'raglan' ? 'selected' : 'normal'} onClick={() => setShoulder('raglan')} />
+              <Btn icon={<IconShoulderStyle style="saddle" />} label="Saddle" state={boat ? 'blocked' : shoulder === 'saddle' ? 'selected' : 'normal'} onClick={() => setShoulder('saddle')} />
 
               <Btn icon={<IconShoulderStyle style="modified_drop" />} label="Modified drop" state="soon" />
               <Btn icon={<IconShoulderStyle style="drop_grafted" />} label="Drop grafted" state="soon" />

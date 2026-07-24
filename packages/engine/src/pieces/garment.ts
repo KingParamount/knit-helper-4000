@@ -24,6 +24,7 @@ import { frontRows } from './front';
 import { sleeves } from './sleeve';
 import { neckbandRows } from './neckband';
 import { armholeBandRows } from './armhole-band';
+import { boatPieceRows } from './boat';
 
 export interface Garment {
   back: Row[];
@@ -55,17 +56,23 @@ export function assembleGarment(
   // Sleeveless has no sleeve pieces — each armhole gets a picked-up band instead.
   const sleeveless = opts.sleeveLength === 'sleeveless';
   const s = sleeveless ? { left: [], right: [] } : sleeves(size, style, gauge, shoulder, opts);
+  // A boat is a whole-garment mode: front and back are identical straight-topped pieces
+  // with an integral band, no neck/shoulder shaping and NO separate neckband. Selecting a
+  // boat front forces the back to a boat too (they are the same piece).
+  const boat = neck === 'boat';
+  const effBackNeck: BackNeckStyle = boat ? 'boat' : backNeck;
   return {
-    back: backRows(size, style, gauge, shoulder, backNeck, opts),
-    front: frontRows(size, style, gauge, neck, shoulder, opts),
+    back: boat ? boatPieceRows('back', size, style, gauge, shoulder, opts) : backRows(size, style, gauge, shoulder, backNeck, opts),
+    front: boat ? boatPieceRows('front', size, style, gauge, shoulder, opts) : frontRows(size, style, gauge, neck, shoulder, opts),
     sleeveLeft: s.left,
     sleeveRight: s.right,
     ...(sleeveless ? { armholeBand: armholeBandRows(size, style, gauge, shoulder) } : {}),
     // The neckband is length- and hem-independent: it picks up from the neck opening
-    // only, and its depth is the separate rib_neck measurement.
-    neckband: neckbandRows(size, style, gauge, neck, shoulder, 'machine', backNeck),
+    // only, and its depth is the separate rib_neck measurement. A boat has none (the
+    // band is integral to the front and back pieces).
+    neckband: boat ? [] : neckbandRows(size, style, gauge, neck, shoulder, 'machine', backNeck),
     neck,
-    backNeck,
+    backNeck: effBackNeck,
     shoulder,
     bodyLength: opts.bodyLength ?? 'hip',
     hem: opts.hem ?? 'ribbing',

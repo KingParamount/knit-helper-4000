@@ -1045,6 +1045,17 @@ export function renderPiece(
       // A change of section mid-plain (body straight → the shoulder wait rows) is a
       // real "knit to length" boundary; flush before it.
       if (pending && pending.section !== row.section) flushPlain(true);
+      // The integral boat band starts here: announce it and change to rib. (A boat has no
+      // separate neckband — this band, worked on every stitch, IS the neck edge.)
+      if (row.section === 'boat_band' && !announced.has('boat_band')) {
+        announced.add('boat_band');
+        heading('The boat neckband.');
+        say(
+          technique === 'hand'
+            ? 'Change to the smaller (ribbing) needles and work the band in K1P1 rib.'
+            : 'Change to the ribbing tension and work the band in K1P1 rib.',
+        );
+      }
       pending = { section: row.section, last: row };
       i += 1;
       continue;
@@ -1490,6 +1501,41 @@ function handMakingUpProse(
   const lines: string[] = [];
   const stretchy = 'a stretchy seam such as mattress stitch';
 
+  // Boat: butt-seam the straight tops part way in from each armhole, leaving the centre
+  // open. No separate neckband — the rib band is part of each piece.
+  if (neck === 'boat') {
+    lines.push(verbose ? 'Block both pieces to the schematic and let them dry.' : 'Block both pieces; let dry.');
+    lines.push('');
+    lines.push(
+      verbose
+        ? `Butt the shoulders: hold the front and back tops together and seam each shoulder in from the armhole to the point the schematic marks, ribbed band and all, leaving the wide centre open for the neck. Use ${stretchy}.`
+        : `Butt-seam each shoulder in from the armhole to the marked point; leave the centre open.`,
+    );
+    lines.push('');
+    if (shoulder === 'drop') {
+      lines.push(
+        verbose
+          ? `Sew in the sleeves. Centre each sleeve's straight top edge on the shoulder seam and sew it to the straight armhole edge down each side, using ${stretchy}.`
+          : `Sew in the sleeves: straight top to the armhole edge, centred on the shoulder seam.`,
+      );
+    } else {
+      lines.push(
+        verbose
+          ? `Set in the sleeves. Ease each sleeve cap into its armhole, matching the cap top to the shoulder seam and the underarm cast-offs to each other, using ${stretchy}.`
+          : `Set in the sleeves: ease each cap into its armhole, cap top to shoulder seam.`,
+      );
+    }
+    lines.push('');
+    lines.push(
+      verbose
+        ? 'Join the sides: seam each side and its sleeve underarm in one line, from the cuff to the hem.'
+        : 'Join the sides: cuff to hem in one line each side.',
+    );
+    lines.push('');
+    lines.push(verbose ? 'Darn in the ends along a seam on the wrong side, and press if the yarn takes it.' : 'Darn in the ends; press if the yarn allows.');
+    return { title: 'Making Up', lines };
+  }
+
   // Saddle: the straps were seamed and the band picked up before this (see "Joining the
   // Straps"); here the last strap is closed and the sleeves set in.
   if (shoulder === 'saddle') {
@@ -1622,6 +1668,50 @@ export function makingUpProse(
   const verbose = style !== 'abbreviated';
   const lines: string[] = [];
   const stretchy = verbose ? 'a stretchy join (e.g. mattress stitch)' : 'stretchy join (e.g. mattress stitch)';
+
+  // A boat is butt-seamed: the two straight tops meet edge to edge, seamed only part way
+  // in from each armhole, and there is NO separate neckband (the band is part of each
+  // piece). See the schematic for exactly how much of each shoulder to seam.
+  if (neck === 'boat') {
+    lines.push(
+      verbose
+        ? 'Block each piece to its schematic and let it dry; take the pieces off their waste yarn as you seam them.'
+        : 'Block both pieces to the schematic; let dry.',
+    );
+    lines.push('');
+    lines.push(
+      verbose
+        ? `Butt the shoulders. With the front and back top edges together (right sides facing), seam each shoulder in from the armhole, stopping where the schematic marks it and leaving the wide centre open for the neck. Seam the ribbed band edge to edge along with the shoulder. Use ${stretchy}.`
+        : `Butt-seam each shoulder in from the armhole to the marked point; leave the centre open. ${cap(stretchy)}.`,
+    );
+    lines.push('');
+    if (shoulder === 'drop') {
+      lines.push(
+        verbose
+          ? `Sew in the sleeves. Centre each sleeve’s straight top edge on the shoulder seam and sew it to the straight armhole edge down each side. Use ${stretchy}.`
+          : `Sew in the sleeves: straight top to the armhole edge, centred on the shoulder seam. ${cap(stretchy)}.`,
+      );
+    } else {
+      lines.push(
+        verbose
+          ? `Set in the sleeves. Ease each sleeve cap into its armhole, lining the cap top up with the shoulder seam and the underarm cast-offs together. Use ${stretchy}.`
+          : `Set in the sleeves: ease each cap into its armhole, cap top to shoulder seam. ${cap(stretchy)}.`,
+      );
+    }
+    lines.push('');
+    lines.push(
+      verbose
+        ? 'Join the sides: seam each side and its sleeve underarm in one line, from the cuff to the hem.'
+        : 'Join the sides: cuff to hem in one line each side.',
+    );
+    lines.push('');
+    lines.push(
+      verbose
+        ? 'Sew in all the loose ends along the wrong side, then give the seams a light press.'
+        : 'Darn in the ends; press the seams if the yarn allows.',
+    );
+    return { title: 'Making Up', lines };
+  }
 
   // A saddle has no shoulder-to-shoulder seam: each sleeve's strap bridges the shoulder,
   // seaming to the front and back shoulder cast-offs, and its end meets the neck. One
@@ -1930,23 +2020,33 @@ export function renderPattern(
   const style = o.style ?? 'verbose';
   const technique = o.technique ?? 'machine';
   const sleeveless = !!garment.armholeBand && garment.sleeveLeft.length === 0;
-  const body = [
-    renderPiece(garment.back, 'The Back', o),
-    renderPiece(garment.front, 'The Front', o),
-    // Sleeveless swaps the sleeve piece for an armhole band, worked twice.
-    sleeveless
-      ? renderPiece(garment.armholeBand!, 'The Armhole Bands (make 2)', o)
-      : renderPiece(garment.sleeveLeft, 'The Sleeves (make 2)', o),
-  ];
-  const band = renderPiece(garment.neckband, 'Neckband', o);
+  // A boat's front and back are the same straight-topped piece with an integral band, so
+  // it is written once ("make 2 alike") and there is no separate neckband piece.
+  const boat = garment.neck === 'boat';
+  const body = boat
+    ? [
+        renderPiece(garment.back, 'The Back and Front (make 2 alike)', o),
+        renderPiece(garment.sleeveLeft, 'The Sleeves (make 2)', o),
+      ]
+    : [
+        renderPiece(garment.back, 'The Back', o),
+        renderPiece(garment.front, 'The Front', o),
+        // Sleeveless swaps the sleeve piece for an armhole band, worked twice.
+        sleeveless
+          ? renderPiece(garment.armholeBand!, 'The Armhole Bands (make 2)', o)
+          : renderPiece(garment.sleeveLeft, 'The Sleeves (make 2)', o),
+      ];
   const makingUp = makingUpProse(garment.neck, garment.shoulder, style, technique, sleeveless, garment.backNeck);
   // A hand knitter picks the band up off a neckline that only exists once a shoulder is
   // joined, so that join has to precede the band for the pattern to be workable in
   // order. A machine band is a separate strip, so all of its making-up waits to the end.
-  const pieces =
-    technique === 'hand'
-      ? [...body, handBeforeBandProse(style, garment.shoulder), band, makingUp]
-      : [...body, band, makingUp];
+  // A boat has no separate band at all — the band is part of each piece.
+  const band = boat ? null : renderPiece(garment.neckband, 'Neckband', o);
+  const pieces = boat
+    ? [...body, makingUp]
+    : technique === 'hand'
+      ? [...body, handBeforeBandProse(style, garment.shoulder), band!, makingUp]
+      : [...body, band!, makingUp];
   // Built from the finished prose, so it can only ever list what is really there.
   const key = abbreviationsProse(pieces, style);
   return { pieces: key ? [...pieces, key] : pieces };
