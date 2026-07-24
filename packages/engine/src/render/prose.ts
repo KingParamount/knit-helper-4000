@@ -25,7 +25,7 @@
  */
 
 import type { Row, Op, Carriage } from '../row';
-import type { NeckStyle, ShoulderStyle, Technique, Units } from '../data/types';
+import type { NeckStyle, BackNeckStyle, ShoulderStyle, Technique, Units } from '../data/types';
 import type { Gauge } from '../gauge';
 import { HEM_SECTIONS, HEM_END_SECTIONS } from '../pieces/hem';
 
@@ -1484,6 +1484,7 @@ function handMakingUpProse(
   shoulder: ShoulderStyle,
   style: ProseStyle,
   sleeveless = false,
+  backNeck: BackNeckStyle = 'scoop',
 ): PieceProse {
   const verbose = style !== 'abbreviated';
   const lines: string[] = [];
@@ -1538,6 +1539,18 @@ function handMakingUpProse(
       verbose
         ? 'The point of the V was shaped as you worked the band, so there is nothing to seam at the centre front.'
         : 'The V point is shaped in the band; nothing to seam at centre front.',
+    );
+    lines.push('');
+  }
+
+  // A square neck: the band is picked up around the neck, so the corners are shaped in
+  // place as it is worked — a paired decrease at each corner stitch (KW's mitre).
+  const squareCorners = (neck === 'square' ? 2 : 0) + (backNeck === 'square' ? 2 : 0);
+  if (squareCorners > 0) {
+    lines.push(
+      verbose
+        ? `Square neck: as you pick up and work the band, mitre each of the ${squareCorners} corners. Mark the corner stitch at each one; then on every right-side row work to two stitches before it, SSK, knit the corner stitch, K2tog — a paired decrease that pulls the band square around the corner and keeps it flat.`
+        : `Square neck — mitre each of the ${squareCorners} corners as you work the band: on right-side rows, SSK before the corner st, K it, K2tog after.`,
     );
     lines.push('');
   }
@@ -1603,8 +1616,9 @@ export function makingUpProse(
   style: ProseStyle = 'verbose',
   technique: Technique = 'machine',
   sleeveless = false,
+  backNeck: BackNeckStyle = 'scoop',
 ): PieceProse {
-  if (technique === 'hand') return handMakingUpProse(neck, shoulder, style, sleeveless);
+  if (technique === 'hand') return handMakingUpProse(neck, shoulder, style, sleeveless, backNeck);
   const verbose = style !== 'abbreviated';
   const lines: string[] = [];
   const stretchy = verbose ? 'a stretchy join (e.g. mattress stitch)' : 'stretchy join (e.g. mattress stitch)';
@@ -1730,6 +1744,19 @@ export function makingUpProse(
       ? `Sew the neckband on. Starting at the open right shoulder, ease the band’s live edge onto the neckline all the way round and back to the start, matching each marker to its seam. Use ${stretchy} so the neck still stretches over the head.`
       : `Sew the band on from the open right shoulder, round and back to it, markers to seams. ${cap(stretchy)}.`,
   );
+
+  // A square neck turns right-angle corners the straight band cannot follow on its own —
+  // mitre each corner in the seam so it turns squarely and lies flat. (Front square = 2
+  // corners; a square back adds 2 more. See the neckline-shapes notes.)
+  const squareCorners = (neck === 'square' ? 2 : 0) + (backNeck === 'square' ? 2 : 0);
+  if (squareCorners > 0) {
+    lines.push('');
+    lines.push(
+      verbose
+        ? `The neck is square, with ${squareCorners} right-angle ${squareCorners === 2 ? 'corners' : 'corners'}. A straight band will not turn a corner flat, so mitre each one as you seam: at the corner, fold the band back on itself at 45° to form a neat mitre, easing the extra band into the fold, and stitch the fold down on the inside. Keep the corners crisp and symmetrical.`
+        : `Square neck — mitre the band at each of the ${squareCorners} corners: fold a 45° tuck and stitch it down inside so the band turns square.`,
+    );
+  }
 
   // 3 — close the last (right) shoulder, shutting the band’s ends.
   lines.push('');
@@ -1894,6 +1921,7 @@ export function renderPattern(
     armholeBand?: Row[];
     neckband: Row[];
     neck: NeckStyle;
+    backNeck?: BackNeckStyle;
     shoulder: ShoulderStyle;
   },
   styleOrOpts: ProseStyle | PieceOpts = 'verbose',
@@ -1911,7 +1939,7 @@ export function renderPattern(
       : renderPiece(garment.sleeveLeft, 'The Sleeves (make 2)', o),
   ];
   const band = renderPiece(garment.neckband, 'Neckband', o);
-  const makingUp = makingUpProse(garment.neck, garment.shoulder, style, technique, sleeveless);
+  const makingUp = makingUpProse(garment.neck, garment.shoulder, style, technique, sleeveless, garment.backNeck);
   // A hand knitter picks the band up off a neckline that only exists once a shoulder is
   // joined, so that join has to precede the band for the pattern to be workable in
   // order. A machine band is a separate strip, so all of its making-up waits to the end.

@@ -74,10 +74,11 @@ export function neckbandPlan(
   if (shoulder === 'raglan') return raglanNeckbandPlan(size, style, gauge);
 
   const bp = backPlan(size, style, gauge, shoulder, backNeck);
-  const backCentreSts = bp.backNeckCentreSts; // centre cast-off (full width for a flat back)
-  // A flat back is a straight cast-off with no shaped side edge to pick up along; a scoop
-  // curves each side over its depth (bp.backNeckPerSide is 0 exactly when the back is flat).
-  const backSidePickup = bp.backNeckPerSide === 0 ? 0 : Math.round(bp.backNeckRows * pickupPerRow(gauge));
+  const backCentreSts = bp.backNeckCentreSts; // centre cast-off (full width for a flat/square back)
+  // Pick up along the back-neck side edge over its depth — UNLESS the back is flat, whose
+  // straight cast-off has no side edge to speak of. A square back has perSide 0 (a flat base)
+  // yet real vertical sides over its depth, so it must be keyed on the style, not on perSide.
+  const backSidePickup = backNeck === 'flat' ? 0 : Math.round(bp.backNeckRows * pickupPerRow(gauge));
   const fp = frontNeckPlan(size, style, gauge, neck, shoulder);
   // The front centre cast-off comes straight from the piece's own split (0 for a V, whose
   // two long edges are the band's ends; the full front neck for a flat, which has no side

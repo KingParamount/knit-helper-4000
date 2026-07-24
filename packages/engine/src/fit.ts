@@ -107,6 +107,18 @@ export function flatFrontAllowed(size: SizeRecord, backNeck: BackNeckStyle = 'sc
 }
 
 /**
+ * A high round sits shallower than a crew, so its opening can fail to clear the head on
+ * small sizes — gated like a flat neck (block, don't warn). These check the front and back
+ * high-round against the current partner neck.
+ */
+export function highRoundFrontAllowed(size: SizeRecord, backNeck: BackNeckStyle = 'scoop'): boolean {
+  return neckClearsHead(size, 'high_round', backNeck);
+}
+export function highRoundBackAllowed(size: SizeRecord, neck: NeckStyle = 'round'): boolean {
+  return neckClearsHead(size, neck, 'high_round');
+}
+
+/**
  * May this sleeve length be offered with this shoulder?
  *  - A modern CAP is the set-in cap bell shortened to cap the shoulder — it only makes
  *    sense with a set-in shoulder (a drop has no cap to shorten, and its short sleeve is

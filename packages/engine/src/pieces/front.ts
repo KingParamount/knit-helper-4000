@@ -13,7 +13,7 @@ import type { SizeRecord, EaseStyleId, NeckStyle, ShoulderStyle, GarmentOptions 
 import { type Gauge, rowsFor, stitchesFor } from '../gauge';
 import { type Row, carriageForRow } from '../row';
 import { backPlan, panelThroughArmhole, armholeShaping, splitIntoSteps, SHOULDER_STEP_STS } from './back';
-import { vNeckDepthIn, scoopDepthIn, NECK_CURVE_IN } from '../neckopening';
+import { vNeckDepthIn, scoopDepthIn, squareDepthIn, highRoundDepthIn, NECK_CURVE_IN } from '../neckopening';
 import { raglanFrontRows } from './raglan';
 
 /** Rows the crew neck occupies below the shoulder line. */
@@ -46,11 +46,13 @@ export function frontNeckSplit(
   gauge: Gauge,
 ): { centreCastOff: number; perSide: number } {
   if (neck === 'v') return { centreCastOff: 0, perSide: 0 };
-  if (neck === 'flat') return { centreCastOff: frontNeckSts, perSide: 0 };
+  // A square, like a flat, casts its whole neck off straight across the base; its shape
+  // comes from the depth and the vertical sides above, not from a side curve.
+  if (neck === 'flat' || neck === 'square') return { centreCastOff: frontNeckSts, perSide: 0 };
   const perSide =
     neck === 'scoop'
       ? Math.floor((frontNeckSts - Math.round(frontNeckSts * SCOOP_CENTRE_FRACTION)) / 2)
-      : stitchesFor(NECK_CURVE_IN, gauge); // round/crew: a fixed ~1.5" curve
+      : stitchesFor(NECK_CURVE_IN, gauge); // round/crew/high_round: a fixed ~1.5" curve
   return { centreCastOff: frontNeckSts - 2 * perSide, perSide };
 }
 
@@ -92,9 +94,13 @@ export function frontNeckPlan(
       ? rowsFor(vNeckDepthIn(armholeDepthIn, size), gauge)
       : neck === 'scoop'
         ? rowsFor(scoopDepthIn(armholeDepthIn, size), gauge)
-        : neck === 'flat'
-          ? rowsFor(FLAT_FRONT_DROP_IN, gauge)
-          : frontNeckDepthRows(size, gauge);
+        : neck === 'square'
+          ? rowsFor(squareDepthIn(size), gauge)
+          : neck === 'high_round'
+            ? rowsFor(highRoundDepthIn(size), gauge)
+            : neck === 'flat'
+              ? rowsFor(FLAT_FRONT_DROP_IN, gauge)
+              : frontNeckDepthRows(size, gauge);
   const { centreCastOff, perSide } = frontNeckSplit(neck, frontNeckSts, gauge);
   return {
     // Piece-row register: a folded hem's facing makes the piece taller than the garment.
@@ -207,12 +213,15 @@ export function frontRows(
       for (let r = 1; r <= shaperRows; r++) {
         push(decAt.has(r) ? [{ kind: 'decrease', count: 1, side: neckEdge }] : [], 'neck');
       }
-    } else if (neck === 'flat') {
-      // Flat: the whole neck came off at the split; nothing to shape, straight to the shoulder.
+    } else if (neck === 'flat' || neck === 'square') {
+      // Flat/square: the whole neck came off at the split; nothing to shape at the sides,
+      // straight up to the shoulder. A square's depth (set in the plan) makes those straight
+      // sides tall and vertical; a flat sits just off the shoulder line.
       fillToShoulder();
-    } else if (neck === 'scoop') {
-      // Scoop: a small centre came off; the rest is a long side curve spread over the deep
-      // scoop (front-loaded like a crew but gradual), then straight to the shoulder.
+    } else if (neck === 'scoop' || neck === 'high_round') {
+      // Scoop / high round: a centre came off; the rest is a side curve of decreases only
+      // (no cast-off step), spread over the depth, then straight to the shoulder. A high
+      // round is the shallow case — its short depth packs the decreases to about every row.
       const shaperRows = Math.max(perSide, fp.neckDepthRows - 2 * shoulderSteps.length);
       const decAt = new Set(evenlySpread(perSide, shaperRows));
       for (let r = 1; r <= shaperRows; r++) {

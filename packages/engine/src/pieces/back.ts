@@ -183,14 +183,16 @@ export function backPlan(
 
   // Back-neck shaping (single source for backRows and the neckband). A 'flat' back casts
   // the whole neck off straight across — no side curve (perSide 0, centre = full width),
-  // which is Knitware's default crew back. A 'scoop' curves each side: the curve is
+  // which is Knitware's default crew back. A 'square' back does the same flat cast-off but
+  // at a real, deeper depth (backNeckRows), so it grows tall vertical sides above the base.
+  // A 'scoop' (and the shallow 'high_round') curves each side: the curve is
   // capped so its cast-offs + decreases fit in the scoop depth alongside the short-row
   // shoulders, and so the flat centre stays positive.
   const achieved = armholeShaping(bodySts, upperBackSts).achievedSts;
   const backShoulderSts = Math.round((achieved - backNeckSts) / 2);
   const backSteps = splitIntoSteps(backShoulderSts, SHOULDER_STEP_STS);
   const backNeckPerSide =
-    backNeck === 'flat'
+    backNeck === 'flat' || backNeck === 'square'
       ? 0
       : Math.max(
           1,

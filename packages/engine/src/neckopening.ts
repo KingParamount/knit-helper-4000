@@ -80,6 +80,32 @@ export function scoopDepthIn(armholeDepthIn: number, size: SizeRecord): number {
   return Math.max(size.neck_depth, armholeDepthIn * SCOOP_DEPTH_FRACTION);
 }
 
+// --- Square and high-round depths (front and back share these; symmetric) --------
+// Both key off the measured neck depth (not the armhole) so the leaf stays gauge-only
+// and the front and back necks match. Calibrated against the 2026-07-24 harvest.
+
+/**
+ * A square neck's depth. Knitware drops the square deep (~0.67× the armhole, 6.1" on a
+ * Woman 36); we take the shallower modern draft (King, 2026-07-24) — deeper than a crew,
+ * shallower than a scoop — so it reads as a square without plunging. neck_depth × 1.1 gives
+ * ~4.0" (W36), ~4.6" (W50), ~2.6" (Child 24). The square shape comes from the flat base and
+ * vertical sides, not the depth, so a modest drop still reads square.
+ */
+export const SQUARE_DEPTH_FACTOR = 1.1;
+export function squareDepthIn(size: SizeRecord): number {
+  return size.neck_depth * SQUARE_DEPTH_FACTOR;
+}
+
+/**
+ * A high round is a crew that sits higher — the same round shape at roughly half the depth.
+ * neck_depth × 0.6 reproduces the harvest exactly (W36 2.2", W50 2.5"). The shallower drop
+ * shrinks the head opening, so a high round is head-checked and gated like a flat neck.
+ */
+export const HIGH_ROUND_DEPTH_FACTOR = 0.6;
+export function highRoundDepthIn(size: SizeRecord): number {
+  return size.neck_depth * HIGH_ROUND_DEPTH_FACTOR;
+}
+
 /**
  * Depth (inches) a front neck adds to the head opening, by style. A crew is the measured
  * neck depth; a scoop is deeper, so for head-clearance it clears at least as well as a
@@ -88,7 +114,13 @@ export function scoopDepthIn(armholeDepthIn: number, size: SizeRecord): number {
  * A V is open and is never head-checked, so it is treated as a crew here for completeness.
  */
 export function frontOpeningDepthIn(size: SizeRecord, neck: NeckStyle): number {
-  return neck === 'flat' ? 0 : size.neck_depth;
+  // A high round is shallower than a crew, so it reports its own reduced depth and can
+  // genuinely fail the head check (gated like a flat neck). A square is deeper than a crew
+  // and a scoop deeper still, so both are safe at the crew lower bound. 'boat' uses a
+  // different construction and never reaches this path (its wide opening always clears).
+  if (neck === 'flat') return 0;
+  if (neck === 'high_round') return highRoundDepthIn(size);
+  return size.neck_depth;
 }
 
 /** Geometric neck-opening circumference (inches): ellipse of width W, total depth D. */
@@ -110,12 +142,16 @@ const MIN_BACK_NECK_DROP_IN = 1.25;
  * the shoulder-slope minimum the short-rows need (it is not literally zero). A 'scoop'
  * back is solved so the opening admits the head at NECK_OPENING_STRETCH, floored at that
  * same drop and capped at the front depth (a back neck is never deeper than the front).
- * Non-crew sizes just get the floor.
+ * A 'square' back mirrors the square front (a real, deeper drop with vertical sides); a
+ * 'high_round' back mirrors the shallow high-round front. Both are floored at the same
+ * minimum drop. Non-crew sizes just get the floor.
  */
 export function backNeckDepthIn(size: SizeRecord, back: BackNeckStyle = 'scoop'): number {
   const front = size.neck_depth;
   const floor = MIN_BACK_NECK_DROP_IN;
   if (back === 'flat') return floor;
+  if (back === 'square') return Math.max(floor, squareDepthIn(size));
+  if (back === 'high_round') return Math.max(floor, highRoundDepthIn(size));
   if (!crewSuitable(size)) return floor;
   const target = size.head_circ / NECK_OPENING_STRETCH;
   // Opening grows monotonically with back depth; find the shallowest that reaches target.

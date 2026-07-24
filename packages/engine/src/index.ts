@@ -104,6 +104,8 @@ export {
   neckClearsHead,
   flatBackAllowed,
   flatFrontAllowed,
+  highRoundFrontAllowed,
+  highRoundBackAllowed,
   hemReachesHip,
   bodyLengthAllowed,
   hemAllowed,

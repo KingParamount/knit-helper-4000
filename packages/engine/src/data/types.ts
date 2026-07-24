@@ -78,8 +78,15 @@ export type EaseStyleId =
  * is deeper and wider (its centre cast-off is smaller, the side curve longer); 'v' splits
  * low to a point; 'flat' works straight to the shoulder and casts the neck off straight
  * across (Front Neck Depth 0 — Knitware's flat front, the same shape as a flat back).
+ *
+ * 'square', 'high_round' and 'boat' are SCAFFOLDED (2026-07-24) but not yet calibrated:
+ * the type is widened and the UI wired, but their geometry currently falls through to the
+ * crew branch as a placeholder. Real shaping (depths, side curves, boat width) lands once
+ * the neckline harvest is read — search TODO(neckline-harvest). 'square' = a full-width
+ * cast-off base with vertical sides at a real depth; 'high_round' = a shallower crew;
+ * 'boat' = a wide, shallow neck (needs a neck-width/shoulder-graft decision).
  */
-export type NeckStyle = 'round' | 'v' | 'scoop' | 'flat';
+export type NeckStyle = 'round' | 'v' | 'scoop' | 'flat' | 'square' | 'high_round' | 'boat';
 
 /**
  * Back neck style, from the `neckline_back` option vocabulary. 'scoop' is a shallow
@@ -88,8 +95,12 @@ export type NeckStyle = 'round' | 'v' | 'scoop' | 'flat';
  * scoop), which is Knitware's default crew back. A flat back is snugger over the head,
  * so it is only offered where the head still clears (see fit.ts). The front is 'round'
  * or 'v' (NeckStyle); the back never takes a V.
+ *
+ * 'square', 'high_round' and 'boat' are SCAFFOLDED (2026-07-24), matching the front: the
+ * type is widened and the UI wired, but the back shaping falls through to the scoop
+ * solve as a placeholder until the neckline harvest is read — TODO(neckline-harvest).
  */
-export type BackNeckStyle = 'scoop' | 'flat';
+export type BackNeckStyle = 'scoop' | 'flat' | 'square' | 'high_round' | 'boat';
 
 /**
  * Shoulder / sleeve-join style. 'set_in' has a shaped armhole and a fitted cap;
